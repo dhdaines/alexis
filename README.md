@@ -1,5 +1,5 @@
-ALEXIS, outil d'EXtraction d'Informations (Sainte-)adèloises
-------------------------------------------------------------
+ALEXIS, outil d'EXtraction d'Information (Sainte-)adèlois
+---------------------------------------------------------
 
 Alexis est une bibliothèque de code Python qui sert à extraire la
 structure et le contenu des documents officiels de la ville de
