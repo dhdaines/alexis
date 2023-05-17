@@ -23,7 +23,7 @@ def clean_text(text: str) -> str:
     """Enlever en-tête, en-pied, et autres anomalies d'une page."""
     # En-pied
     text = re.sub("\n\\d+$", "\n", text)
-    # En-tête (sort of lossy, should crop the pages)
+    # En-tête (methode imparfaite...)
     text = re.sub("^\s*Règlement.*(Chapitre|Entrée en vigueur).*", "", text)
     return text
 
@@ -39,7 +39,7 @@ def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str]]:
     return numero, objet
 
 
-def extract_dates(pages: List[str]) -> Dict[str, str]:
+def extract_dates(pages: List[str]) -> models.Dates:
     """Extraire les dates d'avis de motion, adoption, et entrée en vigueur
     d'un texte règlement."""
     dates = {}
@@ -57,29 +57,31 @@ def extract_dates(pages: List[str]) -> Dict[str, str]:
         m = re.search(r"entrée en vigueur (.*)$", page, re.MULTILINE | re.IGNORECASE)
         if m:
             dates["entree"] = m.group(1)
-        # Si on est rendu ici, on les a eu pour de vrai, alors enlever
+        # Si on est rendu ici, on les a eues pour de vrai, alors enlever
         # le texte de la page
         if "adoption" in dates and "entree" in dates:
             pages[i] = page[:startpos]
             break
     return models.Dates(**dates)
 
-def extract_chapter(page: str, idx: int) -> Optional[models.Ancrage]:
+def extract_chapter(page: str, idx: int) -> Optional[models.Chapitre]:
     m = re.search(r"CHAPITRE\s+(\d+)\s+([^\.\d]+)(\d+)?$", page)
     if m:
         numero = m.group(1)
         return models.Chapitre(numero=numero, titre=m.group(2), page=idx)
+    return None
 
 
-def extract_annex(page: str, idx: int) -> Optional[models.Ancrage]:
+def extract_annex(page: str, idx: int) -> Optional[models.Annexe]:
     m = re.search(r"ANNEXE\s+(\S+)(?: –)?\s+([^\.\d]+)(\d+)?$", page)
     if m:
         numero = m.group(1)
         return models.Annexe(numero=numero, titre=m.group(2), page=idx)
+    return None
 
 
 def extract_bylaw(pdf: Path) -> models.Reglement:
-    """Extraire la structure d'un document règlementaire."""
+    """Extraire la structure d'un règlement d'urbanisme."""
     # D'abord extraire les elements (textes, tableaux)
     pages = []
     with pdfplumber.open(pdf) as doc:
@@ -89,24 +91,24 @@ def extract_bylaw(pdf: Path) -> models.Reglement:
             pages.append(texte)
     numero, objet = extract_title(pages)
     dates = extract_dates(pages)
-    chapitres: List[models.Chapter] = []
+    chapitres: List[models.Chapitre] = []
     articles: List[models.Article] = []
     annexes: List[models.Annexe] = []
     in_tables = True
     art_num = 0
-    for i, page in enumerate(pages):
-        # Tables end with first chapter
-        chapter = extract_chapter(page, i)
-        if chapter:
+    for i, texte in enumerate(pages):
+        # Premier chapitre termine les tables de contenus
+        chapter = extract_chapter(texte, i)
+        if chapter is not None:
             chapitres.append(chapter)
             in_tables = False
             continue
         if in_tables:
             continue
-        annex = extract_annex(page, i)
-        if annex:
+        annex = extract_annex(texte, i)
+        if annex is not None:
             annexes.append(annex)
-        for line in page.split("\n"):
+        for line in texte.split("\n"):
             m = re.match(r"SECTION\s+(\d+)\s+(.*)", line)
             if m:
                 sec = m.group(1)
@@ -151,6 +153,8 @@ def extract_bylaw(pdf: Path) -> models.Reglement:
                 continue
             if articles:
                 articles[-1].alineas.append(line)
+    if numero is None:
+        numero = "INCONNU"
     return models.Reglement(
         numero=numero, objet=objet, dates=dates, chapitres=chapitres, articles=articles, annexes=annexes
     )

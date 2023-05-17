@@ -25,6 +25,7 @@ class Annexe(Ancrage):
 
 class Article(BaseModel):
     numero: int
+    page: int
     titre: Optional[str]
     alineas: List[str] = []
 
