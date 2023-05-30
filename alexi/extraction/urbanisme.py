@@ -10,7 +10,7 @@ from typing import Optional, Tuple, List, Dict
 import pdfplumber
 import tqdm
 
-from alexis import models
+from alexi import models
 
 
 def make_argparse():
@@ -31,7 +31,9 @@ def clean_text(text: str) -> str:
 def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str]]:
     numero, objet = None, None
     for page in pages:
-        m = re.search(r"(?i:règlement)(?:\s+(?:de|d'|sur))?\s+(.*)\s+(?i:numéro\s+(\S+))", page)
+        m = re.search(
+            r"(?i:règlement)(?:\s+(?:de|d'|sur))?\s+(.*)\s+(?i:numéro\s+(\S+))", page
+        )
         if m:
             objet = m.group(1)
             numero = m.group(2)
@@ -63,6 +65,7 @@ def extract_dates(pages: List[str]) -> models.Dates:
             pages[i] = page[:startpos]
             break
     return models.Dates(**dates)
+
 
 def extract_chapter(page: str, idx: int) -> Optional[models.Chapitre]:
     m = re.search(r"CHAPITRE\s+(\d+)\s+([^\.\d]+)(\d+)?$", page)
@@ -136,7 +139,10 @@ def extract_bylaw(pdf: Path) -> models.Reglement:
                         chapitres[-1].debut = art_num
                     if chapitres[-1].sections and chapitres[-1].sections[-1].debut == 0:
                         chapitres[-1].sections[-1].debut = art_num
-                    if chapitres[-1].sections[-1].sous_sections and chapitres[-1].sections[-1].sous_sections[-1].debut == 0:
+                    if (
+                        chapitres[-1].sections[-1].sous_sections
+                        and chapitres[-1].sections[-1].sous_sections[-1].debut == 0
+                    ):
                         chapitres[-1].sections[-1].sous_sections[-1].debut = art_num
                     chapitres[-1].fin = art_num
                     if chapitres[-1].sections:
@@ -156,7 +162,13 @@ def extract_bylaw(pdf: Path) -> models.Reglement:
     if numero is None:
         numero = "INCONNU"
     return models.Reglement(
-        numero=numero, objet=objet, dates=dates, chapitres=chapitres, articles=articles, annexes=annexes
+        fichier=pdf.name,
+        numero=numero,
+        objet=objet,
+        dates=dates,
+        chapitres=chapitres,
+        articles=articles,
+        annexes=annexes,
     )
 
 

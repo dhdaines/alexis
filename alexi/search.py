@@ -9,7 +9,7 @@ from typing import List
 from whoosh.index import open_dir  # type: ignore
 from whoosh.qparser import OrGroup, MultifieldParser  # type: ignore
 
-from alexis.models import Reglement
+from alexi.models import Reglement
 
 
 def make_argparse():
@@ -32,7 +32,8 @@ def search(indexdir: Path, terms: List[str]):
     with ix.searcher() as searcher:
         results = searcher.search(query)
         for r in results:
-            print(r)
+            print(r.score, r["titre"])
+            print()
         
 
 def main():

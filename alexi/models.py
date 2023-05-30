@@ -35,6 +35,7 @@ class Dates(BaseModel):
     entree: str
     
 class Reglement(BaseModel):
+    fichier: str
     numero: str
     objet: Optional[str]
     dates: Dates

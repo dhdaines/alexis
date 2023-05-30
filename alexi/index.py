@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import List
 
 from whoosh.analysis import CharsetFilter, StemmingAnalyzer  # type: ignore
-from whoosh.fields import NUMERIC, TEXT, Schema  # type: ignore
+from whoosh.fields import ID, NUMERIC, TEXT, Schema  # type: ignore
 from whoosh.index import create_in  # type: ignore
 from whoosh.support.charset import charset_table_to_dict, default_charset  # type: ignore
 
-from alexis.models import Reglement
+from alexi.models import Reglement
 
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
@@ -33,22 +33,36 @@ def make_argparse():
 def index(outdir: Path, jsons: List[Path]):
     outdir.mkdir(exist_ok=True)
     schema = Schema(
-        sequence=NUMERIC(stored=True),
-        page=NUMERIC,
-        titre=TEXT(ANALYZER),
-        contenu=TEXT(ANALYZER),
+        document=ID(stored=True),
+        page=NUMERIC(stored=True),
+        titre=TEXT(ANALYZER, stored=True),
+        contenu=TEXT(ANALYZER, stored=True),
     )
     ix = create_in(outdir, schema)
     writer = ix.writer()
     for path in jsons:
         reg = Reglement.parse_file(path)
-        for idx, article in enumerate(reg.articles):
+        for article in reg.articles:
             writer.add_document(
-                sequence=idx,
+                document=reg.fichier,
                 page=article.page,
-                titre=article.titre,
+                titre=f"Règlement {reg.numero} Article {article.numero}\n{article.titre}",
                 contenu="\n".join(article.alineas),
             )
+        for chapitre in reg.chapitres:
+            for section in chapitre.sections:
+                writer.add_document(
+                    document=reg.fichier,
+                    page=section.page,
+                    titre=f"Règlement {reg.numero} Section {chapitre.numero}.{section.numero}\n{section.titre}",
+                    contenu="\n\n".join(f"{article.numero}. {article.titre}\n" + "\n".join(article.alineas)
+                                        for article in reg.articles[section.debut - 1:section.fin - 1]))
+        for annexe in reg.annexes:
+            writer.add_document(
+                document=reg.fichier,
+                page=annexe.page,
+                titre=f"Règlement {reg.numero} Annexe {annexe.numero}\n{annexe.titre}",
+                contenu="\n".join(annexe.alineas))
     writer.commit()
 
 
