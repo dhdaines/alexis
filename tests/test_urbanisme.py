@@ -21,7 +21,10 @@ PAGES = [
     "\nCHAPITRE 3 DISPOSITIONS RELATIVES AUX ABC\n",
     "\nSECTION 1 DISPOSITIONS GÉNÉRALES\nSOUS-SECTION 1.1 OBTENTION ET ÉMISSION D'UN ABC\n7. Nécessité d’un ABC\nUn ABC est requis pour toute opération.\n",
     "\nSOUS-SECTION 1.2 DEMANDE DE PERMIS DE ABC\nSUR DEF GHI\n8. Documents additionnels requis\n",
-    "\nENTRÉE EN VIGUEUR\nLe présent règlement entre en vigueur conformément à la loi.\nAvis de motion 17 mai 2021\nAdoption 19 juillet 2021\nEntrée en vigueur 23 septembre 2021\nSigné à Sainte-Adèle, ce 14e jour du mois d’octobre de l’an 2021.\n(s) Nadine Brière (s) Audrey Senécal\n__________________________ ___________________________________\nNadine Brière Me Audrey Senécal\nMairesse Greffière et directrice des services juridiques\n**************************************************\nCERTIFICAT D’APPROBATION\nRÈGLEMENT 1314-2021-PC sur les permis et certificats\nEn vertu de l’article 357 de la Loi sur les cités et villes :\n« Règlement 1314-2021-XYZABC sur les XYZ et ABC »\nAdoption 19 juillet 2021\n(s) Nadine Brière (s) Audrey Senécal\n__________________________ ___________________________________\nNadine Brière Me Audrey Senécal\nMairesse Greffière et directrice des services juridiques\n",
+    "\nENTRÉE EN VIGUEUR\nLe présent règlement entre en vigueur conformément à la loi.\nAvis de motion 17 mai 2021\nAdoption 19 juillet 2021\nEntrée en vigueur 23 septembre 2021\nSigné à Sainte-Adèle, ce 14e jour du mois d’octobre de l’an 2021.\n",
+    "ANNEXE A ABC\n",
+    "ANNEXE B XYZ\n",
+    "X\nY\nZ\n",
 ]
 
 
@@ -47,3 +50,9 @@ def test_extract_urbanisme():
     assert len(reg.chapitres[2].sections[0].sous_sections) == 2
     assert reg.chapitres[2].sections[0].sous_sections[0].articles == (6, 7)
     assert reg.chapitres[2].sections[0].sous_sections[1].articles == (7, 8)
+    assert len(reg.annexes) == 2
+    assert reg.annexes[0].titre == "ABC\n"
+    assert reg.annexes[0].numero == "A"
+    assert reg.annexes[1].titre == "XYZ\n"
+    assert reg.annexes[1].numero == "B"
+

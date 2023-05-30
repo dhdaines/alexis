@@ -26,7 +26,7 @@ def clean_text(text: str) -> str:
     # En-pied
     text = re.sub("\n\\d+$", "\n", text)
     # En-tête (methode imparfaite...)
-    text = re.sub(r"^\s*Règlement.*(Chapitre|Entrée en vigueur).*", "", text)
+    text = re.sub(r"^\s*Règlement.*(Annexe|Chapitre|Entrée en vigueur|Table des matières).*", "", text)
     return text
 
 
@@ -248,9 +248,11 @@ class Extracteur:
             if self.extract_chapitre():
                 # Passer à la prochaine page
                 self.pageidx += 1
+                continue
             if self.extract_annexe():
                 # Passer à la prochaine page
                 self.pageidx += 1
+                continue
 
             # Il devrait y en avoir rendu ici
             assert self.chapitres
