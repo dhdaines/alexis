@@ -108,6 +108,7 @@ class Extracteur:
         """Clore la derniere annexe (et chapitre, et section, etc)"""
         if self.annexe:
             self.annexe.pages = (self.annexe.pages[0], self.pageidx)
+        self.annexe = None
         self.close_chapitre()
 
     def close_chapitre(self):
@@ -253,7 +254,6 @@ class Extracteur:
 
             # Il devrait y en avoir rendu ici
             assert self.chapitres
-            assert self.chapitre is not None
 
             texte = self.pages[self.pageidx]
             for line in texte.split("\n"):
