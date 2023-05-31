@@ -45,7 +45,7 @@ def index(outdir: Path, jsons: List[Path]):
         for article in reg.articles:
             writer.add_document(
                 document=reg.fichier,
-                page=article.page,
+                page=article.pages[0],
                 titre=f"Règlement {reg.numero} Article {article.numero}\n{article.titre}",
                 contenu="\n".join(article.alineas),
             )
@@ -53,14 +53,14 @@ def index(outdir: Path, jsons: List[Path]):
             for section in chapitre.sections:
                 writer.add_document(
                     document=reg.fichier,
-                    page=section.page,
+                    page=section.pages[0],
                     titre=f"Règlement {reg.numero} Section {chapitre.numero}.{section.numero}\n{section.titre}",
                     contenu="\n\n".join(f"{article.numero}. {article.titre}\n" + "\n".join(article.alineas)
-                                        for article in reg.articles[section.debut - 1:section.fin - 1]))
+                                        for article in reg.articles[section.articles[0]:section.articles[1]]))
         for annexe in reg.annexes:
             writer.add_document(
                 document=reg.fichier,
-                page=annexe.page,
+                page=annexe.pages[0],
                 titre=f"Règlement {reg.numero} Annexe {annexe.numero}\n{annexe.titre}",
                 contenu="\n".join(annexe.alineas))
     writer.commit()
@@ -70,6 +70,7 @@ def main():
     parser = make_argparse()
     args = parser.parse_args()
     index(args.outdir, args.jsons)
+
 
 if __name__ == "__main__":
     main()
