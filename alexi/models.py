@@ -61,7 +61,7 @@ class Article(Contenu):
     """Article du texte."""
 
     numero: int = Field(
-        description="Numéro de cet article tel qu'il apparaît dans le texte"
+        description="Numéro de cet article tel qu'il apparaît dans le texte, ou -1 pour un article sans numéro"
     )
     sous_section: int = Field(
         -1,

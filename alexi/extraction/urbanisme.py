@@ -93,6 +93,7 @@ class Extracteur:
     section: Optional[models.Section] = None
     sous_section: Optional[models.SousSection] = None
     annexe: Optional[models.Annexe] = None
+    article: Optional[models.Article] = None
     artidx: int = -1
     pageidx: int = -1
 
@@ -136,11 +137,13 @@ class Extracteur:
                 len(self.articles),
             )
         self.sous_section = None
+        self.close_article()
 
     def close_article(self):
         """Clore le dernier article"""
-        if self.articles:
-            self.articles[-1].pages = (self.articles[-1].pages[0], self.pageidx)
+        if self.article:
+            self.article.pages = (self.article.pages[0], self.pageidx)
+        self.article = None
 
     def extract_chapitre(self) -> Optional[models.Chapitre]:
         texte = self.pages[self.pageidx]
@@ -148,8 +151,9 @@ class Extracteur:
         if m is None:
             return None
         numero = m.group(1)
+        titre = re.sub(r"\s+", " ", m.group(2).strip())
         chapitre = models.Chapitre(
-            numero=numero, titre=m.group(2), pages=(self.pageidx, -1),
+            numero=numero, titre=titre, pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         self.close_chapitre()
@@ -163,8 +167,9 @@ class Extracteur:
         if m is None:
             return None
         numero = m.group(1)
+        titre = re.sub(r"\s+", " ", m.group(2).strip())
         annexe = models.Annexe(
-            numero=numero, titre=m.group(2), pages=(self.pageidx, -1),
+            numero=numero, titre=titre, pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         # Mettre à jour les indices de pages de la derniere annexe, chapitre, section, etc
@@ -178,9 +183,10 @@ class Extracteur:
         if m is None:
             return None
         sec = m.group(1)
+        titre = re.sub(r"\s+", " ", m.group(2).strip())
         section = models.Section(
             numero=sec,
-            titre=m.group(2),
+            titre=titre,
             pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
@@ -194,9 +200,10 @@ class Extracteur:
         if m is None:
             return None
         sec = m.group(1)
+        titre = re.sub(r"\s+", " ", m.group(2).strip())
         sous_section = models.SousSection(
             numero=sec,
-            titre=m.group(2),
+            titre=titre,
             pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
@@ -205,27 +212,54 @@ class Extracteur:
         self.sous_section = sous_section
         return sous_section
 
-    def extract_article(self, ligne: str) -> Optional[models.Article]:
-        m = re.match(r"(\d+)\.\s+(.*)", ligne)
-        if m is None:
+    def extract_non_numerotee(self, ligne: str) -> Optional[models.SousSection]:
+        return None
+
+    def continue_section_title(self, ligne: str) -> Optional[models.Ancrage]:
+        """Détecte la continuation d'un titre de section, retourner la section
+        en question."""
+        # Devrait pas y avoir un article déjà commencé
+        if self.article is not None:
             return None
-        num = int(m.group(1))
-        if num <= self.artidx:
-            # C'est plutôt une énumération quelconque, traiter comme un alinéa
+        # Exception pour les descriptions de zones
+        if ligne == "INTENTION":
             return None
-        self.close_article()
-        self.artidx = num
+        # Devrait y avoir une (sous-)section avec pas d'articles
+        if self.section and self.section.articles == len(self.articles):
+            self.section.titre += f" {ligne}"
+            return self.section
+        if self.sous_section and self.sous_section.articles == len(self.articles):
+            self.sous_section.titre += f" {ligne}"
+            return self.sous_section
+        return None
+
+    def new_article(self, num: int, titre: str) -> models.Article:
         article = models.Article(
             chapitre=len(self.chapitres) - 1,
             section=(len(self.chapitre.sections) - 1 if self.chapitre else -1),
             sous_section=(len(self.section.sous_sections) - 1 if self.section else -1),
             numero=num,
-            titre=m.group(2),
+            titre=titre,
             pages=(self.pageidx, -1),
             alineas=[],
         )
+        self.close_article()
         self.articles.append(article)
+        self.article = article
         return article
+
+    def extract_article(self, ligne: str) -> Optional[models.Article]:
+        m = re.match(r"(\d+)\.\s+(.*)", ligne)
+        if m is None:
+            # On le reconnaît pas comme un article, c'est peut-être un
+            # sous-titre, on regardera ça plus tard
+            return None
+        num = int(m.group(1))
+        if num <= self.artidx:
+            # C'est plutôt une énumération quelconque, traiter comme un alinéa
+            return None
+        self.artidx = num
+        return self.new_article(num, m.group(2))
 
     def extract_text(self, pages: Optional[List[str]] = None) -> models.Reglement:
         """Extraire la structure d'un règlement d'urbanisme du texte des pages."""
@@ -258,7 +292,7 @@ class Extracteur:
             assert self.chapitres
 
             texte = self.pages[self.pageidx]
-            for line in texte.split("\n"):
+            for line in texte.strip().split("\n"):
                 # Les annexes se trouvent à la fin du document, elles
                 # vont simplement ramasser tout le contenu...
                 if self.annexe:
@@ -272,9 +306,29 @@ class Extracteur:
                 # Trouver des articles
                 if self.extract_article(line):
                     continue
-                # Ajouter du contenu (à un article, on espère)
-                if self.articles:
-                    self.articles[-1].alineas.append(line)
+                # Rendu ici on a affaire à plusieurs possibilités.
+                # 1. C'est possiblement la continuation d'un titre de
+                # section (voici le problème de traîter une ligne à la
+                # fois)
+                if self.continue_section_title(line):
+                    continue
+                # 2. C'est possiblement une sous-section sans numéro
+                # (souvent dans des descriptions de zones)
+                if self.extract_non_numerotee(line):
+                    continue
+                # 3. C'est ... autre chose, on l'appelle un article
+                # sans numéro.
+                if self.article is None:
+                    self.new_article(-1, line)
+                    continue
+                # 4. C'est un alinéa supplémentaire pour le dernier
+                # article.  (FIXME: pas vraiment un alinéa, une ligne)
+                if self.article:
+                    self.article.alineas.append(line)
+                # NOTE: à l'avenir on va faire de la vraie extraction
+                # d'information mais il faudra faire des annotations
+                # et entraîner un modèle, ainsi qu'avoir un modèle à
+                # suivre, on va y arriver ;-)
             self.pageidx += 1
         # Clore toutes les annexes, sections, chapitres, etc
         self.close_annexe()
