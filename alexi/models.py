@@ -1,4 +1,3 @@
-from datetime import date
 from typing import Optional, List, Tuple
 
 from pydantic import BaseModel, Field
@@ -88,11 +87,17 @@ class Dates(BaseModel):
     entree: Optional[str] = Field(description="Date d'entrée en vigueur d'un règlement")
 
 
-class Reglement(BaseModel):
-    fichier: str = Field(description="Nom du fichier source du règlement")
-    numero: str = Field(description="Numéro du règlement, e.g. 1314-Z-09")
-    objet: Optional[str] = Field(description="Objet du règlement, e.g. 'Lotissement'")
-    dates: Dates
+class Document(BaseModel):
+    """Document municipal générique."""
+    fichier: str = Field(description="Nom du fichier source PDF du document")
+    titre: str = Field(description="Titre du document (tel qu'il apparaît sur le site web)")
     chapitres: List[Chapitre] = []
     articles: List[Article] = []
     annexes: List[Annexe] = []
+    
+
+class Reglement(Document):
+    """Structure et contenu d'un règlement."""
+    numero: str = Field(description="Numéro du règlement, e.g. 1314-Z-09")
+    objet: Optional[str] = Field(description="Objet du règlement, e.g. 'Lotissement'")
+    dates: Dates

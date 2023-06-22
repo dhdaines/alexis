@@ -30,6 +30,7 @@ PAGES = [
 OUTPUT = {
     "fichier": "xyz-abc.pdf",
     "numero": "1314-2021-XYZABC",
+    "titre": "Règlement sur XYZ ABC foo bar Numéro 1314-2021-XYZABC",
     "objet": "XYZ ABC foo bar",
     "dates": {
         "adoption": "19 juillet 2021",

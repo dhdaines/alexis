@@ -39,8 +39,9 @@ def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str]]:
         if m:
             objet = m.group(1)
             numero = m.group(2)
+            titre = re.sub(r"\s+", " ", m.group(0))
             break
-    return numero, objet
+    return numero, objet, titre
 
 
 def extract_dates(pages: List[str]) -> models.Dates:
@@ -88,6 +89,7 @@ class Extracteur:
     fichier: str = "INCONNU"
     numero: str = "INCONNU"
     objet: str = "INCONNU"
+    titre: str = "INCONNU"
     dates: models.Dates
     chapitre: Optional[models.Chapitre] = None
     section: Optional[models.Section] = None
@@ -265,7 +267,7 @@ class Extracteur:
         """Extraire la structure d'un règlement d'urbanisme du texte des pages."""
         if pages is not None:
             self.pages = pages
-        self.numero, self.objet = extract_title(self.pages)
+        self.numero, self.objet, self.titre = extract_title(self.pages)
         self.dates = extract_dates(self.pages)
 
         # Passer les tables de contenus pour trouver le premier chapitre
@@ -335,6 +337,7 @@ class Extracteur:
         self.close_article()
         return models.Reglement(
             fichier=self.fichier,
+            titre=self.titre,
             numero=self.numero,
             objet=self.objet,
             dates=self.dates,

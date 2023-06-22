@@ -3,7 +3,7 @@ ALexi, EXtracteur d'Information adèlois
 
 ALEXI est une bibliothèque de code Python qui extrait la structure et
 le contenu des documents officiels de la ville de Sainte-Adèle afin de
-faciliter leur indexation par un moteur de recherche, SÈRAFIN par
+faciliter leur indexation par un moteur de recherche, SÈRAFIM par
 exemple.
 
 Actuellement, sa mode de fonctionnement est de consommer des fichiers
