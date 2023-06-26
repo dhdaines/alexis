@@ -61,10 +61,6 @@ def extract_dates(pages: List[str]) -> models.Dates:
     return models.Dates(**dates)
 
 
-def extract_chapter(page: str, idx: int) -> Optional[models.Chapitre]:
-    return None
-
-
 def extract_text_from_pdf(pdf: Path) -> List[str]:
     """Extraire les pages d'un PDF."""
     pages = []
