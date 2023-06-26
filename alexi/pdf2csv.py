@@ -25,11 +25,12 @@ def crop_page(p, margin=72):
 
 def write_csv(pdf, path):
     with open(path, "wt") as ofh:
-        fieldnames = ["tag"] + list(pdf.pages[0].extract_words()[0].keys())
+        fieldnames = ["page", "tag"] + list(pdf.pages[0].extract_words()[0].keys())
         writer = csv.DictWriter(ofh, fieldnames=fieldnames)
         writer.writeheader()
-        for p in tqdm(pdf.pages):
+        for idx, p in enumerate(tqdm(pdf.pages)):
             for w in crop_page(p).extract_words():
+                w["page"] = idx
                 writer.writerow(w)
 
 

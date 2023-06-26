@@ -24,7 +24,9 @@ class Converteur:
     numero: str = "INCONNU"
     objet: str = "INCONNU"
     titre: str = "INCONNU"
-    dates: models.Dates = models.Dates(adoption="INCONNU")
+    adoption: str = "INCONNU"
+    avis: str = "INCONNU"
+    entree: str = "INCONNU"
     chapitre: Optional[models.Chapitre] = None
     section: Optional[models.Section] = None
     sous_section: Optional[models.SousSection] = None
@@ -40,12 +42,17 @@ class Converteur:
         self.chapitres: List[models.Chapitre] = []
         self.articles: List[models.Article] = []
         self.annexes: List[models.Annexe] = []
-        self.dates
 
     def process_bloc(self, tag: str, bloc: str):
         """Ajouter un bloc de texte au bon endroit."""
         if tag == "Titre" and self.titre == "INCONNU":
-            self.titre = bloc
+            self.extract_titre(bloc)
+        elif tag == "Avis" and self.avis == "INCONNU":
+            self.extract_avis(bloc)
+        elif tag == "Adoption" and self.adoption == "INCONNU":
+            self.extract_adoption(bloc)
+        elif tag == "Vigueur" and self.entree == "INCONNU":
+            self.extract_entree(bloc)
         elif tag == "Chapitre":
             self.extract_chapitre(bloc)
         elif tag == "Section":
@@ -55,9 +62,13 @@ class Converteur:
         elif tag == "Annexe":
             self.extract_annexe(bloc)
         elif tag == "Article":
-            self.extract_article(bloc)
+            if self.extract_article(bloc) is None:
+                if self.article:
+                    self.article.alineas.append(bloc)
         elif tag in ("Alinea", "Enumeration"):
-            if self.article:
+            if self.annexe:
+                self.annexe.alineas.append(bloc)
+            elif self.article:
                 self.article.alineas.append(bloc)
 
     def close_annexe(self):
@@ -100,8 +111,27 @@ class Converteur:
             self.article.pages = (self.article.pages[0], self.pageidx)
         self.article = None
 
+    def extract_titre(self, texte: str):
+        if m := re.search(r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)", texte, re.IGNORECASE):
+            self.objet = m.group(1)
+            self.numero = m.group(2)
+            self.titre = re.sub(r"\s+", " ", m.group(0))
+        elif m := re.search(r"règlement\s+numéro\s+(\S+)(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)", texte, re.IGNORECASE):
+            self.titre = m.group(0)
+            self.numero = m.group(1)
+            self.objet = m.group(2)
+
+    def extract_avis(self, texte: str):
+        self.avis = texte
+
+    def extract_adoption(self, texte: str):
+        self.adoption = texte
+
+    def extract_entree(self, texte: str):
+        self.entree = texte
+
     def extract_chapitre(self, texte) -> Optional[models.Chapitre]:
-        m = re.match(r"CHAPITRE\s+(\d+)\s+(.*)$", texte)
+        m = re.match(r"chapitre\s+(\d+)\s+(.*)$", texte, re.IGNORECASE)
         if m is None:
             return None
         numero = m.group(1)
@@ -116,11 +146,11 @@ class Converteur:
         return chapitre
 
     def extract_annexe(self, texte) -> Optional[models.Annexe]:
-        m = re.search(r"ANNEXE\s+(\S+)(?: –)?\s+([^\.\d]+)(\d+)?$", texte)
+        m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE)
         if m is None:
             return None
         numero = m.group(1)
-        titre = re.sub(r"\s+", " ", m.group(2).strip())
+        titre = m.group(2)
         annexe = models.Annexe(
             numero=numero, titre=titre, pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
@@ -132,11 +162,11 @@ class Converteur:
         return annexe
 
     def extract_section(self, ligne: str) -> Optional[models.Section]:
-        m = re.match(r"SECTION\s+(\d+)\s+(.*)", ligne)
+        m = re.match(r"section\s+(\d+)\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
         sec = m.group(1)
-        titre = re.sub(r"\s+", " ", m.group(2).strip())
+        titre = m.group(2)
         section = models.Section(
             numero=sec,
             titre=titre,
@@ -149,11 +179,11 @@ class Converteur:
         return section
 
     def extract_sous_section(self, ligne: str) -> Optional[models.SousSection]:
-        m = re.match(r"SOUS-SECTION\s+\d+\.(\d+)\s+(.*)", ligne)
+        m = re.match(r"sous-section\s+\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
         sec = m.group(1)
-        titre = re.sub(r"\s+", " ", m.group(2).strip())
+        titre = m.group(2)
         sous_section = models.SousSection(
             numero=sec,
             titre=titre,
@@ -183,9 +213,8 @@ class Converteur:
     def extract_article(self, ligne: str) -> Optional[models.Article]:
         m = re.match(r"(\d+)\.\s+(.*)", ligne)
         if m is None:
-            # On le reconnaît pas comme un article, c'est peut-être un
-            # sous-titre, on regardera ça plus tard
-            return None
+            m = re.match(r"article (\d+)\.?\s+(.*)", ligne, re.IGNORECASE)
+        assert m is not None, ligne
         num = int(m.group(1))
         if num <= self.artidx:
             # C'est plutôt une énumération quelconque, traiter comme un alinéa
@@ -200,18 +229,22 @@ class Converteur:
         bloc = []
         tag = None
         # Extraire les blocs de texte etiquettes
+        self.pageidx = 0
         for row in self.rows:
             label = row["tag"]
+            page = int(row["page"])
             word = row["text"]
-            if label[0] == 'B':
+            if label[0] in ('B', 'O'):
                 if bloc:
                     self.process_bloc(tag, " ".join(bloc))
                     bloc = []
-                tag = label.partition('-')[2]
-            elif len(bloc) == 0:
-                tag = label.partition('-')[2]
-            bloc.append(word)
-        self.process_bloc(tag, " ".join(bloc))
+                    self.pageidx = page
+                if label != "O":
+                    tag = label.partition('-')[2]
+            if label != "O":
+                bloc.append(word)
+        if bloc:
+            self.process_bloc(tag, " ".join(bloc))
         # Clore toutes les annexes, sections, chapitres, etc
         self.close_annexe()
         self.close_article()
@@ -220,7 +253,9 @@ class Converteur:
             titre=self.titre,
             numero=self.numero,
             objet=self.objet,
-            dates=self.dates,
+            dates=models.Dates(adoption=self.adoption,
+                               avis=self.avis,
+                               entree=self.entree),
             chapitres=self.chapitres,
             articles=self.articles,
             annexes=self.annexes,
