@@ -152,7 +152,7 @@ def train_model(train_df, devel_df, fasttext, blocksize=128):
     xw_devel_blocks = make_blocks(make_words(devel_df, fasttext), "float32", blocksize)
     y_devel_blocks = make_blocks(lookup(make_targets(devel_df)), blocksize=blocksize)
     callback = tf.keras.callbacks.EarlyStopping(
-        start_from_epoch=50,
+        start_from_epoch=25,
         monitor="val_sparse_categorical_accuracy",
         patience=25,
         restore_best_weights=True,
