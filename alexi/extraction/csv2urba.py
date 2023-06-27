@@ -45,13 +45,13 @@ class Converteur:
 
     def process_bloc(self, tag: str, bloc: str):
         """Ajouter un bloc de texte au bon endroit."""
-        if tag == "Titre" and self.titre == "INCONNU":
+        if tag == "Titre":
             self.extract_titre(bloc)
-        elif tag == "Avis" and self.avis == "INCONNU":
+        elif tag == "Avis":
             self.extract_avis(bloc)
-        elif tag == "Adoption" and self.adoption == "INCONNU":
+        elif tag == "Adoption":
             self.extract_adoption(bloc)
-        elif tag == "Vigueur" and self.entree == "INCONNU":
+        elif tag == "Vigueur":
             self.extract_entree(bloc)
         elif tag == "Chapitre":
             self.extract_chapitre(bloc)
@@ -131,7 +131,7 @@ class Converteur:
         self.entree = texte
 
     def extract_chapitre(self, texte) -> Optional[models.Chapitre]:
-        m = re.match(r"chapitre\s+(\d+)\s+(.*)$", texte, re.IGNORECASE)
+        m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE)
         if m is None:
             return None
         numero = m.group(1)
@@ -162,7 +162,7 @@ class Converteur:
         return annexe
 
     def extract_section(self, ligne: str) -> Optional[models.Section]:
-        m = re.match(r"section\s+(\d+)\s+(.*)", ligne, re.IGNORECASE)
+        m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
         sec = m.group(1)
@@ -179,7 +179,7 @@ class Converteur:
         return section
 
     def extract_sous_section(self, ligne: str) -> Optional[models.SousSection]:
-        m = re.match(r"sous-section\s+\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE)
+        m = re.match(r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
         sec = m.group(1)
@@ -211,13 +211,12 @@ class Converteur:
         return article
 
     def extract_article(self, ligne: str) -> Optional[models.Article]:
-        m = re.match(r"(\d+)\.\s+(.*)", ligne)
+        m = re.match(r"(?:article\s+)?(\d+)\.?\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
-            m = re.match(r"article (\d+)\.?\s+(.*)", ligne, re.IGNORECASE)
-        assert m is not None, ligne
+            return None
         num = int(m.group(1))
         if num <= self.artidx:
-            # C'est plutôt une énumération quelconque, traiter comme un alinéa
+            # C'est une énumération mal étiquetée
             return None
         self.artidx = num
         return self.new_article(num, m.group(2))
@@ -227,20 +226,21 @@ class Converteur:
         if rows is not None:
             self.rows = rows
         bloc = []
-        tag = None
+        tag = newtag = None
         # Extraire les blocs de texte etiquettes
         self.pageidx = 0
         for row in self.rows:
             label = row["tag"]
             page = int(row["page"])
             word = row["text"]
-            if label[0] in ('B', 'O'):
+            if label != "O":
+                newtag = label.partition('-')[2]
+            if label[0] in ('B', 'O') or newtag != tag:
                 if bloc:
                     self.process_bloc(tag, " ".join(bloc))
                     bloc = []
                     self.pageidx = page
-                if label != "O":
-                    tag = label.partition('-')[2]
+                tag = newtag
             if label != "O":
                 bloc.append(word)
         if bloc:
