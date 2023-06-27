@@ -5,6 +5,7 @@ import pickle
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -17,11 +18,13 @@ MODELPATH = Path(__file__).with_suffix("")
 INDEXLIKE = re.compile(r"^(\d+|[a-z])[\)\.]|-$")
 
 
-def load_model():
-    model = keras.models.load_model(MODELPATH)
-    with open(MODELPATH.with_suffix(".scaler.pkl"), "rb") as infh:
+def load_model(path: Optional[Path] = None):
+    if path is None:
+        path = MODELPATH
+    model = keras.models.load_model(path)
+    with open(path.with_suffix(".scaler.pkl"), "rb") as infh:
         scaler = pickle.load(infh)
-    with open(MODELPATH.with_suffix(".vocab.json"), "rt") as infh:
+    with open(path.with_suffix(".vocab.json"), "rt") as infh:
         vocab = json.load(infh)
     wordvecs = fasttext.load_model(str(MODELPATH.with_suffix(".fasttext")))
     return model, scaler, vocab, wordvecs
@@ -85,8 +88,19 @@ def make_features(df, scaler):
     return feats
 
 
+def simplify_targets(tag):
+    """Enlever certains tags difficiles a predire"""
+    if tag[0] == 'I':
+        tag = tag.partition('-')[0]
+    elif tag == 'B-Amendement':
+        tag = 'B-Alinea'
+    elif tag == 'B-SousSection':
+        tag = 'B-Section'
+    return tag
+
+
 def make_targets(df):
-    return df["tag"]
+    return df["tag"].apply(simplify_targets)
 
 
 def make_words(df, ft):
@@ -152,6 +166,7 @@ def train_model(train_df, devel_df, fasttext, blocksize=128):
         validation_data=((xf_devel_blocks, xw_devel_blocks), y_devel_blocks),
         callbacks=(callback,),
     )
+    model.evaluate((xf_devel_blocks, xw_devel_blocks), y_devel_blocks)
     return model, scaler, lookup.get_vocabulary()
 
 
@@ -196,18 +211,24 @@ def cmd_train(args):
         else:
             df = pd.concat([df, load_csv(path)])
     wordvecs = fasttext.load_model(str(MODELPATH.with_suffix(".fasttext")))
-    train_model(df, devel_df, wordvecs)
+    model, scaler, vocab = train_model(df, devel_df, wordvecs)
+    if args.output:
+        model.save(args.output)
+        with open(args.output.with_suffix(".scaler.pkl"), "wb") as outfh:
+            pickle.dump(scaler, outfh)
+        with open(args.output.with_suffix(".vocab.json"), "wt") as outfh:
+            json.dump(vocab, outfh)
 
 
 def cmd_tag(args):
-    model, scaler, vocab, fasttext = load_model()
+    model, scaler, vocab, fasttext = load_model(args.model)
     df = load_csv(args.csv)
     df = df.assign(tag=tag(df, model, scaler, vocab, fasttext))
     df.to_csv(sys.stdout, index=False)
 
 
 def cmd_chunk(args):
-    model, scaler, vocab, fasttext = load_model()
+    model, scaler, vocab, fasttext = load_model(args.model)
     df = load_csv(args.csv)
     for tag, bloc in chunk(df, model, scaler, vocab, fasttext):
         print(f"{tag}:\n{bloc}\n")
@@ -217,13 +238,16 @@ def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(required=True)
     train_parser = subparsers.add_parser("train", help="entraîner le modèle à partir de fichiers CSV")
-    train_parser.add_argument("csv", help="Fichiers CSV d'entree", nargs="+", type=Path)
+    train_parser.add_argument("csv", help="Fichiers CSV d'entree (le dernier servira à la validation)", nargs="+", type=Path)
+    train_parser.add_argument("-o", "--output", help="Nom de base pour fichiers de sortie", type=Path)
     train_parser.set_defaults(func=cmd_train)
     tag_parser = subparsers.add_parser("tag", help="générer des étiquettes (tags) pour chaque mot d'un CSV")
     tag_parser.add_argument("csv", help="Fichier CSV d'entree", type=Path)
+    tag_parser.add_argument("-m", "--model", help="Nom de base pour modèle", type=Path)
     tag_parser.set_defaults(func=cmd_tag)
     chunk_parser = subparsers.add_parser("chunk", help="analyzer un CSV en blocs de texte étiquettés")
     chunk_parser.add_argument("csv", help="Fichier CSV d'entree", type=Path)
+    chunk_parser.add_argument("-m", "--model", help="Nom de base pour modèle", type=Path)
     chunk_parser.set_defaults(func=cmd_chunk)
     return parser
 
