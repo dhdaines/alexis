@@ -42,7 +42,7 @@ def load_csv(path):
 
 def make_scaler(df):
     scaler = StandardScaler()
-    scaler.fit(df.loc[:, ["x0", "top", "width", "height"]])
+    scaler.fit(df.loc[:, ["x0", "width", "height"]])
     return scaler
 
 
@@ -53,14 +53,10 @@ def make_features(df, scaler):
     idelta = []
     isnum = []
     iseq = []
-    chapitre = []
-    section = []
     prevnum = 0
     for t in df.loc[:, "text"]:
-        t = str(t)  # fuck you, pandas
+        t = str(t)
         isnum.append(t.isnumeric())
-        chapitre.append("chap" in t.lower())
-        section.append("sect" in t.lower())
         if m := INDEXLIKE.match(t):
             index.append(True)
             if m.group(1) and m.group(1).isnumeric():
@@ -76,18 +72,15 @@ def make_features(df, scaler):
             idelta.append(0)
             iseq.append(False)
     feats = feats.assign(xdd=np.sign(df.loc[:, "xdd"]), ydd=np.sign(df.loc[:, "ydd"]))
-    scaled = scaler.transform(df.loc[:, ["x0", "top", "width", "height"]])
+    scaled = scaler.transform(df.loc[:, ["x0", "width", "height"]])
     feats = feats.assign(
-        x0=scaled[:, 0], top=scaled[:, 1],
-        width=scaled[:, 2], height=scaled[:, 3]
+        x0=scaled[:, 0], width=scaled[:, 1], height=scaled[:, 2]
     )
     feats = feats.assign(
         index=index,
         idelta=idelta,
         isnum=isnum,
         iseq=iseq,
-        chapitre=chapitre,
-        section=section,
     )
     return feats
 
