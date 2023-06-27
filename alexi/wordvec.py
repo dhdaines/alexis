@@ -31,5 +31,5 @@ with tempfile.NamedTemporaryFile("wt") as tempfh:
                 prevy = float(row["doctop"])
             tempfh.write(" ".join(line))
             tempfh.write("\n")
-    model = fasttext.train_unsupervised(tempfh.name, dim=16, maxn=5, epoch=25)
-    model.save_model("words.fasttext")
+    model = fasttext.train_unsupervised(tempfh.name, dim=50, epoch=25)
+    model.save_model("alexi/extraction/rnn99.fasttext")
