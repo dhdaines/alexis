@@ -1,1 +1,1 @@
-["[UNK]", "I-Enumeration", "I-Alinea", "I-TOC", "I-Article", "O", "I-Tableau", "B-Enumeration", "B-Alinea", "B-Article", "I-SousSection", "I-Section", "I-Chapitre", "I-Titre", "I-Avis", "B-SousSection", "I-Adoption", "I-Vigueur", "B-Section", "I-Amendement", "I-Figure", "B-Chapitre", "I-Annexe", "B-Amendement", "B-Avis", "B-Vigueur", "B-Titre", "B-Tableau", "B-Adoption", "B-TOC", "B-Figure", "B-Annexe"]
+["[UNK]", "I", "O", "B-Enumeration", "B-Alinea", "B-Article", "B-Section", "B-Chapitre", "B-Avis", "B-Vigueur", "B-Titre", "B-Adoption", "B-TOC", "B-Figure"]

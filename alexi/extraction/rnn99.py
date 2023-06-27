@@ -90,12 +90,16 @@ def make_features(df, scaler):
 
 def simplify_targets(tag):
     """Enlever certains tags difficiles a predire"""
-    if tag[0] == 'I':
-        tag = tag.partition('-')[0]
+    if 'Tableau' in tag:
+        return 'O'  # They just do not work, have to do them elsewhere
+    elif tag[0] == 'I':
+        return tag.partition('-')[0]
     elif tag == 'B-Amendement':
-        tag = 'B-Alinea'
+        return 'B-Alinea'
     elif tag == 'B-SousSection':
-        tag = 'B-Section'
+        return'B-Section'
+    elif tag == 'B-Annexe':
+        return'B-Chapitre'
     return tag
 
 
