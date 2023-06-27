@@ -38,7 +38,11 @@ def write_csv(pdf, path, margin):
         writer = csv.DictWriter(ofh, fieldnames=fieldnames)
         writer.writeheader()
         for idx, p in enumerate(tqdm(pdf.pages)):
-            for w in crop_page(p, margin).extract_words():
+            if margin:
+                page = crop_page(p, margin)
+            else:
+                page = p
+            for w in page.extract_words():
                 w["page"] = idx
                 writer.writerow(w)
 
