@@ -1,4 +1,5 @@
 import argparse
+import fasttext
 import json
 import pickle
 import re
@@ -7,10 +8,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from sklearn.preprocessing import StandardScaler
-from tensorflow import keras
-from tensorflow.keras import layers
+import tensorflow as tf  # type: ignore
+from sklearn.preprocessing import StandardScaler  # type: ignore
+from tensorflow import keras  # type: ignore
+from tensorflow.keras import layers  # type: ignore
 
 MODELPATH = Path(__file__).with_suffix("")
 INDEXLIKE = re.compile(r"^(\d+|[a-z])[\)\.]|-$")
@@ -22,7 +23,8 @@ def load_model():
         scaler = pickle.load(infh)
     with open(MODELPATH.with_suffix(".vocab.json"), "rt") as infh:
         vocab = json.load(infh)
-    return model, scaler, vocab
+    wordvecs = fasttext.load_model(str(MODELPATH.with_suffix(".fasttext")))
+    return model, scaler, vocab, wordvecs
 
 
 def load_csv(path):
@@ -94,6 +96,9 @@ def make_targets(df):
     return df["tag"]
 
 
+def make_words(df, ft):
+    return np.array([ft.get_word_vector(str(w)) for w in df["text"]])
+
 def make_blocks(seq, dtype="int32", blocksize=128):
     blocks = [
         seq[start : start + blocksize] for start in range(0, seq.shape[0], blocksize)
@@ -101,12 +106,12 @@ def make_blocks(seq, dtype="int32", blocksize=128):
     return keras.utils.pad_sequences(blocks, padding="post", dtype=dtype)
 
 
-def make_model(nfeats, vocab, blocksize=128):
+def make_model(nfeats: int, ntags: int, blocksize=128):
     input_features = layers.Input(name="features", shape=(blocksize, nfeats))
     lstm = layers.Bidirectional(layers.LSTM(128, return_sequences=True))(input_features)
     dense = layers.Dense(32, activation="relu")(lstm)
     outputs = layers.Dense(
-        len(vocab), activation="softmax", name="predictions"
+        ntags, activation="softmax", name="predictions"
     )(dense)
     model = keras.Model(inputs=input_features, outputs=outputs)
     model.compile(
@@ -116,9 +121,10 @@ def make_model(nfeats, vocab, blocksize=128):
         # List of metrics to monitor
         metrics=[keras.metrics.SparseCategoricalAccuracy()],
     )
+    return model
 
 
-def train_model(model, train_df, devel_df, blocksize=128):
+def train_model(train_df, devel_df, blocksize=128):
     scaler = make_scaler(train_df)
     features = make_features(train_df, scaler)
     targets = make_targets(train_df)
@@ -128,7 +134,7 @@ def train_model(model, train_df, devel_df, blocksize=128):
     xf_train_blocks = make_blocks(features, "float32", blocksize)
     y_train_blocks = make_blocks(lookup(targets), blocksize=blocksize)
 
-    xf_devel_blocks = make_blocks(make_features(devel_df), "float32", blocksize)
+    xf_devel_blocks = make_blocks(make_features(devel_df, scaler), "float32", blocksize)
     y_devel_blocks = make_blocks(lookup(make_targets(devel_df)), blocksize=blocksize)
     callback = tf.keras.callbacks.EarlyStopping(
         start_from_epoch=50,
@@ -136,7 +142,7 @@ def train_model(model, train_df, devel_df, blocksize=128):
         patience=25,
         restore_best_weights=True,
     )
-    model = make_model(features.shape[1], lookup.vocabulary_size)
+    model = make_model(features.shape[1], lookup.vocabulary_size())
     model.fit(
         xf_train_blocks,
         y_train_blocks,
@@ -150,10 +156,11 @@ def train_model(model, train_df, devel_df, blocksize=128):
 
 def chunk(df, model, scaler, vocab):
     xf_blocks = make_blocks(make_features(df, scaler), "float32")
+    xw_blocks = make_blocks(make_words(df, fasttext), "float32")
     predictions = [
-        vocab[i] for i in np.concatenate(model.predict(xf_blocks, verbose=0).argmax(axis=2))
+        vocab[i] for i in np.concatenate(model.predict((xf_blocks, xw_blocks), verbose=0).argmax(axis=2))
     ]
-    words = df.iloc[:, 1]
+    words = df.loc[:, "text"]
     sentences = []
     chunk = []
     tag = None
@@ -166,32 +173,53 @@ def chunk(df, model, scaler, vocab):
         elif len(chunk) == 0:
             tag = label.partition("-")[2]
         chunk.append(word)
-    sentences.append((tag, " ".join(chunk)))
+    sentences.append((tag, " ".join(str(x) for x in chunk)))
     return sentences
 
 
-def tag(df, model, scaler, vocab):
+def tag(df, model, scaler, vocab, fasttext):
     xf_blocks = make_blocks(make_features(df, scaler), "float32")
+    xw_blocks = make_blocks(make_words(df, fasttext), "float32")
     predictions = [
-        vocab[i] for i in np.concatenate(model.predict(xf_blocks, verbose=0).argmax(axis=2))
+        vocab[i] for i in np.concatenate(model.predict((xf_blocks, xw_blocks), verbose=0).argmax(axis=2))
     ]
     return predictions[: df.shape[0]]
 
 
-def main(args):
-    model, scaler, vocab = load_model()
-    df = load_csv(args.csv)
-    df = df.assign(tag=tag(df, model, scaler, vocab))
-    df.to_csv(sys.stdout, index=False)
+def cmd_train(args):
+    df = load_csv(args.csv[0])
+    for path in args.csv[1:]:
+        df = pd.concat([df, load_csv(path)])
+    devel_df = df.iloc[-1000:]
+    df = df.iloc[:-1000]
+    print(df.shape)
+    print(devel_df.shape)
+    train_model(df, devel_df)
+
+
+def cmd_tag(args):
+    model, scaler, vocab, fasttext = load_model()
+    for path in args.csv:
+        df = load_csv(path)
+        df = df.assign(tag=tag(df, model, scaler, vocab, fasttext))
+        df.to_csv(sys.stdout, index=False)
+
+
+def cmd_chunk(args):
+    model, scaler, vocab, fasttext = load_model()
+    for path in args.csv:
+        df = load_csv(path)
+        for tag, bloc in chunk(df, model, scaler, vocab, fasttext):
+            print(f"{tag}:\n{bloc}\n")
 
 
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("csv", help="Fichier CSV d'entree", type=Path)
+    parser.add_argument("csv", help="Fichiers CSV d'entree", nargs="+", type=Path)
     return parser
 
 
 if __name__ == "__main__":
     parser = make_argparse()
     args = parser.parse_args()
-    main(args)
+    cmd_tag(args)
