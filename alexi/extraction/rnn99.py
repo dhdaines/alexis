@@ -15,7 +15,7 @@ from tensorflow import keras  # type: ignore
 from tensorflow.keras import layers  # type: ignore
 
 MODELPATH = Path(__file__).with_suffix("")
-INDEXLIKE = re.compile(r"^(\d+|[a-z])[\)\.]|-$")
+INDEXLIKE = re.compile(r"^(\d+|[a-z])[\)\.]|[•-]$")
 
 
 def load_model(path: Optional[Path] = None):
@@ -92,6 +92,8 @@ def simplify_targets(tag):
     """Enlever certains tags difficiles a predire"""
     if 'Tableau' in tag:
         return 'O'  # They just do not work, have to do them elsewhere
+    if 'TOC' in tag:
+        return 'O'  # Begone
     elif tag[0] == 'I':
         return tag.partition('-')[0]
     elif tag == 'B-Amendement':
@@ -190,9 +192,8 @@ def chunk(df, model, scaler, vocab, fasttext):
                 sentences.append((tag, " ".join(str(x) for x in chunk)))
                 chunk = []
             tag = label.partition("-")[2]
-        elif len(chunk) == 0:
-            tag = label.partition("-")[2]
-        chunk.append(word)
+        if label != "O":
+            chunk.append(word)
     sentences.append((tag, " ".join(str(x) for x in chunk)))
     return sentences
 
