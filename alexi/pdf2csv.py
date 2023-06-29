@@ -21,10 +21,12 @@ def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("infile", help="Fichier PDF à traiter", type=Path)
     parser.add_argument("outfile", help="Fichier CSV à créer", type=Path)
-    parser.add_argument("-m", "--detect-margins",
-                        help="Detecter les marges", action="store_true")
-    parser.add_argument("-v", "--verbose",
-                        help="Émettre des messages", action="store_true")
+    parser.add_argument(
+        "-m", "--detect-margins", help="Detecter les marges", action="store_true"
+    )
+    parser.add_argument(
+        "-v", "--verbose", help="Émettre des messages", action="store_true"
+    )
     return parser
 
 
@@ -42,10 +44,12 @@ def remove_margins(page, words) -> tuple[int, Optional[int]]:
     lesize = lebottom - letop
     le = [word["text"] for word in words if word["top"] == letop]
     if len(le) == 1 and le[0].isnumeric() and len(le[0]) < 4:
-        LOGGER.info("numéro de page en pied trouvé à %f pt", letop)
+        LOGGER.info(
+            "page %d: numéro de page en pied trouvé à %f pt", page.page_number, letop
+        )
         margin_bottom = letop
     elif lesize < 9 and (page.height - lebottom) < 100:
-        LOGGER.info("pied de page trouvé à %f pt", letop)
+        LOGGER.info("page %d: pied de page trouvé à %f pt", page.page_number, letop)
         margin_bottom = letop
         # Il existe parfois deux lignes de pied de page
         for w in words[::-1]:
@@ -53,18 +57,26 @@ def remove_margins(page, words) -> tuple[int, Optional[int]]:
                 continue
             wsize = w["bottom"] - w["top"]
             if wsize < 9 and letop - w["bottom"] < 9:
-                LOGGER.info("deuxième ligne de pied de page trouvé à %f pt", w["top"])
+                LOGGER.info(
+                    "page %d: deuxième ligne de pied de page trouvé à %f pt",
+                    page.page_number,
+                    w["top"],
+                )
                 margin_bottom = w["top"]
                 break
     if len(l1) == 1 and l1[0].isnumeric() and len(l1[0]) < 4:
-        LOGGER.info("numéro de page en tête trouvé à %f", l1bottom)
+        LOGGER.info(
+            "page %d: numéro de page en tête trouvé à %f", page.page_number, l1bottom
+        )
         margin_top = l1bottom
     elif l1size < 9 and l1top < 100:
-        LOGGER.info("en-tête trouvé a %f pt" % l1bottom)
+        LOGGER.info("page %d: en-tête trouvé a %f pt", page.page_number, l1bottom)
         margin_top = l1bottom
-    return [word for word in words if
-            word["top"] >= margin_top
-            and word["bottom"] <= margin_bottom]
+    return [
+        word
+        for word in words
+        if word["top"] >= margin_top and word["bottom"] <= margin_bottom
+    ]
 
 
 def write_csv(pdf, path, margins=False):
@@ -85,7 +97,7 @@ def write_csv(pdf, path, margins=False):
             if margins:
                 words = remove_margins(p, words)
             for w in words:
-                w["page"] = idx
+                w["page"] = p.page_number
                 w["page_height"] = p.height
                 w["page_width"] = p.width
                 writer.writerow(w)
