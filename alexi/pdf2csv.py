@@ -8,6 +8,7 @@ import argparse
 import pdfplumber
 import logging
 import csv
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,7 @@ from tqdm import tqdm
 
 
 LOGGER = logging.getLogger("pdf2csv")
+RGB = re.compile(r"\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)\)")
 
 
 def make_argparse():
@@ -81,22 +83,31 @@ def remove_margins(page, words) -> tuple[int, Optional[int]]:
 
 def write_csv(pdf, path, margins=False):
     fields = []
-    for page in pdf.pages:
-        words = page.extract_words()
+    for p in pdf.pages:
+        words = p.extract_words()
         if words:
             fields = list(words[0].keys())
             break
     if not fields:
         return
     with open(path, "wt") as ofh:
-        fieldnames = ["tag", "page", "page_width", "page_height"] + fields
+        fieldnames = ["tag", "page", "page_width", "page_height", "r", "g", "b"] + fields
         writer = csv.DictWriter(ofh, fieldnames=fieldnames)
         writer.writeheader()
         for idx, p in enumerate(tqdm(pdf.pages)):
             words = p.extract_words()
             if margins:
                 words = remove_margins(p, words)
+            # Index characters for lookup
+            chars = dict(((c["x0"], c["top"]), c) for c in p.chars)
+            LOGGER.info("traitement de la page %d", p.page_number)
             for w in words:
+                # Extract colour from first character (FIXME: assumes RGB space)
+                if c := chars.get((w["x0"], w["top"])):
+                    if rgb := RGB.match(str(c["stroking_color"])):
+                        w["r"], w["g"], w["b"] = rgb.groups()
+                    else:
+                        w["r"] = w["g"] = w["b"] = c["stroking_color"]
                 w["page"] = p.page_number
                 w["page_height"] = p.height
                 w["page_width"] = p.width
