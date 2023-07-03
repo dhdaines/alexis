@@ -21,15 +21,6 @@ def make_argparse():
     return parser
 
 
-def clean_text(text: str) -> str:
-    """Enlever en-tête, en-pied, et autres anomalies d'une page."""
-    # En-pied
-    text = re.sub("\n\\d+$", "\n", text)
-    # En-tête (methode imparfaite...)
-    text = re.sub(r"^\s*Règlement.*(Annexe|Chapitre|Entrée en vigueur|Table des matières).*", "", text)
-    return text
-
-
 def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str]]:
     numero, objet = None, None
     for page in pages:
@@ -70,17 +61,14 @@ def extract_dates(pages: List[str]) -> models.Dates:
     return models.Dates(**dates)
 
 
-def extract_chapter(page: str, idx: int) -> Optional[models.Chapitre]:
-    return None
-
-
 def extract_text_from_pdf(pdf: Path) -> List[str]:
     """Extraire les pages d'un PDF."""
     pages = []
     with pdfplumber.open(pdf) as doc:
         for page in tqdm.tqdm(doc.pages):
+            # Enlever en-tete et en-pied
+            page = page.crop(0, 72, page.width, page.height - 72)
             texte = page.extract_text()
-            texte = clean_text(texte)
             pages.append(texte)
     return pages
 
