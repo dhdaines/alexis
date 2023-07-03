@@ -1,3 +1,4 @@
+import argparse
 import re
 from pathlib import Path
 
@@ -104,3 +105,58 @@ class PageDataset(Dataset):
 
     def __getitem__(self, idx: int):
         return self.pages[idx]
+
+def cmd_train(args):
+    devel_df = load_csv(args.csv[-1])
+    df = None
+    for path in args.csv[:-1]:
+        if df is None:
+            df = load_csv(path)
+        else:
+            df = pd.concat([df, load_csv(path)])
+    wordvecs = fasttext.load_model(str(MODELPATH.with_suffix(".fasttext")))
+    model, scaler, vocab = train_model(df, devel_df, wordvecs)
+    if args.output:
+        model.save(args.output)
+        with open(args.output.with_suffix(".scaler.pkl"), "wb") as outfh:
+            pickle.dump(scaler, outfh)
+        with open(args.output.with_suffix(".vocab.json"), "wt") as outfh:
+            json.dump(vocab, outfh)
+
+
+def cmd_tag(args):
+    model, scaler, vocab, fasttext = load_model(args.model)
+    df = load_csv(args.csv)
+    df = df.assign(tag=tag(df, model, scaler, vocab, fasttext))
+    df.to_csv(sys.stdout, index=False)
+
+
+def cmd_chunk(args):
+    model, scaler, vocab, fasttext = load_model(args.model)
+    df = load_csv(args.csv)
+    for tag, bloc in chunk(df, model, scaler, vocab, fasttext):
+        print(f"{tag}:\n{bloc}\n")
+
+
+def make_argparse():
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(required=True)
+    train_parser = subparsers.add_parser("train", help="entraîner le modèle à partir de fichiers CSV")
+    train_parser.add_argument("csv", help="Fichiers CSV d'entree (le dernier servira à la validation)", nargs="+", type=Path)
+    train_parser.add_argument("-o", "--output", help="Nom de base pour fichiers de sortie", type=Path)
+    train_parser.set_defaults(func=cmd_train)
+    tag_parser = subparsers.add_parser("tag", help="générer des étiquettes (tags) pour chaque mot d'un CSV")
+    tag_parser.add_argument("csv", help="Fichier CSV d'entree", type=Path)
+    tag_parser.add_argument("-m", "--model", help="Nom de base pour modèle", type=Path)
+    tag_parser.set_defaults(func=cmd_tag)
+    chunk_parser = subparsers.add_parser("chunk", help="analyzer un CSV en blocs de texte étiquettés")
+    chunk_parser.add_argument("csv", help="Fichier CSV d'entree", type=Path)
+    chunk_parser.add_argument("-m", "--model", help="Nom de base pour modèle", type=Path)
+    chunk_parser.set_defaults(func=cmd_chunk)
+    return parser
+
+
+if __name__ == "__main__":
+    parser = make_argparse()
+    args = parser.parse_args()
+    args.func(args)
