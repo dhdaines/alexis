@@ -9,7 +9,7 @@ from typing import List
 from whoosh.index import open_dir  # type: ignore
 from whoosh.qparser import OrGroup, MultifieldParser  # type: ignore
 
-from alexi.models import Reglement
+from alexi.types import Reglement
 
 
 def make_argparse():

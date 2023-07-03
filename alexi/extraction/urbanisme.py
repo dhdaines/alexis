@@ -6,17 +6,27 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 import pdfplumber
 import tqdm
-
-from alexi import models
+from alexi.types import (
+    Ancrage,
+    Annexe,
+    Article,
+    Chapitre,
+    Dates,
+    Reglement,
+    Section,
+    SousSection,
+)
 
 
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--text", help="Extraire le texte seulement", action="store_true")
+    parser.add_argument(
+        "--text", help="Extraire le texte seulement", action="store_true"
+    )
     parser.add_argument("pdf", help="Fichier PDF", type=Path)
     return parser
 
@@ -35,7 +45,7 @@ def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str]]:
     return numero, objet, titre
 
 
-def extract_dates(pages: List[str]) -> models.Dates:
+def extract_dates(pages: List[str]) -> Dates:
     """Extraire les dates d'avis de motion, adoption, et entrée en vigueur
     d'un texte règlement."""
     dates = {}
@@ -58,7 +68,7 @@ def extract_dates(pages: List[str]) -> models.Dates:
         if "adoption" in dates and "entree" in dates:
             pages[i] = page[:startpos]
             break
-    return models.Dates(**dates)
+    return Dates(**dates)
 
 
 def extract_text_from_pdf(pdf: Path) -> List[str]:
@@ -78,12 +88,12 @@ class Extracteur:
     numero: str = "INCONNU"
     objet: str = "INCONNU"
     titre: str = "INCONNU"
-    dates: models.Dates
-    chapitre: Optional[models.Chapitre] = None
-    section: Optional[models.Section] = None
-    sous_section: Optional[models.SousSection] = None
-    annexe: Optional[models.Annexe] = None
-    article: Optional[models.Article] = None
+    dates: Dates
+    chapitre: Optional[Chapitre] = None
+    section: Optional[Section] = None
+    sous_section: Optional[SousSection] = None
+    annexe: Optional[Annexe] = None
+    article: Optional[Article] = None
     artidx: int = -1
     pageidx: int = -1
 
@@ -91,9 +101,9 @@ class Extracteur:
         if fichier is not None:
             self.fichier = fichier
         self.pages: List[str] = []
-        self.chapitres: List[models.Chapitre] = []
-        self.articles: List[models.Article] = []
-        self.annexes: List[models.Annexe] = []
+        self.chapitres: List[Chapitre] = []
+        self.articles: List[Article] = []
+        self.annexes: List[Annexe] = []
 
     def close_annexe(self):
         """Clore la derniere annexe (et chapitre, et section, etc)"""
@@ -135,15 +145,17 @@ class Extracteur:
             self.article.pages = (self.article.pages[0], self.pageidx)
         self.article = None
 
-    def extract_chapitre(self) -> Optional[models.Chapitre]:
+    def extract_chapitre(self) -> Optional[Chapitre]:
         texte = self.pages[self.pageidx]
         m = re.search(r"CHAPITRE\s+(\d+)\s+([^\.\d]+)(\d+)?$", texte)
         if m is None:
             return None
         numero = m.group(1)
         titre = re.sub(r"\s+", " ", m.group(2).strip())
-        chapitre = models.Chapitre(
-            numero=numero, titre=titre, pages=(self.pageidx, -1),
+        chapitre = Chapitre(
+            numero=numero,
+            titre=titre,
+            pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         self.close_chapitre()
@@ -151,15 +163,17 @@ class Extracteur:
         self.chapitres.append(self.chapitre)
         return chapitre
 
-    def extract_annexe(self) -> Optional[models.Annexe]:
+    def extract_annexe(self) -> Optional[Annexe]:
         texte = self.pages[self.pageidx]
         m = re.search(r"ANNEXE\s+(\S+)(?: –)?\s+([^\.\d]+)(\d+)?$", texte)
         if m is None:
             return None
         numero = m.group(1)
         titre = re.sub(r"\s+", " ", m.group(2).strip())
-        annexe = models.Annexe(
-            numero=numero, titre=titre, pages=(self.pageidx, -1),
+        annexe = Annexe(
+            numero=numero,
+            titre=titre,
+            pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         # Mettre à jour les indices de pages de la derniere annexe, chapitre, section, etc
@@ -168,13 +182,13 @@ class Extracteur:
         self.annexes.append(self.annexe)
         return annexe
 
-    def extract_section(self, ligne: str) -> Optional[models.Section]:
+    def extract_section(self, ligne: str) -> Optional[Section]:
         m = re.match(r"SECTION\s+(\d+)\s+(.*)", ligne)
         if m is None:
             return None
         sec = m.group(1)
         titre = re.sub(r"\s+", " ", m.group(2).strip())
-        section = models.Section(
+        section = Section(
             numero=sec,
             titre=titre,
             pages=(self.pageidx, -1),
@@ -185,13 +199,13 @@ class Extracteur:
         self.section = section
         return section
 
-    def extract_sous_section(self, ligne: str) -> Optional[models.SousSection]:
+    def extract_sous_section(self, ligne: str) -> Optional[SousSection]:
         m = re.match(r"SOUS-SECTION\s+\d+\.(\d+)\s+(.*)", ligne)
         if m is None:
             return None
         sec = m.group(1)
         titre = re.sub(r"\s+", " ", m.group(2).strip())
-        sous_section = models.SousSection(
+        sous_section = SousSection(
             numero=sec,
             titre=titre,
             pages=(self.pageidx, -1),
@@ -202,10 +216,10 @@ class Extracteur:
         self.sous_section = sous_section
         return sous_section
 
-    def extract_non_numerotee(self, ligne: str) -> Optional[models.SousSection]:
+    def extract_non_numerotee(self, ligne: str) -> Optional[SousSection]:
         return None
 
-    def continue_section_title(self, ligne: str) -> Optional[models.Ancrage]:
+    def continue_section_title(self, ligne: str) -> Optional[Ancrage]:
         """Détecte la continuation d'un titre de section, retourner la section
         en question."""
         # Devrait pas y avoir un article déjà commencé
@@ -223,8 +237,8 @@ class Extracteur:
             return self.sous_section
         return None
 
-    def new_article(self, num: int, titre: str) -> models.Article:
-        article = models.Article(
+    def new_article(self, num: int, titre: str) -> Article:
+        article = Article(
             chapitre=len(self.chapitres) - 1,
             section=(len(self.chapitre.sections) - 1 if self.chapitre else -1),
             sous_section=(len(self.section.sous_sections) - 1 if self.section else -1),
@@ -238,7 +252,7 @@ class Extracteur:
         self.article = article
         return article
 
-    def extract_article(self, ligne: str) -> Optional[models.Article]:
+    def extract_article(self, ligne: str) -> Optional[Article]:
         m = re.match(r"(\d+)\.\s+(.*)", ligne)
         if m is None:
             # On le reconnaît pas comme un article, c'est peut-être un
@@ -251,7 +265,7 @@ class Extracteur:
         self.artidx = num
         return self.new_article(num, m.group(2))
 
-    def extract_text(self, pages: Optional[List[str]] = None) -> models.Reglement:
+    def extract_text(self, pages: Optional[List[str]] = None) -> Reglement:
         """Extraire la structure d'un règlement d'urbanisme du texte des pages."""
         if pages is not None:
             self.pages = pages
@@ -323,7 +337,7 @@ class Extracteur:
         # Clore toutes les annexes, sections, chapitres, etc
         self.close_annexe()
         self.close_article()
-        return models.Reglement(
+        return Reglement(
             fichier=self.fichier,
             titre=self.titre,
             numero=self.numero,
@@ -334,7 +348,7 @@ class Extracteur:
             annexes=self.annexes,
         )
 
-    def __call__(self, pdf: Path, fichier: Optional[str] = None) -> models.Reglement:
+    def __call__(self, pdf: Path, fichier: Optional[str] = None) -> Reglement:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
         self.fichier = pdf.name if fichier is None else fichier
         self.pages = extract_text_from_pdf(pdf)

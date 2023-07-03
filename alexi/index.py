@@ -11,7 +11,7 @@ from whoosh.fields import ID, NUMERIC, TEXT, Schema  # type: ignore
 from whoosh.index import create_in  # type: ignore
 from whoosh.support.charset import charset_table_to_dict, default_charset  # type: ignore
 
-from alexi.models import Reglement
+from alexi.types import Reglement
 
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
