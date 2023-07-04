@@ -54,11 +54,29 @@ def make_argparse() -> argparse.ArgumentParser:
         "extract", help="Extraire la structure des CSV segmentés en format JSON"
     ).set_defaults(func=cli.extract.main)
 
-    subp.add_parser(
+    index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
-    ).set_defaults(func=cli.index.main)
+    )
+    index.add_argument(
+        "-o",
+        "--outdir",
+        help="Repertoire destination pour l'index",
+        type=Path,
+        default="indexdir",
+    )
+    index.add_argument("jsons", help="Fichiers JSON", type=Path, nargs="+")
+    index.set_defaults(func=cli.index.main)
 
-    subp.add_parser("search", help="Effectuer une recherche sur l'index").set_defaults(
+    search = subp.add_parser("search", help="Effectuer une recherche sur l'index")
+    search.add_argument(
+        "-i",
+        "--indexdir",
+        help="Repertoire source pour l'index",
+        type=Path,
+        default="indexdir",
+    )
+    search.add_argument("query", help="Requête", nargs="+")
+    search.set_defaults(
         func=cli.search.main
     )
     return parser
