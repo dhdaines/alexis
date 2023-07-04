@@ -1,5 +1,5 @@
 ALexi, EXtracteur d'Information adèlois
----------------------------------------------------------
+=======================================
 
 ALEXI est une bibliothèque de code Python qui extrait la structure et
 le contenu des documents officiels de la ville de Sainte-Adèle afin de
@@ -13,7 +13,7 @@ et que sa sortie pourra être dirigé vers une base de données
 relationnelle.
 
 Extraction des documents
-========================
+------------------------
 
 L'extraction de la structure et du contenu des documents se fait par
 cette série d'étapes:
@@ -29,7 +29,7 @@ les règlements y sont compris, si vous voulez par exemple seulement
 les règlements d'urbanisme, l'option `-s` peut être utilisé, par
 exemple:
 
-   alexi select -s urbanisme
+    alexi select -s urbanisme
 
 3. Convertir les documents du format PDF en format CSV, avec `alexi convert`.
 4. Extraire les blocs de texte brut avec `alexi segment`.
