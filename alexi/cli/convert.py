@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
-
 """
-Convertir un PDF en CSV pour traitement automatique
+Fonction de conversion de PDF en CSV d'ALEXI.
 """
 
-import argparse
 import pdfplumber
 import logging
 import csv
-import re
 from pathlib import Path
 from typing import Iterator, Any
 
@@ -16,16 +12,6 @@ from tqdm import tqdm
 
 
 LOGGER = logging.getLogger("pdf2csv")
-
-
-def make_argparse():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("infile", help="Fichier PDF à traiter", type=Path)
-    parser.add_argument("outfile", help="Fichier CSV à créer", type=Path)
-    parser.add_argument(
-        "-v", "--verbose", help="Émettre des messages", action="store_true"
-    )
-    return parser
 
 
 def detect_margins(page, words) -> Iterator[dict[str,Any]]:
@@ -116,6 +102,7 @@ def write_csv(pdf: pdfplumber.PDF, path: Path):
 
 
 def main(args):
+    """Convertir les PDF en CSV"""
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
     if args.verbose:
         global tqdm
@@ -124,6 +111,3 @@ def main(args):
         logging.info("processing %s", args.infile)
         write_csv(pdf, args.outfile)
 
-
-if __name__ == "__main__":
-    main(make_argparse().parse_args())

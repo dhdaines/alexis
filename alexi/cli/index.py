@@ -2,32 +2,18 @@
 Construire un index pour faire des recherches dans les données extraites.
 """
 
-import argparse
 from pathlib import Path
 from typing import List
 
+from alexi.types import Reglement
 from whoosh.analysis import CharsetFilter, StemmingAnalyzer  # type: ignore
 from whoosh.fields import ID, NUMERIC, TEXT, Schema  # type: ignore
 from whoosh.index import create_in  # type: ignore
-from whoosh.support.charset import charset_table_to_dict, default_charset  # type: ignore
-
-from alexi.types import Reglement
+from whoosh.support.charset import charset_table_to_dict  # type: ignore
+from whoosh.support.charset import default_charset
 
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
-
-
-def make_argparse():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "-o",
-        "--outdir",
-        help="Repertoire destination pour l'index",
-        type=Path,
-        default="indexdir",
-    )
-    parser.add_argument("jsons", help="Fichiers JSON", type=Path, nargs="+")
-    return parser
 
 
 def index(outdir: Path, jsons: List[Path]):
@@ -66,11 +52,5 @@ def index(outdir: Path, jsons: List[Path]):
     writer.commit()
 
 
-def main():
-    parser = make_argparse()
-    args = parser.parse_args()
+def main(args):
     index(args.outdir, args.jsons)
-
-
-if __name__ == "__main__":
-    main()
