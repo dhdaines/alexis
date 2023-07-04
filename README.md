@@ -26,8 +26,7 @@ documents.
 2. Générer la liste de documents d'intérêt.  Ceci se fait avec `alexi
 select` qui écrit une liste sur la sortie standarde.  Par défaut tous
 les règlements y sont compris, si vous voulez par exemple seulement
-les règlements d'urbanisme, l'option `-s` peut être utilisé, par
-exemple:
+les règlements d'urbanisme, l'option `-s` peut être utilisé:
 
        alexi select -s urbanisme
 
