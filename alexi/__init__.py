@@ -70,7 +70,7 @@ def index_main(args):
 
 def extract_main(args):
     """Extraire la structure de documents à partir de CSV segmentés"""
-    conv = Extracteur()
+    conv = Extracteur(fichier=Path(args.csv.name).with_suffix(".pdf"))
     doc = conv(args.csv)
     print(doc.model_dump_json(indent=2, exclude_defaults=True))
 

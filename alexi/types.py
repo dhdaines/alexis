@@ -1,4 +1,5 @@
-from typing import Optional, List, Tuple
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -56,6 +57,12 @@ class Annexe(Contenu):
     numero: str
 
 
+class Attendu(Contenu):
+    """Attendu du texte."""
+
+    pass
+
+
 class Article(Contenu):
     """Article du texte."""
 
@@ -78,26 +85,46 @@ class Article(Contenu):
 
 class Dates(BaseModel):
     """Dates de publication ou adoption d'un document ou règlement."""
+
     adoption: str = Field(
         description="Date de l'adoption d'un règlement ou résolution, ou de publication d'autre document"
     )
-    avis: Optional[str] = Field(
-        description="Date de l'avis de motion pour un règlement"
+    projet: Optional[str] = Field(
+        None, description="Date de l'adoption d'un projet de règlement"
     )
-    entree: Optional[str] = Field(description="Date d'entrée en vigueur d'un règlement")
+    avis: Optional[str] = Field(
+        None, description="Date de l'avis de motion pour un règlement"
+    )
+    entree: Optional[str] = Field(
+        None, description="Date d'entrée en vigueur d'un règlement"
+    )
+    publique: Optional[str] = Field(
+        None, description="Date de la consultation publique"
+    )
+    ecrite: Optional[str] = Field(None, description="Date de la consultation écrite")
+    mrc: Optional[str] = Field(
+        None, description="Date du certificat de conformité de la MRC"
+    )
 
 
 class Document(BaseModel):
     """Document municipal générique."""
-    fichier: str = Field(description="Nom du fichier source PDF du document")
-    titre: str = Field(description="Titre du document (tel qu'il apparaît sur le site web)")
+
+    fichier: Path = Field(description="Nom du fichier source PDF du document")
+    titre: Optional[str] = Field(
+        None, description="Titre du document (tel qu'il apparaît sur le site web)"
+    )
     chapitres: List[Chapitre] = []
+    attendus: List[Attendu] = []
     articles: List[Article] = []
     annexes: List[Annexe] = []
-    
+
 
 class Reglement(Document):
     """Structure et contenu d'un règlement."""
+
     numero: str = Field(description="Numéro du règlement, e.g. 1314-Z-09")
-    objet: Optional[str] = Field(description="Objet du règlement, e.g. 'Lotissement'")
+    objet: Optional[str] = Field(
+        None, description="Objet du règlement, e.g. 'Lotissement'"
+    )
     dates: Dates
