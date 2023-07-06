@@ -8,9 +8,9 @@ import argparse
 import re
 from csv import DictReader
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from alexi import models
+from alexi import types
 
 
 def make_argparse():
@@ -27,21 +27,21 @@ class Converteur:
     adoption: str = "INCONNU"
     avis: str = "INCONNU"
     entree: str = "INCONNU"
-    chapitre: Optional[models.Chapitre] = None
-    section: Optional[models.Section] = None
-    sous_section: Optional[models.SousSection] = None
-    annexe: Optional[models.Annexe] = None
-    article: Optional[models.Article] = None
+    chapitre: Optional[types.Chapitre] = None
+    section: Optional[types.Section] = None
+    sous_section: Optional[types.SousSection] = None
+    annexe: Optional[types.Annexe] = None
+    article: Optional[types.Article] = None
     artidx: int = -1
     pageidx: int = -1
 
-    def __init__(self, fichier: str = None):
+    def __init__(self, fichier: Optional[str] = None):
         if fichier is not None:
             self.fichier = fichier
         self.pages: List[str] = []
-        self.chapitres: List[models.Chapitre] = []
-        self.articles: List[models.Article] = []
-        self.annexes: List[models.Annexe] = []
+        self.chapitres: List[types.Chapitre] = []
+        self.articles: List[types.Article] = []
+        self.annexes: List[types.Annexe] = []
 
     def process_bloc(self, tag: str, bloc: str):
         """Ajouter un bloc de texte au bon endroit."""
@@ -112,11 +112,19 @@ class Converteur:
         self.article = None
 
     def extract_titre(self, texte: str):
-        if m := re.search(r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)", texte, re.IGNORECASE):
+        if m := re.search(
+            r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
+            texte,
+            re.IGNORECASE,
+        ):
             self.objet = m.group(1)
             self.numero = m.group(2)
             self.titre = re.sub(r"\s+", " ", m.group(0))
-        elif m := re.search(r"règlement\s+numéro\s+(\S+)(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)", texte, re.IGNORECASE):
+        elif m := re.search(
+            r"règlement\s+numéro\s+(\S+)(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)",
+            texte,
+            re.IGNORECASE,
+        ):
             self.titre = m.group(0)
             self.numero = m.group(1)
             self.objet = m.group(2)
@@ -130,14 +138,16 @@ class Converteur:
     def extract_entree(self, texte: str):
         self.entree = texte
 
-    def extract_chapitre(self, texte) -> Optional[models.Chapitre]:
+    def extract_chapitre(self, texte) -> Optional[types.Chapitre]:
         m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE)
         if m is None:
             return None
         numero = m.group(1)
         titre = m.group(2)
-        chapitre = models.Chapitre(
-            numero=numero, titre=titre, pages=(self.pageidx, -1),
+        chapitre = types.Chapitre(
+            numero=numero,
+            titre=titre,
+            pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         self.close_chapitre()
@@ -145,15 +155,16 @@ class Converteur:
         self.chapitres.append(self.chapitre)
         return chapitre
 
-    def extract_annexe(self, texte) -> Optional[models.Annexe]:
+    def extract_annexe(self, texte) -> Optional[types.Annexe]:
         m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE)
         if m is None:
             return None
         numero = m.group(1)
         titre = m.group(2)
-        annexe = models.Annexe(
-            numero=numero, titre=titre, pages=(self.pageidx, -1),
-            articles=(len(self.articles), -1),
+        annexe = types.Annexe(
+            numero=numero,
+            titre=titre,
+            pages=(self.pageidx, -1),
         )
         # Mettre à jour les indices de pages de la derniere annexe, chapitre, section, etc
         self.close_annexe()
@@ -161,42 +172,44 @@ class Converteur:
         self.annexes.append(self.annexe)
         return annexe
 
-    def extract_section(self, ligne: str) -> Optional[models.Section]:
+    def extract_section(self, ligne: str) -> Optional[types.Section]:
         m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
         sec = m.group(1)
         titre = m.group(2)
-        section = models.Section(
+        section = types.Section(
             numero=sec,
             titre=titre,
             pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         self.close_section()
-        self.chapitre.sections.append(section)
+        if self.chapitre:
+            self.chapitre.sections.append(section)
         self.section = section
         return section
 
-    def extract_sous_section(self, ligne: str) -> Optional[models.SousSection]:
+    def extract_sous_section(self, ligne: str) -> Optional[types.SousSection]:
         m = re.match(r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
         sec = m.group(1)
         titre = m.group(2)
-        sous_section = models.SousSection(
+        sous_section = types.SousSection(
             numero=sec,
             titre=titre,
             pages=(self.pageidx, -1),
             articles=(len(self.articles), -1),
         )
         self.close_sous_section()
-        self.section.sous_sections.append(sous_section)
+        if self.section:
+            self.section.sous_sections.append(sous_section)
         self.sous_section = sous_section
         return sous_section
 
-    def new_article(self, num: int, titre: str) -> models.Article:
-        article = models.Article(
+    def new_article(self, num: int, titre: str) -> types.Article:
+        article = types.Article(
             chapitre=len(self.chapitres) - 1,
             section=(len(self.chapitre.sections) - 1 if self.chapitre else -1),
             sous_section=(len(self.section.sous_sections) - 1 if self.section else -1),
@@ -210,7 +223,7 @@ class Converteur:
         self.article = article
         return article
 
-    def extract_article(self, ligne: str) -> Optional[models.Article]:
+    def extract_article(self, ligne: str) -> Optional[types.Article]:
         m = re.match(r"(?:article\s+)?(\d+)\.?\s+(.*)", ligne, re.IGNORECASE)
         if m is None:
             return None
@@ -221,12 +234,12 @@ class Converteur:
         self.artidx = num
         return self.new_article(num, m.group(2))
 
-    def extract_text(self, rows: Optional[List[dict]] = None) -> models.Reglement:
+    def extract_text(self, rows: Optional[List[dict]] = None) -> types.Reglement:
         """Convertir une sequence de mots d'un CSV en structure"""
         if rows is not None:
             self.rows = rows
-        bloc = []
-        tag = newtag = None
+        bloc: List[str] = []
+        tag = newtag = "O"
         # Extraire les blocs de texte etiquettes
         self.pageidx = 0
         for row in self.rows:
@@ -234,9 +247,9 @@ class Converteur:
             page = int(row["page"])
             word = row["text"]
             if label != "O":
-                newtag = label.partition('-')[2]
-            if label[0] in ('B', 'O') or newtag != tag:
-                if bloc:
+                newtag = label.partition("-")[2]
+            if label[0] in ("B", "O") or newtag != tag:
+                if bloc and tag:
                     self.process_bloc(tag, " ".join(bloc))
                     bloc = []
                     self.pageidx = page
@@ -248,20 +261,20 @@ class Converteur:
         # Clore toutes les annexes, sections, chapitres, etc
         self.close_annexe()
         self.close_article()
-        return models.Reglement(
+        return types.Reglement(
             fichier=self.fichier,
             titre=self.titre,
             numero=self.numero,
             objet=self.objet,
-            dates=models.Dates(adoption=self.adoption,
-                               avis=self.avis,
-                               entree=self.entree),
+            dates=types.Dates(
+                adoption=self.adoption, avis=self.avis, entree=self.entree
+            ),
             chapitres=self.chapitres,
             articles=self.articles,
             annexes=self.annexes,
         )
 
-    def __call__(self, csv: Path, fichier: Optional[str] = None) -> models.Reglement:
+    def __call__(self, csv: Path, fichier: Optional[str] = None) -> types.Reglement:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
         self.fichier = csv.name if fichier is None else fichier
         with open(csv, "rt") as infh:

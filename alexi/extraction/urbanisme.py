@@ -10,16 +10,8 @@ from typing import List, Optional, Tuple
 
 import pdfplumber
 import tqdm
-from alexi.types import (
-    Ancrage,
-    Annexe,
-    Article,
-    Chapitre,
-    Dates,
-    Reglement,
-    Section,
-    SousSection,
-)
+from alexi.types import (Ancrage, Annexe, Article, Chapitre, Dates, Reglement,
+                         Section, SousSection)
 
 
 def make_argparse():
@@ -31,7 +23,7 @@ def make_argparse():
     return parser
 
 
-def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str]]:
+def extract_title(pages: List[str]) -> Tuple[Optional[str], Optional[str], str]:
     numero, objet = None, None
     for page in pages:
         m = re.search(
@@ -77,7 +69,7 @@ def extract_text_from_pdf(pdf: Path) -> List[str]:
     with pdfplumber.open(pdf) as doc:
         for page in tqdm.tqdm(doc.pages):
             # Enlever en-tete et en-pied
-            page = page.crop(0, 72, page.width, page.height - 72)
+            page = page.crop((0, 72, page.width, page.height - 72))
             texte = page.extract_text()
             pages.append(texte)
     return pages
@@ -86,7 +78,7 @@ def extract_text_from_pdf(pdf: Path) -> List[str]:
 class Extracteur:
     fichier: str = "INCONNU"
     numero: str = "INCONNU"
-    objet: str = "INCONNU"
+    objet: Optional[str]
     titre: str = "INCONNU"
     dates: Dates
     chapitre: Optional[Chapitre] = None
@@ -97,7 +89,7 @@ class Extracteur:
     artidx: int = -1
     pageidx: int = -1
 
-    def __init__(self, fichier: str = None):
+    def __init__(self, fichier: Optional[str] = None):
         if fichier is not None:
             self.fichier = fichier
         self.pages: List[str] = []
@@ -174,7 +166,6 @@ class Extracteur:
             numero=numero,
             titre=titre,
             pages=(self.pageidx, -1),
-            articles=(len(self.articles), -1),
         )
         # Mettre à jour les indices de pages de la derniere annexe, chapitre, section, etc
         self.close_annexe()
@@ -195,7 +186,8 @@ class Extracteur:
             articles=(len(self.articles), -1),
         )
         self.close_section()
-        self.chapitre.sections.append(section)
+        if self.chapitre:
+            self.chapitre.sections.append(section)
         self.section = section
         return section
 
@@ -212,7 +204,8 @@ class Extracteur:
             articles=(len(self.articles), -1),
         )
         self.close_sous_section()
-        self.section.sous_sections.append(sous_section)
+        if self.section:
+            self.section.sous_sections.append(sous_section)
         self.sous_section = sous_section
         return sous_section
 
@@ -269,7 +262,11 @@ class Extracteur:
         """Extraire la structure d'un règlement d'urbanisme du texte des pages."""
         if pages is not None:
             self.pages = pages
-        self.numero, self.objet, self.titre = extract_title(self.pages)
+        numero, objet, self.titre = extract_title(self.pages)
+        if numero is not None:
+            self.numero = numero
+        if objet is not None:
+            self.objet = objet
         self.dates = extract_dates(self.pages)
 
         # Passer les tables de contenus pour trouver le premier chapitre

@@ -1,6 +1,4 @@
-"""
-Fonction de conversion de PDF en CSV d'ALEXI.
-"""
+"""Conversion de PDF en CSV"""
 
 import csv
 import logging
@@ -10,12 +8,12 @@ from typing import Any, Iterator
 import pdfplumber
 from tqdm import tqdm
 
-LOGGER = logging.getLogger("pdf2csv")
+LOGGER = logging.getLogger("convert")
 
 
 def detect_margins(page, words) -> Iterator[dict[str, Any]]:
     if not words:
-        return words
+        return
     margin_top = 0
     margin_bottom = page.height
     l1top = words[0]["top"]
@@ -91,11 +89,10 @@ def write_csv(pdf: pdfplumber.PDF, path: Path):
         writer.writeheader()
         for idx, p in enumerate(tqdm(pdf.pages)):
             words = p.extract_words()
-            words = detect_margins(p, words)
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in p.chars)
             LOGGER.info("traitement de la page %d", p.page_number)
-            for w in words:
+            for w in detect_margins(p, words):
                 # Extract colour from first character (FIXME: assumes RGB space)
                 if c := chars.get((w["x0"], w["top"])):
                     # OMG WTF pdfplumber!!!
@@ -120,14 +117,3 @@ def write_csv(pdf: pdfplumber.PDF, path: Path):
                 for field in "x0", "x1", "top", "bottom", "doctop":
                     w[field] = round(float(w[field]))
                 writer.writerow(w)
-
-
-def main(args):
-    """Convertir les PDF en CSV"""
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
-    if args.verbose:
-        global tqdm
-        tqdm = lambda x: x  # noqa: E731
-    with pdfplumber.open(args.infile) as pdf:
-        logging.info("processing %s", args.infile)
-        write_csv(pdf, args.outfile)

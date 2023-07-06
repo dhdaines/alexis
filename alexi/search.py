@@ -20,7 +20,3 @@ def search(indexdir: Path, terms: List[str]):
         for r in results:
             print(r.score, r["titre"])
             print()
-
-
-def main(args):
-    search(args.indexdir, args.query)
