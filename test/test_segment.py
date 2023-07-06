@@ -2,12 +2,12 @@ import csv
 import tempfile
 from pathlib import Path
 
-from alexi.segment import Segmenteur
+from alexi.segment import Segmenteur, group_paragraphs
 
 DATADIR = Path(__file__).parent / "data"
 
 
-def test_convert():
+def test_segment():
     with open(DATADIR / "pdf_structure.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         with tempfile.TemporaryFile("w+t") as testfh:
@@ -29,3 +29,77 @@ def test_convert():
             hyp_tag = hyp["tag"].partition("-")[0]
             print(ref["tag"], hyp["tag"], ref["text"])
             assert ref_tag == hyp_tag
+
+
+def test_group_paragaraphs():
+    TESTWORDS = [
+        {"tag": "O"},
+        {"tag": "B-Foo"},
+        {"tag": "I-Foo"},
+        {"tag": "O"},
+        {"tag": "O"},
+        {"tag": "O"},
+        {"tag": "B-Foo"},
+        {"tag": "I-Foo"},
+        {"tag": "I-Foo"},
+        {"tag": "O"},
+        {"tag": "B-Bar"},
+        {"tag": "B-Bar"},
+        {"tag": "O"},
+    ]
+    groups = list(group_paragraphs(TESTWORDS))
+    assert groups == [
+        (
+            "O",
+            [
+                {"tag": "O"},
+            ],
+        ),
+        (
+            "Foo",
+            [
+                {"tag": "B-Foo"},
+                {"tag": "I-Foo"},
+            ],
+        ),
+        (
+            "O",
+            [
+                {"tag": "O"},
+                {"tag": "O"},
+                {"tag": "O"},
+            ],
+        ),
+        (
+            "Foo",
+            [
+                {"tag": "B-Foo"},
+                {"tag": "I-Foo"},
+                {"tag": "I-Foo"},
+            ],
+        ),
+        (
+            "O",
+            [
+                {"tag": "O"},
+            ],
+        ),
+        (
+            "Bar",
+            [
+                {"tag": "B-Bar"},
+            ],
+        ),
+        (
+            "Bar",
+            [
+                {"tag": "B-Bar"},
+            ],
+        ),
+        (
+            "O",
+            [
+                {"tag": "O"},
+            ],
+        ),
+    ]

@@ -12,6 +12,8 @@ LOGGER = logging.getLogger("segment")
 def detect_page_margins(
     page_number: int, page_words: Sequence[dict[str, Any]]
 ) -> Iterator[dict[str, Any]]:
+    """Détection heuristique des marges (haut et bas seuelement) d'une
+    page, qui sont étiquettées avec 'Tete' et 'Pied'."""
     if not page_words:
         return
     for w in page_words:
@@ -57,6 +59,19 @@ def detect_page_margins(
     elif l1size < 10 and l1top < 72:
         LOGGER.info("page %d: en-tête trouvé a %f pt", page_number, l1bottom)
         margin_top = l1bottom
+        # Il existe parfois deux lignes de tête de page aussi!
+        for w in page_words:
+            if w["top"] == l1top:
+                continue
+            wsize = w["bottom"] - w["top"]
+            if wsize < 10 and w["top"] - l1bottom < 10:
+                LOGGER.info(
+                    "page %d: deuxième ligne d'en-tête trouvé à %f pt",
+                    page_number,
+                    w["bottom"],
+                )
+                margin_top = w["bottom"]
+                break
     seen_head = seen_foot = False
     for word in page_words:
         if word["bottom"] <= margin_top:
@@ -69,24 +84,101 @@ def detect_page_margins(
 
 
 def detect_margins(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    """Détection heuristique des marges (haut et bas seuelement) de chaque
+    page, qui sont étiquettées avec 'Tete' et 'Pied'."""
     for page_number, page_words in itertools.groupby(words, key=lambda x: x["page"]):
         for word in detect_page_margins(page_number, list(page_words)):
             yield word
 
 
 def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    """Détection heuristique très simple des alinéas.  Un nouvel alinéa
+    est marqué lorsque l'interligne dépasse 1,5 fois la hauteur du
+    texte.
+    """
     prev_top = 0
     for word in words:
         if word["tag"]:
             pass
         elif word["top"] - prev_top < 0:
-            word["tag"] = "B"
+            word["tag"] = "B-Alinea"
         elif word["top"] - prev_top >= 1.5 * (word["bottom"] - word["top"]):
-            word["tag"] = "B"
+            word["tag"] = "B-Alinea"
         else:
-            word["tag"] = "I"
+            word["tag"] = "I-Alinea"
         prev_top = word["top"]
         yield word
+
+
+def group_paragraphs(
+    words: Iterable[dict[str, Any]]
+) -> Iterator[tuple[str, Iterable[dict[str, Any]]]]:
+    """Grouper le flux de mots par unité (BI*) de texte."""
+    bio = tag = "O"
+    paragraph = []
+    for word in words:
+        next_bio, _, next_tag = word["tag"].partition("-")
+        if not next_tag:
+            next_tag = next_bio
+        if next_bio != bio or next_bio == "B":
+            if next_bio == "I":
+                paragraph.append(word)
+            else:
+                # Could do this without storing the paragraph, but not
+                # strictly necessary (it's not that big!)
+                if paragraph:
+                    yield tag, paragraph
+                paragraph = [word]
+                # Note: tag *could* change inside a block
+                tag = next_tag
+            bio = next_bio
+        else:
+            paragraph.append(word)
+    if paragraph:
+        yield tag, paragraph
+
+
+def classify_paragraph_heuristic(
+    tag: str, paragraph: Sequence[dict[str, Any]]
+) -> Iterator[dict[str, Any]]:
+    """Classification heuristique très simplistique d'un alinéa, suffisant
+    pour détecter les articles, énumérations, et parfois les dates
+    d'adoption.
+    """
+    if len(paragraph) == 0:
+        return
+    word = paragraph[0]
+    if word["text"].lower() == "article":
+        tag = "Article"
+    elif word["text"].lower() == "attendu":
+        tag = "Attendu"
+        for idx in range(len(paragraph) - 3):
+            if [
+                w["text"].lower() for w in paragraph[idx : idx + 3]
+            ] == "avis de motion".split():
+                tag = "Avis"
+    if tag == "O":
+        word["tag"] = "O"
+    else:
+        word["tag"] = f"B-{tag}"
+    yield word
+    for word in paragraph[1:]:
+        if tag == "O":
+            word["tag"] = "O"
+        else:
+            word["tag"] = f"I-{tag}"
+        yield word
+
+
+def classify_heuristic(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    """Classification heuristique très simplistique des alinéas, suffisant
+    pour détecter les articles, énumérations, et parfois les dates
+    d'adoption."""
+    for tag, paragraph in group_paragraphs(words):
+        if not paragraph:
+            return
+        for word in classify_paragraph_heuristic(tag, paragraph):
+            yield word
 
 
 class Segmenteur:
@@ -94,4 +186,5 @@ class Segmenteur:
         reader = csv.DictReader(infh)
         words = detect_margins(reader)
         words = split_paragraphs(words)
+        words = classify_heuristic(words)
         return list(words)
