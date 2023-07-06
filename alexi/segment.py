@@ -3,7 +3,7 @@
 import csv
 import itertools
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any, Iterator, TextIO
 
 LOGGER = logging.getLogger("segment")
@@ -15,10 +15,10 @@ def detect_page_margins(
     if not page_words:
         return
     for w in page_words:
-        w["top"] = float(w["top"])
-        w["bottom"] = float(w["bottom"])
+        w["top"] = round(float(w["top"]))
+        w["bottom"] = round(float(w["bottom"]))
     margin_top = 0
-    page_height = float(page_words[0]["page_height"])
+    page_height = round(float(page_words[0]["page_height"]))
     margin_bottom = page_height
     l1top = page_words[0]["top"]
     l1bottom = page_words[0]["bottom"]
@@ -74,7 +74,24 @@ def detect_margins(words: Sequence[dict[str, Any]]) -> Iterator[dict[str, Any]]:
             yield word
 
 
+def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    prev_top = 0
+    for word in words:
+        if word["tag"]:
+            pass
+        elif word["top"] - prev_top < 0:
+            word["tag"] = "B"
+        elif word["top"] - prev_top >= 1.5 * (word["bottom"] - word["top"]):
+            word["tag"] = "B"
+        else:
+            word["tag"] = "I"
+        prev_top = word["top"]
+        yield word
+
+
 class Segmenteur:
     def __call__(self, infh: TextIO) -> list[dict[str, Any]]:
         reader = csv.DictReader(infh)
-        return list(detect_margins(list(reader)))
+        words = detect_margins(list(reader))
+        words = split_paragraphs(words)
+        return list(words)
