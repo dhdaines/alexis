@@ -1,0 +1,319 @@
+{
+  "fichier": "00-Reglement-1000-2008-PPC.pdf",
+  "titre": "règlement numéro 1000-2008-PPC relatif aux projets particuliers de construction, de modification ou d'occupation d'un immeuble.",
+  "chapitres": [
+    {
+      "numero": "1",
+      "titre": "DISPOSITIONS DÉCLARATOIRES, INTERPRÉTATIVES ET ADMINISTRATIVES",
+      "pages": [
+        1,
+        2
+      ],
+      "articles": [
+        0,
+        10
+      ]
+    },
+    {
+      "numero": "2",
+      "titre": "PROCÉDURE DE DEMANDE D'AUTORISATION D'UN PROJET PARTICULIER",
+      "pages": [
+        2,
+        5
+      ],
+      "articles": [
+        10,
+        17
+      ]
+    },
+    {
+      "numero": "3",
+      "titre": "DSPOSITIONS FINALES",
+      "pages": [
+        5,
+        5
+      ],
+      "articles": [
+        17,
+        18
+      ]
+    }
+  ],
+  "articles": [
+    {
+      "titre": "TITRE DU RÈGLEMENT",
+      "pages": [
+        1,
+        1
+      ],
+      "alineas": [
+        "Le présent règlement s'intitule « Règlement relatif aux projets particuliers de construction, de modification ou d'occupation d'un immeuble»."
+      ],
+      "numero": 1,
+      "chapitre": 0
+    },
+    {
+      "titre": "TERRITOIRE ASSUJETTI",
+      "pages": [
+        1,
+        1
+      ],
+      "alineas": [
+        "Le présent règlement s'applique à l'ensemble du territoire soumis à la juridiction de la Ville de Sainte-Adèle à l'exception de toute partie du territoire située dans une zone où l'occupation du sol est soumise à des contraintes particulières pour des raisons de sécurité publique."
+      ],
+      "numero": 2,
+      "chapitre": 0
+    },
+    {
+      "titre": "DOMAINE D'APPLICATION",
+      "pages": [
+        1,
+        1
+      ],
+      "alineas": [
+        "L'autorisation par le Conseil d'un projet particulier de construction, de modification d'un immeuble ou d'occupation d'un immeuble qui déroge à l'une ou l'autre des dispositions des règlements concernés doit être faite conformément aux dispositions du présent règlement."
+      ],
+      "numero": 3,
+      "chapitre": 0
+    },
+    {
+      "titre": "RÈGLES DE PRÉSÉANCE DES DISPOSITIONS",
+      "pages": [
+        1,
+        2
+      ],
+      "alineas": [
+        "Dans le présent règlement, à moins d'indication contraire, les règles de préséance suivantes s'appliquent :",
+        "a) En cas d'incompatibilité entre le texte et un titre, le texte prévaut.",
+        "b) En cas d'incompatibilité entre le texte et toute autre forme d'expression, à l'exception de la grille des spécifications, le texte prévaut."
+      ],
+      "numero": 4,
+      "chapitre": 0
+    },
+    {
+      "titre": "RÈGLES DE PRÉSÉANCE DES DISPOSITIONS SUR LES AUTRES RÈGLEMENTS D'URBANISME",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "Les règles du présent règlement ont preseance sur toute disposition incompatible d'un ou plusieurs des règlements mentionnés à l'article 11."
+      ],
+      "numero": 5,
+      "chapitre": 0
+    },
+    {
+      "titre": "RENVOIS",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "Tous les renvois à un autre règlement contenus dans le présent règlement sont ouverts, c'est-à-dire qu'ils s'étendent à toute modification que pourrait subir le présent règlement faisant l'objet du renvoi postérieurement à l'entrée en vigueur du présent règlement."
+      ],
+      "numero": 6,
+      "chapitre": 0
+    },
+    {
+      "titre": "TERMINOLOGIE",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "Pour l'interprétation du présent règlement, à moins que le contexte n'indique un sens différent, tout mot ou expression a le sens qui lui est attribué au chapitre 3 du règlement de zonage en vigueur. Si un mot ou une expression n'est pas spécifiquement défini au règlement de zonage, il s'entend dans son sens commun défini au dictionnaire."
+      ],
+      "numero": 7,
+      "chapitre": 0
+    },
+    {
+      "titre": "APPLICATION DU RÈGLEMENT",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "L'application",
+        "du",
+        "présent règlement relève du fonctionnaire désigné nommé selon les dispositions du règlement relatif aux permis et certificats en vigueur."
+      ],
+      "numero": 8,
+      "chapitre": 0
+    },
+    {
+      "titre": "POUVOIRS ET DEVOIRS DU FONCTIONNAIRE DÉSIGNÉ",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "Les pouvoirs et devoirs du fonctionnaire désigné sont définis au règlement relatif aux permis et certificats en vigueur."
+      ],
+      "numero": 9,
+      "chapitre": 0
+    },
+    {
+      "titre": "CONTRAVENTIONS, SANCTIONS, RECOURS ET POURSUITES",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "Les dispositions relatives à une contravention, une sanction, un recours ou une poursuite judiciaire à l'égard du présent règlement sont celles prévues au règlement relatif aux permis et certificats en vigueur."
+      ],
+      "numero": 10,
+      "chapitre": 0
+    },
+    {
+      "titre": "OBJET D'UNE DEMANDE",
+      "pages": [
+        2,
+        2
+      ],
+      "alineas": [
+        "Le Conseil peut autoriser, sur demande et aux conditions prévues au présent règlement, un projet particulier de construction, de modification ou d'occupation d'un immeuble qui déroge à l'un ou l'autre des règlements suivants :",
+        "a) Le règlement de zonage en vigueur.",
+        "b) Le règlement de lotissement en vigueur.",
+        "c) Le règlement de construction en vigueur.",
+        "d) Le règlement relatif aux plans d'implantation et d'intégration architecturale en vigueur.",
+        "e) Le règlement relatif aux permis et certificats en vigueur limité à une disposition relative aux conditions d'émission d'un permis de construction ou d'un certificat d'autorisation."
+      ],
+      "numero": 11,
+      "chapitre": 1
+    },
+    {
+      "titre": "TRANSMISSION D'UNE DEMANDE D'AUTORISATION",
+      "pages": [
+        2,
+        3
+      ],
+      "alineas": [
+        "En vue de l'autorisation prévue à l'article 11 du présent règlement, une demande écrite doit être transmise par le propriétaire de l'immeuble visé, ou par son mandataire dûment autorisé par procuration, au fonctionnaire désigné.",
+        "La demande d'autorisation doit être accompagnée des documents suivants :",
+        "a) le cas échéant, la procuration établissant le mandat de toute personne autorisée à agir au nom du propriétaire;",
+        "b) un chèque libellé à l'ordre de la Ville de Sainte-Adèle au montant fixé par le règlement en vigueur régissant la tarification relative aux demandes d'autorisation d'un projet particulier de construction, de modification ou d'occupation d'un immeuble ;",
+        "c) une copie d'un plan d'arpentage du terrain ou du certificat de localisation du terrain visé par la demande ;",
+        "d) une copie authentique de tout titre établissant que le requérant est propriétaire de ce terrain ou un document établissant qu'il détient une option d'achat de ce terrain ou, s'il s'agit d'un terrain appartenant à la Ville de Sainte-Adèle, d'une preuve d'intention d'achat acceptée par le Conseil;",
+        "e) une déclaration établissant le ou les types d'occupation de l'immeuble visé par la demande."
+      ],
+      "numero": 12,
+      "chapitre": 1
+    },
+    {
+      "titre": "CADUCITÉ D'UNE DEMANDE D'AUTORISATION D'UN PROJET PARTICULIER",
+      "pages": [
+        3,
+        3
+      ],
+      "alineas": [
+        "La demande d'autorisation formulée en vertu de l'article 12 du présent règlement est caduque si le requérant n'a pas déposé un projet particulier comprenant les renseignements et documents exigés à l'article 14 du présent règlement, dans le délai prescrit à cet article. Le cas échéant, les documents fournis par le requérant aux fins de l'article 12 du présent article lui sont remis. Lorsqu'une demande d'autorisation est devenue caduque par l'effet du paragraphe précédant, le requérant peut présenter une nouvelle demande à condition de se conformer à toutes les exigences du présent article, y compris le paiement du tarif.",
+        "Aux fins de l'application de l'article 14 du présent règlement, la date de réception de la demande d'autorisation est celle à laquelle elle a été dûment complétée, conformément à toutes les exigences de l'article 12 du présent règlement. Le fonctionnaire désigné notifie cette date, par écrit, au requérant."
+      ],
+      "numero": 13,
+      "chapitre": 1
+    },
+    {
+      "titre": "RENSEIGNEMENTS ET DOCUMENTS EXIGÉS POUR UNE DEMANDE D'AUTORISATION D'UN PROJET PARTICULIER",
+      "pages": [
+        3,
+        4
+      ],
+      "alineas": [
+        "Dans les 90 jours de la date de réception de la demande d'autorisation déposée en vertu de l'article 12 du présent règlement, le requérant doit déposer auprès du fonctionnaire désigné un projet particulier visé par cette demande. A cette fin, il doit fournir les renseignements et documents suivants :",
+        "a) un écrit exposant les motifs de la demande et une description détaillée du projet particulier visé ;",
+        "a) un plan montrant les types d'occupation prévus du terrain et des constructions existantes et a ériger, ainsi que l'occupation de tous les terrains voisins situés à moins de 100 m des limites du terrain visé par la demande;",
+        "b) des photos de l'immeuble visé par la demande ainsi que pour les terrains voisins situés à moins de 100 m des limites du terrain visé par la demande",
+        "c) un plan d'implantation démontrant les constructions existantes et à être érigées et comprenant tous les renseignements et toutes les informations exigés au paragraphe a) de l'article 5.2.2 du règlement sur les permis et certificats, à l'exception du plan de piquetage qui n'est pas requis ;",
+        "d) des esquisses en couleur montrant la volumétrie générale, les dimensions et la hauteur des constructions existantes et à ériger sur le terrain, et leur intégration dans le contexte bâti situé à moins de 100 mètres des limite du terrain visé par la demande ;",
+        "e) la densité, en termes d'indice de superficie de plancher, des constructions existantes ou à ériger sur le terrain;",
+        "f) les occupations du domaine public à prévoir;",
+        "g) les propositions d'intégration ou de démolition de constructions existantes, de conservation et de mise en valeur d'éléments architecturaux d'origine;",
+        "h) un plan montrant les propositions d'aménagement d'espaces extérieurs, de mise en valeur et de protection des plantations existantes et prévues;",
+        "i) un plan montrant les accès véhiculaires, les espaces de stationnement, les espaces de chargement et de déchargement, les espaces d'entreposage extérieur, les aires d'entreposage des conteneurs à déchets ;",
+        "k) les études nécessaires à l'évaluation du projet eu égard aux impacts environnementaux pour le drainage des eaux de surface et le contrôle de l'érosion pendant et après ;",
+        "j) dans le cas où le projet serait viabilisé par des installations privées d'alimentation en eau et d'évacuation des eaux sanitaires, un rapport technique, comprenant une étude de caractérisation du site et du terrain naturel réalisée par une personne membre d'un ordre professionnel habilité, confirmant la possibilité de desservir les lots projetés en eau potable et par des installations sanitaires conformes à la réglementation en vigueur.",
+        "m) l'estimation totale des coûts de réalisation et par item (bâtiments, aménagement du terrain, etc.), ainsi qu'un échéancier de réalisation ;",
+        "Le requérant peut joindre tout document qu'il juge utile au soutien du projet qu'il dépose. Un tel document sera étudié dans les délais prévus au présent règlement pour l'évaluation du programme.",
+        "Outre les renseignements prévus au présent article, le fonctionnaire désigné peut exiger du requérant une étude ou une expertise complémentaire portant sur un aspect du projet. Il doit fixer pour la production d'une telle étude ou expertise un délai d'au plus 90 jours, qui commence à courir à la date à laquelle le fonctionnaire désigné avise le requérant de cette exigence.",
+        "Les documents fournis en application du présent article demeurent la propriété de la Ville de Sainte-Adèle."
+      ],
+      "numero": 14,
+      "chapitre": 1
+    },
+    {
+      "titre": "CRITÈRES D'ÉVALUATION",
+      "pages": [
+        4,
+        4
+      ],
+      "alineas": [
+        "Les critères selon lesquels est faite l'évaluation d'une demande d'autorisation de projet particulier sont les suivants :",
+        "a) Le projet doit respecter les objectifs du plan d'urbanisme en vigueur ;",
+        "b) la compatibilité et mitigation des impacts des occupations prévues au projet avec le milieu d'insertion;",
+        "c) les qualités d'intégration du projet sur le plan de l'implantation, de la volumétrie, de la densité et de l'aménagement des lieux;",
+        "d) la contribution du projet à enrichir le patrimoine architectural, naturel et paysager de la Vi Ile ;",
+        "e) les avantages des propositions d'intégration ou de démolition des constructions existantes et de celles pour la conservation ou la mise en valeur d'éléments architecturaux d'origine;",
+        "f) les avantages des propositions de mise en valeur des espaces extérieurs et des plantations;",
+        "g) les impacts environnementaux du projet, notamment sur le plan du drainage, du paysage naturel, de l'érosion, du bruit et de la circulation ;",
+        "h) la qualité de l'organisation fonctionnelle du projet, au regard notamment du stationnement, des accès et de la sécurité;",
+        "i) les avantages des composantes culturelles ou sociales du projet, s'il y a lieu;",
+        "j) la faisabilité du projet selon l'échéancier de réalisation prévu.",
+        "Malgré le paragraphe a) du présent, un projet particulier peut être approuvé même s'il ne rencontre pas les densités minimales ou maximales inscrites au plan d'urbanisme. Pour l'application du présent article, le coefficient d'occupation du sol et le nombre de logements à l'hectare sont considérés comme une densité."
+      ],
+      "numero": 15,
+      "chapitre": 1
+    },
+    {
+      "titre": "TRANSMISSION DE LA DEMANDE AU CCU",
+      "pages": [
+        4,
+        5
+      ],
+      "alineas": [
+        "Dans les 90 jours suivant la date du dépôt d'un projet particulier, le fonctionnaire désigné transmet un exemplaire du projet au comité consultatif d'urbanisme, avec ou sans commentaires.",
+        "Après étude du projet particulier, le comité consultatif d'urbanisme soumet au conseil sa recommandation à l'effet d'accorder, avec ou sans conditions, la demande d'autorisation, ou de la refuser en précisant les motifs du refus.",
+        "Aux fins du présent article, la date de dépôt du projet particulier est celle à laquelle le requérant a fourni tous les renseignements requis aux articles 12 et 14. Le fonctionnaire désigné notifie cette date, par écrit, au requérant."
+      ],
+      "numero": 16,
+      "chapitre": 1
+    },
+    {
+      "titre": "TRANSMISSION DE LA DEMANDE AU CONSEIL ET DÉCISION",
+      "pages": [
+        5,
+        5
+      ],
+      "alineas": [
+        "Le fonctionnaire désigné transmet au conseil un exemplaire du projet particulier accompagné de la recommandation du comité consultatif d'urbanisme.",
+        "Le conseil rend, par résolution, sa décision à l'effet d'accorder ou de refuser la demande d'autorisation du projet particulier. Une copie certifiée conforme de la résolution du conseil est transmise au requérant de la demande.",
+        "La résolution du conseil, en cas de refus de la demande, doit préciser les motifs du refus.",
+        "La résolution qui accorde l'autorisation du projet particulier est assujettie aux procédures de consultation et d'approbation prévues à la Loi sur l'aménagement et l'urbanisme (L.R.Q., chapitre A-19.1)."
+      ],
+      "numero": 17,
+      "chapitre": 1
+    },
+    {
+      "titre": "ENTRÉE EN VIGUEUR",
+      "pages": [
+        5,
+        5
+      ],
+      "alineas": [
+        "Le",
+        "présent règlement entrera en vigueur conformément à la Loi.",
+        "RÉSOLUTION NO. 2008-312 IL EST PROPOSÉ PAR LE CONSEILLER : M. Jean-Pierre Pariseau APPUYÉ PAR LE CONSEILLER : M. Victor Mainville ET RÉSOLU À L'UNANIMITÉ",
+        "QUE le règlement numéro 1000-2008-PPC soit adopté par le Conseil.",
+        "M. Claude Descôteaux, Maire Me Michel Rousseau, Avocat/greffier",
+        "DATE D'ENTRÉE EN VIGUEUR:"
+      ],
+      "numero": 18,
+      "chapitre": 2
+    }
+  ],
+  "numero": "1000-2008-PPC",
+  "objet": "projets particuliers de construction, de modification ou d'occupation d'un immeuble.",
+  "dates": {
+    "adoption": "A une séance ordinaire du Conseil municipal, tenue publiquement le 20 octobre 2008 à 20HOO dans la salle du Conseil Municipal située au 1386 de la rue Dumouchel, Sainte-Adèle, province de Québec, lieu ordinaire des séances à laquelle étaient présents Madame et Messieurs les Conseillers",
+    "avis": "ATIENDU QUE l'avis de motion du présent règlement a été donné lors de la séance ordinaire du 15 septembre 2008, par Monsieur le Conseiller Jean-Pierre Pariseau."
+  }
+}
