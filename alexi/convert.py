@@ -1,28 +1,11 @@
 """Conversion de PDF en CSV"""
 
-import csv
 import logging
-from pathlib import Path
-from typing import Iterator, Any
+from typing import Any, Iterator
 
 import pdfplumber
 
 LOGGER = logging.getLogger("convert")
-FIELDNAMES = [
-    "tag",
-    "text",
-    "page",
-    "page_width",
-    "page_height",
-    "r",
-    "g",
-    "b",
-    "x0",
-    "x1",
-    "top",
-    "bottom",
-    "doctop",
-]
 
 
 def extract_words(pdf: pdfplumber.PDF) -> Iterator[dict[str, Any]]:
@@ -56,3 +39,9 @@ def extract_words(pdf: pdfplumber.PDF) -> Iterator[dict[str, Any]]:
             for field in "x0", "x1", "top", "bottom", "doctop":
                 w[field] = round(float(w[field]))
             yield w
+
+
+class Converteur:
+    def __call__(self, infh: Any):
+        with pdfplumber.open(infh) as pdf:
+            return extract_words(pdf)

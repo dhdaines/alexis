@@ -11,18 +11,32 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, TextIO, Any
+from typing import Any, Iterable, TextIO
 
-import pdfplumber
 from bs4 import BeautifulSoup
 
-from .convert import extract_words, FIELDNAMES
+from .convert import Converteur
 from .extract import Extracteur
 from .index import index
 from .search import search
 from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
+FIELDNAMES = [
+    "tag",
+    "text",
+    "page",
+    "page_width",
+    "page_height",
+    "r",
+    "g",
+    "b",
+    "x0",
+    "x1",
+    "top",
+    "bottom",
+    "doctop",
+]
 
 
 def download_main(args):
@@ -63,9 +77,8 @@ def write_csv(
 
 def convert_main(args):
     """Convertir les PDF en CSV"""
-    with pdfplumber.open(args.pdf) as pdf:
-        LOGGER.info("processing %s", args.pdf)
-        write_csv(extract_words(pdf), sys.stdout)
+    conv = Converteur()
+    write_csv(conv(args.pdf), sys.stdout)
 
 
 def segment_main(args):
@@ -118,7 +131,9 @@ def make_argparse() -> argparse.ArgumentParser:
     convert = subp.add_parser(
         "convert", help="Convertir le texte et les objets des fichiers PDF en CSV"
     )
-    convert.add_argument("pdf", help="Fichier PDF à traiter", type=Path)
+    convert.add_argument(
+        "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
+    )
     convert.add_argument(
         "-v", "--verbose", help="Émettre des messages", action="store_true"
     )
