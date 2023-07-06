@@ -45,7 +45,7 @@ class Chapitre(Ancrage):
 class Contenu(BaseModel):
     """Modèle de base pour du contenu textuel."""
 
-    titre: Optional[str]
+    titre: Optional[str] = None
     pages: Tuple[int, int]
     alineas: List[str] = []
 

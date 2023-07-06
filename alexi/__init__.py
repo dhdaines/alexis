@@ -14,6 +14,7 @@ import pdfplumber
 from bs4 import BeautifulSoup
 
 from .convert import write_csv
+from .extract import Extracteur
 from .index import index
 from .search import search
 
@@ -69,7 +70,9 @@ def index_main(args):
 
 def extract_main(args):
     """Extraire la structure de documents à partir de CSV segmentés"""
-    pass
+    conv = Extracteur()
+    doc = conv(args.csv)
+    print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def search_main(args):
@@ -116,9 +119,11 @@ def make_argparse() -> argparse.ArgumentParser:
         "segment", help="Extraire les unités de texte des CSV"
     ).set_defaults(func=segment_main)
 
-    subp.add_parser(
+    extract = subp.add_parser(
         "extract", help="Extraire la structure des CSV segmentés en format JSON"
-    ).set_defaults(func=extract_main)
+    )
+    extract.add_argument("csv", help="Fichier CSV à traiter", type=Path)
+    extract.set_defaults(func=extract_main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
