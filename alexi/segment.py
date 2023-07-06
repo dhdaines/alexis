@@ -68,7 +68,7 @@ def detect_page_margins(
         yield word
 
 
-def detect_margins(words: Sequence[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+def detect_margins(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
     for page_number, page_words in itertools.groupby(words, key=lambda x: x["page"]):
         for word in detect_page_margins(page_number, list(page_words)):
             yield word
@@ -92,6 +92,6 @@ def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]
 class Segmenteur:
     def __call__(self, infh: TextIO) -> list[dict[str, Any]]:
         reader = csv.DictReader(infh)
-        words = detect_margins(list(reader))
+        words = detect_margins(reader)
         words = split_paragraphs(words)
         return list(words)
