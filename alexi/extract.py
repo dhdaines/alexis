@@ -5,10 +5,18 @@ Extraire la structure du document à partir de CSV étiqueté
 import re
 from csv import DictReader
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TextIO
 
-from alexi.types import (Annexe, Article, Attendu, Chapitre, Dates, Reglement,
-                         Section, SousSection)
+from alexi.types import (
+    Annexe,
+    Article,
+    Attendu,
+    Chapitre,
+    Dates,
+    Reglement,
+    Section,
+    SousSection,
+)
 
 
 class Extracteur:
@@ -255,6 +263,8 @@ class Extracteur:
             label = row["tag"]
             page = int(row["page"])
             word = row["text"]
+            if label == "":  # Should not happen! Ignore!
+                continue
             if label != "O":
                 newtag = label.partition("-")[2]
             if label[0] in ("B", "O") or newtag != tag:
@@ -282,9 +292,8 @@ class Extracteur:
             annexes=self.annexes,
         )
 
-    def __call__(self, csv: Path) -> Reglement:
+    def __call__(self, infh: TextIO) -> Reglement:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
-        with open(csv, "rt") as infh:
-            reader = DictReader(infh)
-            self.rows = list(reader)
+        reader = DictReader(infh)
+        self.rows = list(reader)
         return self.extract_text()

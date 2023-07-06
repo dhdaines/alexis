@@ -5,18 +5,22 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 """
 
 import argparse
+import csv
 import logging
 import re
 import subprocess
+import sys
 from pathlib import Path
+from typing import Iterable, TextIO, Any
 
 import pdfplumber
 from bs4 import BeautifulSoup
 
-from .convert import write_csv
+from .convert import extract_words, FIELDNAMES
 from .extract import Extracteur
 from .index import index
 from .search import search
+from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
 
@@ -49,19 +53,25 @@ def select_main(args):
                 print(path.relative_to("/"))
 
 
+def write_csv(
+    doc: Iterable[dict[str, Any]], outfh: TextIO, fieldnames: list[str] = FIELDNAMES
+):
+    writer = csv.DictWriter(outfh, fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(doc)
+
+
 def convert_main(args):
     """Convertir les PDF en CSV"""
-    if args.verbose:
-        global tqdm
-        tqdm = lambda x: x  # noqa: E731
-    with pdfplumber.open(args.infile) as pdf:
-        LOGGER.info("processing %s", args.infile)
-        write_csv(pdf, args.outfile)
+    with pdfplumber.open(args.pdf) as pdf:
+        LOGGER.info("processing %s", args.pdf)
+        write_csv(extract_words(pdf), sys.stdout)
 
 
 def segment_main(args):
     """Extraire les unités de texte des CSV"""
-    pass
+    seg = Segmenteur()
+    write_csv(seg(args.csv), sys.stdout)
 
 
 def index_main(args):
@@ -70,7 +80,7 @@ def index_main(args):
 
 def extract_main(args):
     """Extraire la structure de documents à partir de CSV segmentés"""
-    conv = Extracteur(fichier=Path(args.csv.name).with_suffix(".pdf"))
+    conv = Extracteur(fichier=args.name)
     doc = conv(args.csv)
     print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
@@ -108,21 +118,29 @@ def make_argparse() -> argparse.ArgumentParser:
     convert = subp.add_parser(
         "convert", help="Convertir le texte et les objets des fichiers PDF en CSV"
     )
-    convert.add_argument("infile", help="Fichier PDF à traiter", type=Path)
-    convert.add_argument("outfile", help="Fichier CSV à créer", type=Path)
+    convert.add_argument("pdf", help="Fichier PDF à traiter", type=Path)
     convert.add_argument(
         "-v", "--verbose", help="Émettre des messages", action="store_true"
     )
     convert.set_defaults(func=convert_main)
 
-    subp.add_parser(
-        "segment", help="Extraire les unités de texte des CSV"
-    ).set_defaults(func=segment_main)
+    segment = subp.add_parser("segment", help="Extraire les unités de texte des CSV")
+    segment.add_argument(
+        "csv",
+        help="Fichier CSV à traiter",
+        type=argparse.FileType("rt"),
+    )
+    segment.set_defaults(func=segment_main)
 
     extract = subp.add_parser(
         "extract", help="Extraire la structure des CSV segmentés en format JSON"
     )
-    extract.add_argument("csv", help="Fichier CSV à traiter", type=Path)
+    extract.add_argument(
+        "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
+    )
+    extract.add_argument(
+        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
+    )
     extract.set_defaults(func=extract_main)
 
     index = subp.add_parser(
