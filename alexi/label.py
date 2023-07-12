@@ -9,7 +9,7 @@ LOGGER = logging.getLogger("label")
 
 def group_paragraphs(
     words: Iterable[dict[str, Any]]
-) -> Iterator[tuple[str, Iterable[dict[str, Any]]]]:
+) -> Iterator[tuple[str, list[dict[str, Any]]]]:
     """Grouper le flux de mots par unité (BI*) de texte."""
     bio = tag = "O"
     paragraph = []
