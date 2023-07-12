@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from .convert import Converteur
 from .extract import Extracteur
 from .index import index
+from .label import Classificateur
 from .search import search
 from .segment import Segmenteur
 
@@ -87,6 +88,12 @@ def segment_main(args):
     write_csv(seg(args.csv), sys.stdout)
 
 
+def label_main(args):
+    """Étiquetter les unités de texte des CSV"""
+    seg = Classificateur()
+    write_csv(seg(args.csv), sys.stdout)
+
+
 def index_main(args):
     index(args.outdir, args.jsons)
 
@@ -147,8 +154,17 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     segment.set_defaults(func=segment_main)
 
+    label = subp.add_parser("label", help="Étiquetter les unités de texte dans un CSV")
+    label.add_argument(
+        "csv",
+        help="Fichier CSV à traiter",
+        type=argparse.FileType("rt"),
+    )
+    label.set_defaults(func=label_main)
+
     extract = subp.add_parser(
-        "extract", help="Extraire la structure des CSV segmentés en format JSON"
+        "extract",
+        help="Extraire la structure en format JSON en partant du CSV étiquetté",
     )
     extract.add_argument(
         "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
