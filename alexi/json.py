@@ -7,19 +7,11 @@ from csv import DictReader
 from pathlib import Path
 from typing import Dict, List, Optional, TextIO
 
-from alexi.types import (
-    Annexe,
-    Article,
-    Attendu,
-    Chapitre,
-    Dates,
-    Reglement,
-    Section,
-    SousSection,
-)
+from alexi.types import (Annexe, Article, Attendu, Chapitre, Dates, Reglement,
+                         Section, SousSection)
 
 
-class Extracteur:
+class Formatteur:
     fichier: Path
     numero: str
     objet: Optional[str] = None

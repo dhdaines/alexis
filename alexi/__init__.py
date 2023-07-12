@@ -16,8 +16,8 @@ from typing import Any, Iterable, TextIO
 from bs4 import BeautifulSoup
 
 from .convert import Converteur
-from .extract import Extracteur
 from .index import index
+from .json import Formatteur
 from .label import Classificateur
 from .search import search
 from .segment import Segmenteur
@@ -95,17 +95,19 @@ def label_main(args):
 
 
 def index_main(args):
+    """Construire un index sur des fichiers JSON"""
     index(args.outdir, args.jsons)
 
 
-def extract_main(args):
-    """Extraire la structure de documents à partir de CSV segmentés"""
-    conv = Extracteur(fichier=args.name)
+def json_main(args):
+    """Convertir un CSV segmenté en JSON"""
+    conv = Formatteur(fichier=args.name)
     doc = conv(args.csv)
-    print(doc.model_dump_json(indent=2, exclude_defaults=True))
+    print(doc.json(indent=2, exclude_defaults=True))
 
 
 def search_main(args):
+    """Lancer une recherche sur l'index"""
     search(args.indexdir, args.query)
 
 
@@ -162,17 +164,15 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     label.set_defaults(func=label_main)
 
-    extract = subp.add_parser(
-        "extract",
+    json = subp.add_parser(
+        "json",
         help="Extraire la structure en format JSON en partant du CSV étiquetté",
     )
-    extract.add_argument(
+    json.add_argument(
         "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
     )
-    extract.add_argument(
-        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
-    )
-    extract.set_defaults(func=extract_main)
+    json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    json.set_defaults(func=json_main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
