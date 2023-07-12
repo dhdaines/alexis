@@ -121,6 +121,13 @@ class Classificateur:
             tag = "Attendu"
             if re.match(r".*avis de motion", text, re.IGNORECASE):
                 tag = "Avis"
+        elif word["text"].lower() == "chapitre":
+            tag = "Chapitre"
+        elif word["text"].lower() == "section":
+            tag = "Section"
+        elif word["text"].lower() == "sous-section":
+            # FIXME: Not the only way we find these
+            tag = "SousSection"
         return [(tag, paragraph)]
 
     def output_paragraph(
