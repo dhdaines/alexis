@@ -1,6 +1,8 @@
 """Classification des unités de texte en format CSV"""
 
+import itertools
 import logging
+import re
 from collections.abc import Iterable, Sequence
 from typing import Any, Iterator
 
@@ -35,26 +37,96 @@ def group_paragraphs(
         yield tag, paragraph
 
 
+def line_breaks(
+    paragraph: Sequence[dict[str, Any]]
+) -> Iterable[Sequence[dict[str, Any]]]:
+    xdeltas = [int(paragraph[0]["x0"])]
+    xdeltas.extend(
+        int(b["x0"]) - int(a["x0"]) for a, b in itertools.pairwise(paragraph)
+    )
+    line = []
+    for word, xdelta in zip(paragraph, xdeltas):
+        if xdelta < 0:
+            yield line
+            line = []
+        line.append(word)
+    if line:
+        yield line
+
+
+def extract_dates(
+    paragraph: Sequence[dict[str, Any]]
+) -> Iterable[tuple[str, Sequence[dict[str, Any]]]]:
+    for line in line_breaks(paragraph):
+        text = " ".join(w["text"] for w in line).lower()
+        if "avis" in text:
+            tag = "Avis"
+        elif "vigueur" in text:
+            tag = "Vigueur"
+        elif "adoption" in text:
+            tag = "Adoption"
+        elif "mrc" in text:
+            tag = "MRC"
+        elif "consultation publique" in text:
+            tag = "Publique"
+        elif "consultation écrite" in text:
+            tag = "Ecrite"
+        yield tag, line
+
+
 class Classificateur:
+    article_idx: int = 0
+    in_toc: bool = False
+
     def classify_paragraph_heuristic(
         self, tag: str, paragraph: Sequence[dict[str, Any]]
-    ) -> Iterator[dict[str, Any]]:
+    ) -> Iterable[tuple[str, Sequence[dict[str, Any]]]]:
         """Classification heuristique très simplistique d'un alinéa, suffisant
         pour détecter les articles, énumérations, et parfois les dates
         d'adoption.
         """
         if len(paragraph) == 0:
-            return
+            return []
         word = paragraph[0]
-        if word["text"].lower() == "article":
+        text = " ".join(w["text"] for w in paragraph)
+
+        if re.match("^table des mati[èe]res$", text, re.IGNORECASE):
+            self.in_toc = True
+        if self.in_toc:
+            # FIXME: Not entirely reliable way to detect end of TOC
+            if tag == "Tete" and re.match(".*chapitre", text, re.IGNORECASE):
+                self.in_toc = False
+            elif tag not in ("Pied", "Tete"):
+                return [("TOC", paragraph)]
+        if tag in ("Pied", "Tete"):
+            return [(tag, paragraph)]
+
+        # Detecter les dates dans des tableaux
+        if tag == "Tableau" and "avis de motion" in text.lower():
+            return extract_dates(paragraph)
+
+        if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
+            self.article_idx = int(m.group(1))
+        elif m := re.match(r"(\d+)", text):
+            idx = int(m.group(1))
+            if idx == self.article_idx + 1:
+                self.article_idx = idx
+                tag = "Article"
+            else:
+                tag = "Enumeration"
+        elif re.match(r"[a-z][\)\.]|[•-]", text):
+            tag = "Enumeration"
         elif word["text"].lower() == "attendu":
             tag = "Attendu"
-            for idx in range(len(paragraph) - 3):
-                if [
-                    w["text"].lower() for w in paragraph[idx : idx + 3]
-                ] == "avis de motion".split():
-                    tag = "Avis"
+            if re.match(r".*avis de motion", text, re.IGNORECASE):
+                tag = "Avis"
+        return [(tag, paragraph)]
+
+    def output_paragraph(
+        self, tag: str, paragraph: Sequence[dict[str, Any]]
+    ) -> Iterator[dict[str, Any]]:
+        word = paragraph[0]
         if tag == "O":
             word["tag"] = "O"
         else:
@@ -76,8 +148,9 @@ class Classificateur:
         for tag, paragraph in group_paragraphs(words):
             if not paragraph:
                 return
-            for word in self.classify_paragraph_heuristic(tag, paragraph):
-                yield word
+            # FIXME: Can split but not join paragraphs
+            for t, p in self.classify_paragraph_heuristic(tag, paragraph):
+                yield from self.output_paragraph(t, p)
 
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         words = self.classify_heuristic(words)
