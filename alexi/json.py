@@ -131,6 +131,13 @@ class Formatteur:
             self.titre = m.group(0)
             self.numero = m.group(1)
             self.objet = m.group(2)
+        elif m := re.search(
+            r"règlement(?:\s+numéro)?\s+(\S+)",
+            texte,
+            re.IGNORECASE,
+        ):
+            self.titre = m.group(0)
+            self.numero = m.group(1)
         else:
             self.titre = texte
 

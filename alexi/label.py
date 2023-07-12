@@ -63,6 +63,8 @@ def extract_dates(
             tag = "Avis"
         elif "vigueur" in text:
             tag = "Vigueur"
+        elif "projet" in text:  # Doit venir avant "adoption"
+            tag = "Projet"
         elif "adoption" in text:
             tag = "Adoption"
         elif "mrc" in text:
@@ -90,7 +92,7 @@ class Classificateur:
         word = paragraph[0]
         text = " ".join(w["text"] for w in paragraph)
 
-        if re.match("^table des mati[èe]res$", text, re.IGNORECASE):
+        if re.match("^table des mati[èe]res", text, re.IGNORECASE):
             self.in_toc = True
         if self.in_toc:
             # FIXME: Not entirely reliable way to detect end of TOC
@@ -128,6 +130,13 @@ class Classificateur:
         elif word["text"].lower() == "sous-section":
             # FIXME: Not the only way we find these
             tag = "SousSection"
+        elif re.match(
+            r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
+            text,
+            re.IGNORECASE,
+        ):
+            tag = "Titre"
+
         return [(tag, paragraph)]
 
     def output_paragraph(

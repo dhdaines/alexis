@@ -1,10 +1,9 @@
 """Segmentation du texte en format CSV"""
 
-import csv
 import itertools
 import logging
 from collections.abc import Iterable, Sequence
-from typing import Any, Iterator, TextIO
+from typing import Any, Iterator
 
 LOGGER = logging.getLogger("segment")
 
@@ -93,20 +92,22 @@ def detect_margins(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
 
 def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
     """Détection heuristique très simple des alinéas.  Un nouvel alinéa
-    est marqué lorsque l'interligne dépasse 1,5 fois la hauteur du
-    texte.
+    est marqué lorsque l'interligne dépasse 1,666 fois la hauteur de
+    la ligne précédente.
     """
     prev_top = 0
+    prev_height = 0
     for word in words:
         if "tag" in word and word["tag"]:
             pass
         elif word["top"] - prev_top < 0:
             word["tag"] = "B-Alinea"
-        elif word["top"] - prev_top >= 1.5 * (word["bottom"] - word["top"]):
+        elif word["top"] - prev_top > 1.666 * prev_height:
             word["tag"] = "B-Alinea"
         else:
             word["tag"] = "I-Alinea"
         prev_top = word["top"]
+        prev_height = word["bottom"] - word["top"]
         yield word
 
 
