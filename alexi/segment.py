@@ -98,7 +98,7 @@ def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]
     """
     prev_top = 0
     for word in words:
-        if word["tag"]:
+        if "tag" in word and word["tag"]:
             pass
         elif word["top"] - prev_top < 0:
             word["tag"] = "B-Alinea"
@@ -111,8 +111,7 @@ def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]
 
 
 class Segmenteur:
-    def __call__(self, infh: TextIO) -> list[dict[str, Any]]:
-        reader = csv.DictReader(infh)
-        words = detect_margins(reader)
+    def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+        words = detect_margins(words)
         words = split_paragraphs(words)
-        return list(words)
+        return words

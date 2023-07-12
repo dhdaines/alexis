@@ -1,9 +1,8 @@
 """Classification des unités de texte en format CSV"""
 
-import csv
 import logging
 from collections.abc import Iterable, Sequence
-from typing import Any, Iterator, TextIO
+from typing import Any, Iterator
 
 LOGGER = logging.getLogger("label")
 
@@ -80,7 +79,6 @@ class Classificateur:
             for word in self.classify_paragraph_heuristic(tag, paragraph):
                 yield word
 
-    def __call__(self, infh: TextIO) -> list[dict[str, Any]]:
-        reader = csv.DictReader(infh)
-        words = self.classify_heuristic(reader)
-        return list(words)
+    def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+        words = self.classify_heuristic(words)
+        return words

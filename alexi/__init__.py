@@ -85,25 +85,42 @@ def convert_main(args):
 def segment_main(args):
     """Extraire les unités de texte des CSV"""
     seg = Segmenteur()
-    write_csv(seg(args.csv), sys.stdout)
+    reader = csv.DictReader(args.csv)
+    write_csv(seg(reader), sys.stdout)
 
 
 def label_main(args):
     """Étiquetter les unités de texte des CSV"""
-    seg = Classificateur()
-    write_csv(seg(args.csv), sys.stdout)
-
-
-def index_main(args):
-    """Construire un index sur des fichiers JSON"""
-    index(args.outdir, args.jsons)
+    classificateur = Classificateur()
+    reader = csv.DictReader(args.csv)
+    write_csv(classificateur(reader), sys.stdout)
 
 
 def json_main(args):
     """Convertir un CSV segmenté en JSON"""
     conv = Formatteur(fichier=args.name)
-    doc = conv(args.csv)
+    reader = csv.DictReader(args.csv)
+    doc = conv(reader)
     print(doc.json(indent=2, exclude_defaults=True))
+
+
+def extract_main(args):
+    """Convertir un PDF en JSON"""
+    converteur = Converteur()
+    segmenteur = Segmenteur()
+    classificateur = Classificateur()
+    formatteur = Formatteur(fichier=Path(args.pdf.name).name)
+
+    doc = converteur(args.pdf)
+    doc = segmenteur(doc)
+    doc = classificateur(doc)
+    doc = formatteur(doc)
+    print(doc.json(indent=2, exclude_defaults=True))
+
+
+def index_main(args):
+    """Construire un index sur des fichiers JSON"""
+    index(args.outdir, args.jsons)
 
 
 def search_main(args):
@@ -173,6 +190,15 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     json.set_defaults(func=json_main)
+
+    extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
+    extract.add_argument(
+        "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
+    )
+    extract.add_argument(
+        "-v", "--verbose", help="Émettre des messages", action="store_true"
+    )
+    extract.set_defaults(func=extract_main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"

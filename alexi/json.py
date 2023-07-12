@@ -3,17 +3,24 @@ Extraire la structure du document à partir de CSV étiqueté
 """
 
 import re
-from csv import DictReader
 from pathlib import Path
-from typing import Dict, List, Optional, TextIO
+from typing import Dict, List, Optional, Iterable, Any
 
-from alexi.types import (Annexe, Article, Attendu, Chapitre, Dates, Reglement,
-                         Section, SousSection)
+from alexi.types import (
+    Annexe,
+    Article,
+    Attendu,
+    Chapitre,
+    Dates,
+    Reglement,
+    Section,
+    SousSection,
+)
 
 
 class Formatteur:
     fichier: Path
-    numero: str
+    numero: str = "INCONNU"
     objet: Optional[str] = None
     titre: Optional[str] = None
     chapitre: Optional[Chapitre] = None
@@ -31,7 +38,7 @@ class Formatteur:
         self.articles: List[Article] = []
         self.attendus: List[Attendu] = []
         self.annexes: List[Annexe] = []
-        self.dates: Dict[str, str] = {}
+        self.dates: Dict[str, str] = {"Adoption": "INCONNU"}
 
     def process_bloc(self, tag: str, bloc: str):
         """Ajouter un bloc de texte au bon endroit."""
@@ -126,7 +133,6 @@ class Formatteur:
             self.objet = m.group(2)
         else:
             self.titre = texte
-            self.numero = "INCONNU"
 
     def extract_date(self, tag: str, texte: str):
         self.dates[tag] = texte
@@ -284,8 +290,7 @@ class Formatteur:
             annexes=self.annexes,
         )
 
-    def __call__(self, infh: TextIO) -> Reglement:
+    def __call__(self, words: Iterable[dict[str, Any]]) -> Reglement:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
-        reader = DictReader(infh)
-        self.rows = list(reader)
+        self.rows = list(words)
         return self.extract_text()
