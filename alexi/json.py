@@ -122,7 +122,7 @@ class Formatteur:
         if m := re.search(
             r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
             texte,
-            re.IGNORECASE,
+            re.IGNORECASE | re.DOTALL,
         ):
             self.objet = m.group(1)
             self.numero = m.group(2)
@@ -130,7 +130,7 @@ class Formatteur:
         elif m := re.search(
             r"règlement(?:\s+numéro)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)",
             texte,
-            re.IGNORECASE,
+            re.IGNORECASE | re.DOTALL,
         ):
             self.titre = m.group(0)
             self.numero = m.group(1)
@@ -149,7 +149,7 @@ class Formatteur:
         self.dates[tag] = texte
 
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
-        m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE)
+        m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
             return None
         numero = m.group(1)
@@ -166,7 +166,7 @@ class Formatteur:
         return chapitre
 
     def extract_annexe(self, texte) -> Optional[Annexe]:
-        m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE)
+        m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
             return None
         numero = m.group(1)
@@ -183,7 +183,7 @@ class Formatteur:
         return annexe
 
     def extract_section(self, ligne: str) -> Optional[Section]:
-        m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE)
+        m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL)
         if m is None:
             return None
         sec = m.group(1)
@@ -201,7 +201,9 @@ class Formatteur:
         return section
 
     def extract_sous_section(self, ligne: str) -> Optional[SousSection]:
-        m = re.match(r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE)
+        m = re.match(
+            r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL
+        )
         if m is None:
             return None
         sec = m.group(1)
