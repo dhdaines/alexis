@@ -14,7 +14,10 @@ class Ancrage(BaseModel):
     pages: Tuple[int, int] = Field(
         description="Première et dernière indices de pages (en partant de 0) de cette partie"
     )
-    articles: Tuple[int, int] = (-1, -1)
+    contenus: Tuple[int, int] = Field(
+        (-1, -1),
+        description="Première et dernière indices de contenus (articles, alinéas, tableaux, etc)",
+    )
 
 
 class SousSection(Ancrage):
@@ -54,7 +57,7 @@ class Contenu(BaseModel):
 class Annexe(Contenu):
     """Annexe du texte."""
 
-    numero: str
+    annexe: str
 
 
 class Attendu(Contenu):
@@ -66,7 +69,7 @@ class Attendu(Contenu):
 class Article(Contenu):
     """Article du texte."""
 
-    numero: int = Field(
+    article: int = Field(
         description="Numéro de cet article tel qu'il apparaît dans le texte, ou -1 pour un article sans numéro"
     )
     sous_section: int = Field(
@@ -116,8 +119,7 @@ class Document(BaseModel):
     )
     chapitres: List[Chapitre] = []
     attendus: List[Attendu] = []
-    articles: List[Article] = []
-    annexes: List[Annexe] = []
+    contenus: List[Contenu] = []
 
 
 class Reglement(Document):
