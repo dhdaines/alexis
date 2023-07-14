@@ -3,6 +3,7 @@
 import itertools
 import logging
 import re
+from enum import Enum
 from collections.abc import Iterable, Sequence
 from typing import Any, Iterator
 
@@ -76,9 +77,72 @@ def extract_dates(
         yield tag, line
 
 
+class Bullet(Enum):
+    NUMERIC = re.compile(r"(\d+)[\)\.]?")
+    ALPHABETIC = re.compile(r"([a-z])[\)\.]", re.IGNORECASE)
+    ROMAN = re.compile(r"([xiv]+)[\)\.]", re.IGNORECASE)
+    BULLET = re.compile(r"([•-])")
+
+
+def extract_enumeration(
+    paragraph: Sequence[dict[str, Any]]
+) -> Iterable[tuple[str, Sequence[dict[str, Any]]]]:
+    word = paragraph[0]
+    pattern = None
+    for pattern in Bullet:
+        if pattern.value.match(word["text"]):
+            break
+    if pattern is None:
+        return [("Enumeration", paragraph)]
+    item = [word]
+    for word in paragraph[1:]:
+        if pattern.value.match(word["text"]):
+            if item:
+                yield ("Enumeration", item)
+                item = []
+        item.append(word)
+    if item:
+        yield ("Enumeration", item)
+
+
 class Classificateur:
     article_idx: int = 0
     in_toc: bool = False
+
+    def classify_alinea(
+        self, tag: str, paragraph: Sequence[dict[str, Any]], text: str
+    ) -> str:
+        word = paragraph[0]["text"].lower()
+        if m := re.match(r"article (\d+)", text, re.IGNORECASE):
+            tag = "Article"
+            self.article_idx = int(m.group(1))
+        elif m := re.match(r"(\d+)[\)\.]?", text):
+            idx = int(m.group(1))
+            if idx == self.article_idx + 1:
+                self.article_idx = idx
+                tag = "Article"
+            else:
+                tag = "Enumeration"
+        elif re.match(r"[a-z][\)\.]|[•-]", text):
+            tag = "Enumeration"
+        elif word == "attendu":
+            tag = "Attendu"
+            if re.match(r".*avis de motion", text, re.IGNORECASE):
+                tag = "Avis"
+        elif word == "chapitre":
+            tag = "Chapitre"
+        elif word == "section":
+            tag = "Section"
+        elif word == "sous-section":
+            # FIXME: Not the only way we find these
+            tag = "SousSection"
+        elif re.match(
+            r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
+            text,
+            re.IGNORECASE,
+        ):
+            tag = "Titre"
+        return tag
 
     def classify_paragraph_heuristic(
         self, tag: str, paragraph: Sequence[dict[str, Any]]
@@ -89,7 +153,6 @@ class Classificateur:
         """
         if len(paragraph) == 0:
             return []
-        word = paragraph[0]
         text = " ".join(w["text"] for w in paragraph)
 
         if re.match("^table des mati[èe]res", text, re.IGNORECASE):
@@ -107,36 +170,10 @@ class Classificateur:
         if tag == "Tableau" and "avis de motion" in text.lower():
             return extract_dates(paragraph)
 
-        if m := re.match(r"article (\d+)", text, re.IGNORECASE):
-            tag = "Article"
-            self.article_idx = int(m.group(1))
-        elif m := re.match(r"(\d+)", text):
-            idx = int(m.group(1))
-            if idx == self.article_idx + 1:
-                self.article_idx = idx
-                tag = "Article"
-            else:
-                tag = "Enumeration"
-        elif re.match(r"[a-z][\)\.]|[•-]", text):
-            tag = "Enumeration"
-        elif word["text"].lower() == "attendu":
-            tag = "Attendu"
-            if re.match(r".*avis de motion", text, re.IGNORECASE):
-                tag = "Avis"
-        elif word["text"].lower() == "chapitre":
-            tag = "Chapitre"
-        elif word["text"].lower() == "section":
-            tag = "Section"
-        elif word["text"].lower() == "sous-section":
-            # FIXME: Not the only way we find these
-            tag = "SousSection"
-        elif re.match(
-            r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
-            text,
-            re.IGNORECASE,
-        ):
-            tag = "Titre"
+        tag = self.classify_alinea(tag, paragraph, text)
 
+        if tag == "Enumeration":
+            return extract_enumeration(paragraph)
         return [(tag, paragraph)]
 
     def output_paragraph(
