@@ -29,32 +29,38 @@ def index(outdir: Path, jsons: List[Path]):
     writer = ix.writer()
     for path in jsons:
         reg = Reglement.parse_file(path)
-        for article in reg.articles:
+        for contenu in reg.contenus:
+            titre = [f"Règlement {reg.numero}"]
+            if hasattr(contenu, "article"):
+                titre.append(f"Article {contenu.article}")
+            if hasattr(contenu, "annexe"):
+                titre.append(f"Annexe {contenu.annexe}")
+            if contenu.titre is not None:
+                titre.append(contenu.titre)
             writer.add_document(
-                document=reg.fichier,
-                page=article.pages[0],
-                titre=f"Règlement {reg.numero} Article {article.numero}\n{article.titre}",
-                contenu="\n".join(article.alineas),
+                document=str(reg.fichier),
+                page=contenu.pages[0],
+                titre=" ".join(titre),
+                contenu="\n\n".join(contenu.alineas),
             )
         for chapitre in reg.chapitres:
             for section in chapitre.sections:
+
+                def make_contenu_texte(c):
+                    alineas = []
+                    if c.article:
+                        alineas.append(f"{c.article}. {c.titre}\n")
+                    return "\n\n".join(alineas)
+
                 writer.add_document(
                     document=reg.fichier,
                     page=section.pages[0],
                     titre=f"Règlement {reg.numero} Section {chapitre.numero}.{section.numero}\n{section.titre}",
                     contenu="\n\n".join(
-                        f"{article.numero}. {article.titre}\n"
-                        + "\n".join(article.alineas)
-                        for article in reg.articles[
-                            section.articles[0] : section.articles[1]
+                        make_contenu_texte(c)
+                        for c in reg.contenus[
+                            section.contenus[0] : section.contenus[1] + 1
                         ]
                     ),
                 )
-        for annexe in reg.annexes:
-            writer.add_document(
-                document=reg.fichier,
-                page=annexe.pages[0],
-                titre=f"Règlement {reg.numero} Annexe {annexe.numero}\n{annexe.titre}",
-                contenu="\n".join(annexe.alineas),
-            )
     writer.commit()

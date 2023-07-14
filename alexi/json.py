@@ -2,7 +2,6 @@
 Extraire la structure du document à partir de CSV étiqueté
 """
 
-import itertools
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Iterable, Any
@@ -39,7 +38,6 @@ class Formatteur:
         self.pages: List[str] = []
         self.chapitres: List[Chapitre] = []
         self.contenus: List[Contenu] = []
-        self.attendus: List[Attendu] = []
         self.dates: Dict[str, str] = {"Adoption": "INCONNU"}
 
     def process_bloc(self, tag: str, bloc: List[dict]):
@@ -248,7 +246,7 @@ class Formatteur:
 
     def extract_attendu(self, texte: str) -> Attendu:
         attendu = Attendu(pages=(self.pageidx, self.pageidx), alineas=[texte])
-        self.attendus.append(attendu)
+        self.contenus.append(attendu)
         return attendu
 
     def extract_alinea(self, texte: str, bloc: List[dict]) -> Contenu:

@@ -118,7 +118,6 @@ class Document(BaseModel):
         None, description="Titre du document (tel qu'il apparaît sur le site web)"
     )
     chapitres: List[Chapitre] = []
-    attendus: List[Attendu] = []
     contenus: List[Contenu] = []
 
 
