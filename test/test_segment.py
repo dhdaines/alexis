@@ -18,7 +18,8 @@ def test_segment():
                 writer.writerow(word)
             testfh.seek(0, 0)
             seg = Segmenteur()
-            words = list(seg(testfh))
+            reader = csv.DictReader(testfh)
+            words = list(seg(reader))
     assert len(words) > 0
     with open(DATADIR / "pdf_structure.csv", "rt") as infh:
         reader = csv.DictReader(infh)
