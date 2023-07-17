@@ -105,7 +105,7 @@ def json_main(args):
     conv = Formatteur(fichier=args.name)
     reader = csv.DictReader(args.csv)
     doc = conv(reader)
-    print(doc.json(indent=2, exclude_defaults=True))
+    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
 
 
 def extract_main(args):
@@ -119,7 +119,7 @@ def extract_main(args):
     doc = segmenteur(doc)
     doc = classificateur(doc)
     doc = formatteur(doc)
-    print(doc.json(indent=2, exclude_defaults=True))
+    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
 
 
 def index_main(args):
