@@ -42,19 +42,23 @@ FIELDNAMES = [
 
 def download_main(args):
     """Télécharger les fichiers avec wget"""
-    subprocess.run(
-        [
-            "wget",
-            "--no-check-certificate",
-            "--timestamping",
-            "--recursive",
-            "--level=1",
-            "--accept-regex",
-            r".*upload/documents/.*\.pdf",
-            "https://ville.sainte-adele.qc.ca/publications.php",
-        ],
-        check=True,
-    )
+    try:
+        subprocess.run(
+            [
+                "wget",
+                "--no-check-certificate",
+                "--timestamping",
+                "--recursive",
+                "--level=1",
+                "--accept-regex",
+                r".*upload/documents/.*\.pdf",
+                "https://ville.sainte-adele.qc.ca/publications.php",
+            ],
+            check=True,
+        )
+    except subprocess.CalledProcessError as err:
+        if err.returncode != 8:
+            raise
 
 
 def select_main(args):
