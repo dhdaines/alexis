@@ -136,10 +136,13 @@ class Classificateur:
         elif word == "sous-section":
             # FIXME: Not the only way we find these
             tag = "SousSection"
-        elif re.match(
-            r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
-            text,
-            re.IGNORECASE,
+        elif (
+            re.match(
+                r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
+                text,
+                re.IGNORECASE,
+            )
+            and int(paragraph[0]["page"]) < 5
         ):
             tag = "Titre"
         return tag
