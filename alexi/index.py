@@ -48,12 +48,12 @@ def index(outdir: Path, jsons: List[Path]):
 
                 def make_contenu_texte(c):
                     alineas = []
-                    if c.article:
+                    if hasattr(c, "article"):  # implies titre
                         alineas.append(f"{c.article}. {c.titre}\n")
                     return "\n\n".join(alineas)
 
                 writer.add_document(
-                    document=reg.fichier,
+                    document=str(reg.fichier),
                     page=section.pages[0],
                     titre=f"Règlement {reg.numero} Section {chapitre.numero}.{section.numero}\n{section.titre}",
                     contenu="\n\n".join(
