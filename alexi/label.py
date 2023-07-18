@@ -5,7 +5,7 @@ import logging
 import re
 from enum import Enum
 from collections.abc import Iterable, Sequence
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 LOGGER = logging.getLogger("label")
 
@@ -106,12 +106,27 @@ def extract_enumeration(
 
 
 class Classificateur:
+    chapitre: Optional[str] = None
+    en_tete: Optional[str] = None
     article_idx: int = 0
     in_toc: bool = False
+    debut_chapitre: bool = False
 
     def classify_alinea(
         self, tag: str, paragraph: Sequence[dict[str, Any]], text: str
     ) -> str:
+        if tag == "Tete":
+            # enregistrer l'en-tete pour assister en classification
+            en_tete = text.lower()
+            if en_tete != self.en_tete:
+                self.en_tete = en_tete
+                self.debut_chapitre = True
+            else:
+                self.debut_chapitre = False
+            return tag
+        elif tag == "Pied":
+            return tag
+
         word = paragraph[0]["text"].lower()
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
@@ -130,12 +145,34 @@ class Classificateur:
             if re.match(r".*avis de motion", text, re.IGNORECASE):
                 tag = "Avis"
         elif word == "chapitre":
-            tag = "Chapitre"
+            # voyons donc (faut du machine learning chose)
+            if (
+                self.chapitre is not None
+                and "dispositions déclaratoires" in self.chapitre
+                and int(paragraph[0]["top"]) > 200
+            ):
+                pass
+            else:
+                tag = "Chapitre"
+                self.chapitre = text.lower()
         elif word == "section":
             tag = "Section"
         elif word == "sous-section":
-            # FIXME: Not the only way we find these
+            # voyons donc #2
+            if (
+                self.chapitre is not None
+                and "dispositions déclaratoires" in self.chapitre
+                and int(paragraph[0]["top"]) > 200
+            ):
+                pass
+            else:
+                tag = "SousSection"
+        elif text.isupper() and int(paragraph[0]["x0"]) == 193:
+            # voyons donc #3 (problème de pdfplumber...?)
             tag = "SousSection"
+        elif text.isupper() and self.debut_chapitre:
+            # voyons donc #4 (problème de pdfplumber...?)
+            tag = "Chapitre"
         elif (
             re.match(
                 r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
@@ -145,6 +182,7 @@ class Classificateur:
             and int(paragraph[0]["page"]) < 5
         ):
             tag = "Titre"
+
         return tag
 
     def classify_paragraph_heuristic(
@@ -166,8 +204,6 @@ class Classificateur:
                 self.in_toc = False
             elif tag not in ("Pied", "Tete"):
                 return [("TOC", paragraph)]
-        if tag in ("Pied", "Tete"):
-            return [(tag, paragraph)]
 
         # Detecter les dates dans des tableaux
         if tag == "Tableau" and "avis de motion" in text.lower():

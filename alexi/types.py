@@ -60,8 +60,8 @@ class Annexe(Contenu):
     annexe: str
 
 
-class Attendu(Contenu):
-    """Attendu du texte."""
+class Attendus(Contenu):
+    """Attendus d'un reglement ou resolution."""
 
     pass
 
@@ -118,6 +118,7 @@ class Document(BaseModel):
         None, description="Titre du document (tel qu'il apparaît sur le site web)"
     )
     chapitres: List[Chapitre] = []
+    attendus: Optional[Attendus] = None
     contenus: List[Contenu] = []
 
 

@@ -10,7 +10,7 @@ from alexi.label import line_breaks
 from alexi.types import (
     Annexe,
     Article,
-    Attendu,
+    Attendus,
     Contenu,
     Chapitre,
     Dates,
@@ -30,8 +30,11 @@ class Formatteur:
     sous_section: Optional[SousSection] = None
     annexe: Optional[Annexe] = None
     article: Optional[Article] = None
+    attendus: Optional[Attendus] = None
     artidx: int = -1
     pageidx: int = -1
+    sous_section_idx: int = 0
+    chapitre_idx: int = 1
 
     def __init__(self, fichier: Path):
         self.fichier = fichier
@@ -151,9 +154,13 @@ class Formatteur:
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
         m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
-            return None
-        numero = m.group(1)
-        titre = m.group(2)
+            # problème de pdfplumber ou qqch
+            titre = texte
+            numero = str(self.chapitre_idx)
+            self.chapitre_idx += 1
+        else:
+            numero = m.group(1)
+            titre = m.group(2)
         chapitre = Chapitre(
             numero=numero,
             titre=titre,
@@ -198,6 +205,7 @@ class Formatteur:
         if self.chapitre:
             self.chapitre.sections.append(section)
         self.section = section
+        self.sous_section_idx = 1
         return section
 
     def extract_sous_section(self, ligne: str) -> Optional[SousSection]:
@@ -205,9 +213,13 @@ class Formatteur:
             r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL
         )
         if m is None:
-            return None
-        sec = m.group(1)
-        titre = m.group(2)
+            # problème de pdfplumber ou qqch
+            titre = ligne
+            sec = self.sous_section_idx
+            self.sous_section_idx += 1
+        else:
+            sec = m.group(1)
+            titre = m.group(2)
         sous_section = SousSection(
             numero=sec,
             titre=titre,
@@ -246,10 +258,12 @@ class Formatteur:
         self.artidx = num
         return self.new_article(num, m.group(2))
 
-    def extract_attendu(self, texte: str) -> Attendu:
-        attendu = Attendu(pages=(self.pageidx, self.pageidx), alineas=[texte])
-        self.contenus.append(attendu)
-        return attendu
+    def extract_attendu(self, texte: str) -> Contenu:
+        if self.attendus is None:
+            self.attendus = Contenu(pages=(self.pageidx, self.pageidx), alineas=[texte])
+        else:
+            self.attendus.alineas.append(texte)
+        return self.attendus
 
     def extract_alinea(self, texte: str, bloc: List[dict]) -> Contenu:
         contenu = Contenu(pages=(self.pageidx, self.pageidx), alineas=[texte])
@@ -302,6 +316,7 @@ class Formatteur:
             objet=self.objet,
             dates=self.make_dates(),
             chapitres=self.chapitres,
+            attendus=self.attendus,
             contenus=self.contenus,
         )
 
