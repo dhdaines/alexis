@@ -1,7 +1,7 @@
 """Conversion de PDF en CSV"""
 
 import logging
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 import pdfplumber
 
@@ -64,6 +64,6 @@ def extract_words(pdf: pdfplumber.PDF) -> Iterator[dict[str, Any]]:
 
 
 class Converteur:
-    def __call__(self, infh: Any):
+    def __call__(self, infh: Any) -> Iterable[dict[str, Any]]:
         with pdfplumber.open(infh) as pdf:
             return extract_words(pdf)

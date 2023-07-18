@@ -16,8 +16,9 @@ from typing import Any, Iterable, TextIO
 from bs4 import BeautifulSoup
 
 from .convert import Converteur
-from .extract import Extracteur
 from .index import index
+from .json import Formatteur
+from .label import Classificateur
 from .search import search
 from .segment import Segmenteur
 
@@ -41,19 +42,23 @@ FIELDNAMES = [
 
 def download_main(args):
     """Télécharger les fichiers avec wget"""
-    subprocess.run(
-        [
-            "wget",
-            "--no-check-certificate",
-            "--timestamping",
-            "--recursive",
-            "--level=1",
-            "--accept-regex",
-            r".*upload/documents/.*\.pdf",
-            "https://ville.sainte-adele.qc.ca/publications.php",
-        ],
-        check=True,
-    )
+    try:
+        subprocess.run(
+            [
+                "wget",
+                "--no-check-certificate",
+                "--timestamping",
+                "--recursive",
+                "--level=1",
+                "--accept-regex",
+                r".*upload/documents/.*\.pdf",
+                "https://ville.sainte-adele.qc.ca/publications.php",
+            ],
+            check=True,
+        )
+    except subprocess.CalledProcessError as err:
+        if err.returncode != 8:
+            raise
 
 
 def select_main(args):
@@ -84,21 +89,46 @@ def convert_main(args):
 def segment_main(args):
     """Extraire les unités de texte des CSV"""
     seg = Segmenteur()
-    write_csv(seg(args.csv), sys.stdout)
+    reader = csv.DictReader(args.csv)
+    write_csv(seg(reader), sys.stdout)
 
 
-def index_main(args):
-    index(args.outdir, args.jsons)
+def label_main(args):
+    """Étiquetter les unités de texte des CSV"""
+    classificateur = Classificateur()
+    reader = csv.DictReader(args.csv)
+    write_csv(classificateur(reader), sys.stdout)
+
+
+def json_main(args):
+    """Convertir un CSV segmenté en JSON"""
+    conv = Formatteur(fichier=args.name)
+    reader = csv.DictReader(args.csv)
+    doc = conv(reader)
+    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
 
 
 def extract_main(args):
-    """Extraire la structure de documents à partir de CSV segmentés"""
-    conv = Extracteur(fichier=args.name)
-    doc = conv(args.csv)
-    print(doc.model_dump_json(indent=2, exclude_defaults=True))
+    """Convertir un PDF en JSON"""
+    converteur = Converteur()
+    segmenteur = Segmenteur()
+    classificateur = Classificateur()
+    formatteur = Formatteur(fichier=Path(args.pdf.name).name)
+
+    doc = converteur(args.pdf)
+    doc = segmenteur(doc)
+    doc = classificateur(doc)
+    doc = formatteur(doc)
+    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
+
+
+def index_main(args):
+    """Construire un index sur des fichiers JSON"""
+    index(args.outdir, args.jsons)
 
 
 def search_main(args):
+    """Lancer une recherche sur l'index"""
     search(args.indexdir, args.query)
 
 
@@ -147,14 +177,30 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     segment.set_defaults(func=segment_main)
 
-    extract = subp.add_parser(
-        "extract", help="Extraire la structure des CSV segmentés en format JSON"
+    label = subp.add_parser("label", help="Étiquetter les unités de texte dans un CSV")
+    label.add_argument(
+        "csv",
+        help="Fichier CSV à traiter",
+        type=argparse.FileType("rt"),
     )
-    extract.add_argument(
+    label.set_defaults(func=label_main)
+
+    json = subp.add_parser(
+        "json",
+        help="Extraire la structure en format JSON en partant du CSV étiquetté",
+    )
+    json.add_argument(
         "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
     )
+    json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    json.set_defaults(func=json_main)
+
+    extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
     extract.add_argument(
-        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
+        "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
+    )
+    extract.add_argument(
+        "-v", "--verbose", help="Émettre des messages", action="store_true"
     )
     extract.set_defaults(func=extract_main)
 

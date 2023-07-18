@@ -3,14 +3,15 @@ Extraire la structure du document à partir de CSV étiqueté
 """
 
 import re
-from csv import DictReader
 from pathlib import Path
-from typing import Dict, List, Optional, TextIO
+from typing import Dict, List, Optional, Iterable, Any
 
+from alexi.label import line_breaks
 from alexi.types import (
     Annexe,
     Article,
     Attendu,
+    Contenu,
     Chapitre,
     Dates,
     Reglement,
@@ -19,9 +20,9 @@ from alexi.types import (
 )
 
 
-class Extracteur:
+class Formatteur:
     fichier: Path
-    numero: str
+    numero: str = "INCONNU"
     objet: Optional[str] = None
     titre: Optional[str] = None
     chapitre: Optional[Chapitre] = None
@@ -36,15 +37,16 @@ class Extracteur:
         self.fichier = fichier
         self.pages: List[str] = []
         self.chapitres: List[Chapitre] = []
-        self.articles: List[Article] = []
-        self.attendus: List[Attendu] = []
-        self.annexes: List[Annexe] = []
-        self.dates: Dict[str, str] = {}
+        self.contenus: List[Contenu] = []
+        self.dates: Dict[str, str] = {"Adoption": "INCONNU"}
 
-    def process_bloc(self, tag: str, bloc: str):
+    def process_bloc(self, tag: str, bloc: List[dict]):
         """Ajouter un bloc de texte au bon endroit."""
+        texte = "\n".join(
+            " ".join(w["text"] for w in line) for line in line_breaks(bloc)
+        )
         if tag == "Titre":
-            self.extract_titre(bloc)
+            self.extract_titre(texte)
         elif tag in (
             "Avis",
             "Projet",
@@ -54,26 +56,27 @@ class Extracteur:
             "Ecrite",
             "MRC",
         ):
-            self.extract_date(tag, bloc)
+            self.extract_date(tag, texte)
         elif tag == "Chapitre":
-            self.extract_chapitre(bloc)
+            self.extract_chapitre(texte)
         elif tag == "Section":
-            self.extract_section(bloc)
+            self.extract_section(texte)
         elif tag == "SousSection":
-            self.extract_sous_section(bloc)
+            self.extract_sous_section(texte)
         elif tag == "Annexe":
-            self.extract_annexe(bloc)
+            self.extract_annexe(texte)
         elif tag == "Attendu":
-            self.extract_attendu(bloc)
+            self.extract_attendu(texte)
         elif tag == "Article":
-            if self.extract_article(bloc) is None:
-                if self.article:
-                    self.article.alineas.append(bloc)
+            if self.extract_article(texte) is None:
+                self.extract_alinea(texte, bloc)
         elif tag in ("Alinea", "Enumeration"):
             if self.annexe:
-                self.annexe.alineas.append(bloc)
+                self.annexe.alineas.append(texte)
             elif self.article:
-                self.article.alineas.append(bloc)
+                self.article.alineas.append(texte)
+            else:
+                self.extract_alinea(texte, bloc)
 
     def close_annexe(self):
         """Clore la derniere annexe (et chapitre, et section, etc)"""
@@ -86,7 +89,7 @@ class Extracteur:
         """Clore le dernier chapitre (et section, etc)"""
         if self.chapitre:
             self.chapitre.pages = (self.chapitre.pages[0], self.pageidx)
-            self.chapitre.articles = (self.chapitre.articles[0], len(self.articles))
+            self.chapitre.contenus = (self.chapitre.contenus[0], len(self.contenus) - 1)
         self.chapitre = None
         self.close_section()
 
@@ -94,7 +97,7 @@ class Extracteur:
         """Clore la derniere section (et sous-section, etc)"""
         if self.section:
             self.section.pages = (self.section.pages[0], self.pageidx)
-            self.section.articles = (self.section.articles[0], len(self.articles))
+            self.section.contenus = (self.section.contenus[0], len(self.contenus) - 1)
         self.section = None
         self.close_sous_section()
 
@@ -102,9 +105,9 @@ class Extracteur:
         """Clore la derniere sous-section"""
         if self.sous_section:
             self.sous_section.pages = (self.sous_section.pages[0], self.pageidx)
-            self.sous_section.articles = (
-                self.sous_section.articles[0],
-                len(self.articles),
+            self.sous_section.contenus = (
+                self.sous_section.contenus[0],
+                len(self.contenus) - 1,
             )
         self.sous_section = None
         self.close_article()
@@ -119,7 +122,7 @@ class Extracteur:
         if m := re.search(
             r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
             texte,
-            re.IGNORECASE,
+            re.IGNORECASE | re.DOTALL,
         ):
             self.objet = m.group(1)
             self.numero = m.group(2)
@@ -127,20 +130,26 @@ class Extracteur:
         elif m := re.search(
             r"règlement(?:\s+numéro)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)",
             texte,
-            re.IGNORECASE,
+            re.IGNORECASE | re.DOTALL,
         ):
             self.titre = m.group(0)
             self.numero = m.group(1)
             self.objet = m.group(2)
+        elif m := re.search(
+            r"règlement(?:\s+numéro)?\s+(\S+)",
+            texte,
+            re.IGNORECASE,
+        ):
+            self.titre = m.group(0)
+            self.numero = m.group(1)
         else:
             self.titre = texte
-            self.numero = "INCONNU"
 
     def extract_date(self, tag: str, texte: str):
         self.dates[tag] = texte
 
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
-        m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE)
+        m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
             return None
         numero = m.group(1)
@@ -148,8 +157,8 @@ class Extracteur:
         chapitre = Chapitre(
             numero=numero,
             titre=titre,
-            pages=(self.pageidx, -1),
-            articles=(len(self.articles), -1),
+            pages=(self.pageidx, self.pageidx),
+            contenus=(len(self.contenus), len(self.contenus)),
         )
         self.close_chapitre()
         self.chapitre = chapitre
@@ -157,24 +166,24 @@ class Extracteur:
         return chapitre
 
     def extract_annexe(self, texte) -> Optional[Annexe]:
-        m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE)
+        m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
             return None
         numero = m.group(1)
         titre = m.group(2)
         annexe = Annexe(
-            numero=numero,
+            annexe=numero,
             titre=titre,
-            pages=(self.pageidx, -1),
+            pages=(self.pageidx, self.pageidx),
         )
         # Mettre à jour les indices de pages de la derniere annexe, chapitre, section, etc
         self.close_annexe()
         self.annexe = annexe
-        self.annexes.append(self.annexe)
+        self.contenus.append(self.annexe)
         return annexe
 
     def extract_section(self, ligne: str) -> Optional[Section]:
-        m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE)
+        m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL)
         if m is None:
             return None
         sec = m.group(1)
@@ -182,8 +191,8 @@ class Extracteur:
         section = Section(
             numero=sec,
             titre=titre,
-            pages=(self.pageidx, -1),
-            articles=(len(self.articles), -1),
+            pages=(self.pageidx, self.pageidx),
+            contenus=(len(self.contenus), len(self.contenus)),
         )
         self.close_section()
         if self.chapitre:
@@ -192,7 +201,9 @@ class Extracteur:
         return section
 
     def extract_sous_section(self, ligne: str) -> Optional[SousSection]:
-        m = re.match(r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE)
+        m = re.match(
+            r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL
+        )
         if m is None:
             return None
         sec = m.group(1)
@@ -200,8 +211,8 @@ class Extracteur:
         sous_section = SousSection(
             numero=sec,
             titre=titre,
-            pages=(self.pageidx, -1),
-            articles=(len(self.articles), -1),
+            pages=(self.pageidx, self.pageidx),
+            contenus=(len(self.contenus), len(self.contenus)),
         )
         self.close_sous_section()
         if self.section:
@@ -214,13 +225,13 @@ class Extracteur:
             chapitre=len(self.chapitres) - 1,
             section=(len(self.chapitre.sections) - 1 if self.chapitre else -1),
             sous_section=(len(self.section.sous_sections) - 1 if self.section else -1),
-            numero=num,
+            article=num,
             titre=titre,
-            pages=(self.pageidx, -1),
+            pages=(self.pageidx, self.pageidx),
             alineas=[],
         )
         self.close_article()
-        self.articles.append(article)
+        self.contenus.append(article)
         self.article = article
         return article
 
@@ -237,8 +248,13 @@ class Extracteur:
 
     def extract_attendu(self, texte: str) -> Attendu:
         attendu = Attendu(pages=(self.pageidx, self.pageidx), alineas=[texte])
-        self.attendus.append(attendu)
+        self.contenus.append(attendu)
         return attendu
+
+    def extract_alinea(self, texte: str, bloc: List[dict]) -> Contenu:
+        contenu = Contenu(pages=(self.pageidx, self.pageidx), alineas=[texte])
+        self.contenus.append(contenu)
+        return contenu
 
     def make_dates(self) -> Dates:
         return Dates(
@@ -255,28 +271,27 @@ class Extracteur:
         """Convertir une sequence de mots d'un CSV en structure"""
         if rows is not None:
             self.rows = rows
-        bloc: List[str] = []
+        bloc: List[dict] = []
         tag = newtag = "O"
         # Extraire les blocs de texte etiquettes
         self.pageidx = 0
-        for row in self.rows:
-            label = row["tag"]
-            page = int(row["page"])
-            word = row["text"]
+        for word in self.rows:
+            label = word["tag"]
+            page = int(word["page"])
             if label == "":  # Should not happen! Ignore!
                 continue
             if label != "O":
                 newtag = label.partition("-")[2]
             if label[0] in ("B", "O") or newtag != tag:
                 if bloc and tag:
-                    self.process_bloc(tag, " ".join(bloc))
+                    self.process_bloc(tag, bloc)
                     bloc = []
                     self.pageidx = page
                 tag = newtag
             if label != "O":
                 bloc.append(word)
         if bloc:
-            self.process_bloc(tag, " ".join(bloc))
+            self.process_bloc(tag, bloc)
         # Clore toutes les annexes, sections, chapitres, etc
         self.close_annexe()
         self.close_article()
@@ -287,13 +302,10 @@ class Extracteur:
             objet=self.objet,
             dates=self.make_dates(),
             chapitres=self.chapitres,
-            articles=self.articles,
-            attendus=self.attendus,
-            annexes=self.annexes,
+            contenus=self.contenus,
         )
 
-    def __call__(self, infh: TextIO) -> Reglement:
+    def __call__(self, words: Iterable[dict[str, Any]]) -> Reglement:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
-        reader = DictReader(infh)
-        self.rows = list(reader)
+        self.rows = list(words)
         return self.extract_text()

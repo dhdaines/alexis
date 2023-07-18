@@ -1,7 +1,9 @@
-upload/documents/10.2R-Projet-rgl-1220-1-AM.pdf
-upload/documents/10.3R-Projet-rgl-SQ-2023-AM.pdf
 upload/documents/10.1R-Projet-rgl-1000-2008-PPC-2-AM.pdf
-upload/documents/2023-03-20-Projet-Rgl-1314-2021-Z-9-AM.pdf
+upload/documents/2023-07-17-RGL-1314-2021-Z-10-AM.pdf
+upload/documents/2023-07-17-RGL-1314-2021-PC-3-AM.pdf
+upload/documents/2023-07-17-Rgl-1337-Type-Parapluie-2023-AM-.pdf
+upload/documents/2023-07-17-Rgl-1338-rue-du-Valais-AM-.pdf
+upload/documents/2023-07-12-RGL-SQ-2023-01-AM.pdf
 upload/documents/RGL-790-1993-Formation-du-CCU-COMPILATION-ADMINISTRATIVE.pdf
 upload/documents/2019-06-18-RGL-1132-1-amdt-occupation-domaine-public-Adoption.pdf
 upload/documents/RGL-1135-2010-Comite-culturel-COMPILATION-ADMINISTRATIVE.pdf
@@ -43,7 +45,7 @@ upload/documents/xx2023-04-17-RGL-1333-delegation-pouvoir.pdf
 upload/documents/RGL-1092-2007-vidange-des-boues-de-fosses-septiques.pdf
 upload/documents/RGL-1171-2012-Gestion-eau-potable-COMPILATION-ADMINISTRATIVE.pdf
 upload/documents/2016-04-27-Reglement-1202-Engrais-et-pesticides-COMPILATION-ADMINISTRATIVE.pdf
-upload/documents/2015-04-20-Reglement-1220-Matieres-residuelles-VF_2.pdf
+upload/documents/RGL-1220-Codification.pdf
 upload/documents/2023-03-07-Rgl-1221-Compteurs-eau-COMPILATION-ADM-rgl-1221-4.pdf
 upload/documents/xx-2020-04-20-RGL-1289-Formation-CCE-adopte_1.pdf
 upload/documents/RGL-1306-Lavage-embarcations-Adoption.pdf
@@ -146,8 +148,7 @@ upload/documents/xx-2019-10-21-RGL-1280-Nuisance-Adoption_1.pdf
 upload/documents/xx-2019-10-21-RGL-1281-Systeme-d-alarme-Adoption.pdf
 upload/documents/2020-12-14-RGL-1281-1-Systeme-d-alarme-Adoption.pdf
 upload/documents/2021-03-15-Reglement-1301-animaux-adoption.pdf
-upload/documents/Stationnement-periode-hivernale-et-stationnements-municipaux.pdf
-upload/documents/2022-09-29-RGL-SQ-2019-01-COMPILATION.pdf
+upload/documents/xx2023-06-20-rgl-SQ-2023-Adopte_1.pdf
 upload/documents/2022-12-19-Reglement-1327-Tarification-2023-Adoption_1.pdf
 upload/documents/2023-01-16-Rgl-1334-Taxation-2023-Adoption-Version-JT.pdf
 upload/documents/2022-01-26-Rgl-1320-Taxation-2022-adopte.pdf
@@ -164,12 +165,12 @@ upload/documents/Rgl-1314-2021-L-Lotissement.pdf
 upload/documents/Rgl-1314-2021-PC-version-en-vigueur-20230509.pdf
 upload/documents/2022-03-21-1314-2021-PC-1-Adopte_1.pdf
 upload/documents/xx2023-04-17-Rgl-1314-2021-PC-2-Adopte.pdf
-upload/documents/Codification-administrative-Rgl-1314-2021-PIIA-en-vigueur-17022023.pdf
+upload/documents/Rgl-1314-2021-PIIA-en-vigueur-17022023.pdf
 upload/documents/xx2023-02-17-Regl-1314-2021-PIIA-1-adopte.pdf
 upload/documents/Rgl-1314-2021-PU-refonte-Plan-d-urbanisme.pdf
 upload/documents/Rgl-1314-2021-TM-Travaux-municipaux.pdf
 upload/documents/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
-upload/documents/Rgl-1314-2021-Z-en-vigueur-20230509.pdf
+upload/documents/Rgl-1314-2021-Z-en-vigueur-20230614.pdf
 upload/documents/xx-2022-01-24-Reglement-1314-2021-Z-1-adopte-et-signe_1.pdf
 upload/documents/2022-02-21-Reglement-1314-2021-Z-2-adopte-_1.pdf
 upload/documents/2022-03-21-Rgl-1314-2021-Z-3-Omnibus-Adopte.pdf
@@ -178,6 +179,6 @@ upload/documents/2022-06-20-Reglement-1314-2021-Z-5-adopte.pdf
 upload/documents/2022-09-19-Rgl-1314-2021-Z-6-Adoption.pdf
 upload/documents/xx2023-02-17-Rgl-1314-2021-Z-7-adopte.pdf
 upload/documents/xx2023-04-17-Rgl-1314-2021-Z-8-Adopte.pdf
+upload/documents/xx2023-05-15-Rgl-1314-2021-Z-9-Adopte.pdf
 upload/documents/2022-03-21-Reglement-PAE-Adopte.pdf
 upload/documents/2022-04-19-Rgl-1324-redevances-adopte.pdf
-upload/documents/derogation-mineure-2013.pdf
