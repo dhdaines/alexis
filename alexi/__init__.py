@@ -82,7 +82,9 @@ def write_csv(
 
 def convert_main(args):
     """Convertir les PDF en CSV"""
-    conv = Converteur()
+    if args.images is not None:
+        args.images.mkdir(parents=True, exist_ok=True)
+    conv = Converteur(imgdir=args.images)
     write_csv(conv(args.pdf), sys.stdout)
 
 
@@ -163,6 +165,9 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     convert.add_argument(
         "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
+    )
+    convert.add_argument(
+        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
     convert.add_argument(
         "-v", "--verbose", help="Émettre des messages", action="store_true"
