@@ -155,18 +155,27 @@ class Classificateur:
             tag = "SousSection"
         elif (
             re.match(
-                r"r[eè]glement ?(?:de|d'|sur|relatif aux|concernant)?",
+                r"(?:ville de sainte-adèle.*)?r[eè]glement.*(?:de|d'|sur|relatif aux?|concernant|numero|numéro|no\.)",
                 text,
-                re.IGNORECASE,
+                re.DOTALL | re.IGNORECASE,
             )
             and int(paragraph[0]["page"]) < 3
         ):
             tag = "Titre"
         elif (
             re.match(
-                r"(?:de|d'|sur|relatif aux|concernant)",
+                r"^r[eè]glement\s+(?:numero|numéro|no\.\s+)?(\S+)$",
                 text,
-                re.IGNORECASE,
+                re.DOTALL | re.IGNORECASE,
+            )
+            and int(paragraph[0]["page"]) < 3
+        ):
+            tag = "Titre"
+        elif (
+            re.match(
+                r"(?:sur|relatif aux?|concernant|numero|numéro|no\.)",
+                text,
+                re.DOTALL | re.IGNORECASE,
             )
             and int(paragraph[0]["page"]) < 3
         ):
