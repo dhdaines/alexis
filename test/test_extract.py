@@ -56,8 +56,13 @@ EXPECT_TITLES = [
     ),
     (
         "test/data/RGL-1176-2012-Vente-de-garages-et-bazars-COMPILATION-ADMINISTRATIVE.pdf",
-        "Règlement numéro 1176-2012 concernant les ventes de garage et les bazars\nsur le territoire de la Ville de Sainte-Adèle.",
+        "RÈGLEMENT 1176-2012\nCONCERNANT LES VENTES DE GARAGES ET LES BAZARS SUR LE\nTERRITOIRE DE LA VILLE DE SAINTE-ADÈLE",
         "1176-2012",
+    ),
+    (
+        "test/data/domaine_publique_titre.pdf",
+        "RÈGLEMENT 1132-2010\nAFIN DE DÉCRÉTER DES DISPOSITIONS CONCERNANT L’OCCUPATION DU\nDOMAINE PUBLIC.",
+        "1132-2010",
     ),
 ]
 

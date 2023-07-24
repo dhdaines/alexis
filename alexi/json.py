@@ -202,7 +202,9 @@ class Formatteur:
 
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
         m = re.match(
-            r"(?:chapitre\s+)?(\d+|[XIV]+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL
+            r"(?:chapitre\s+)?(\d+|[XIV]+)(?: [-–])?\s+(.*)$",
+            texte,
+            re.IGNORECASE | re.DOTALL,
         )
         if m is None:
             numero = self.head_chapitre
@@ -222,7 +224,9 @@ class Formatteur:
         return chapitre
 
     def extract_annexe(self, texte) -> Optional[Annexe]:
-        m = re.match(r"annexe\s+(\S+)(?: –)?\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
+        m = re.match(
+            r"annexe\s+(\S+)(?: [-–])?\s+(.*)$", texte, re.IGNORECASE | re.DOTALL
+        )
         if m is None:
             return None
         numero = m.group(1)
@@ -239,7 +243,9 @@ class Formatteur:
         return annexe
 
     def extract_section(self, ligne: str) -> Optional[Section]:
-        m = re.match(r"(?:section\s+)?(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL)
+        m = re.match(
+            r"(?:section\s+)?(\d+)(?: [-–])?\s+(.*)", ligne, re.IGNORECASE | re.DOTALL
+        )
         if m is None:
             return None
         sec = m.group(1)
@@ -259,7 +265,9 @@ class Formatteur:
 
     def extract_sous_section(self, ligne: str) -> Optional[SousSection]:
         m = re.match(
-            r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL
+            r"(?:sous-section\s+)\d+\.(\d+)(?: [-–])?\s+(.*)",
+            ligne,
+            re.IGNORECASE | re.DOTALL,
         )
         if m is None:
             # texte "SOUS-SECTION" manquant (c'est un osti d'image, WTF!)
