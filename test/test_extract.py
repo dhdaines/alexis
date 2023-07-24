@@ -24,40 +24,51 @@ class ExtractArgs:
 
 
 EXPECT_TITLES = [
-    ("data/train/00-Reglement-1000-2008-PPC.pdf", "REGLEMENT NO. 1000-2008-PPC"),
+    (
+        "data/train/00-Reglement-1000-2008-PPC.pdf",
+        "REGLEMENT NO. 1000-2008-PPC",
+        "1000-2008-PPC",
+    ),
     (
         "data/train/2022-04-19-Rgl-1324-redevances-adopte.pdf",
         "RÈGLEMENT 1324\nrelatif au paiement d’une contribution pour financer en\ntout ou en partie une dépense liée à l’ajout,\nl’agrandissement ou la modification d’infrastructures ou\nd’équipements municipaux",
+        "1324",
     ),
     (
         "data/train/Rgl-1314-2021-L-Lotissement.pdf",
         "Règlement de lotissement Numéro 1314-2021-L",
+        "1314-2021-L",
     ),
     (
         "data/train/Rgl-1314-2021-PC-version-en-vigueur-20230509.pdf",
         "Règlement sur les permis et certificats Numéro 1314-2021-PC",
+        "1314-2021-PC",
     ),
     (
         "data/train/Rgl-1314-2021-TM-Travaux-municipaux.pdf",
         "Règlement sur les ententes relatives à des travaux municipaux Numéro 1314-2021-TM",
+        "1314-2021-TM",
     ),
     (
         "data/train/xx-2020-04-20-RGL-1289-Formation-CCE-adopte_1.pdf",
         "RÈGLEMENT 1289\nconcernant formation d’un Comité consultatif en\nenvironnement",
+        "1289",
     ),
     (
         "test/data/RGL-1176-2012-Vente-de-garages-et-bazars-COMPILATION-ADMINISTRATIVE.pdf",
         "Règlement numéro 1176-2012 concernant les ventes de garage et les bazars\nsur le territoire de la Ville de Sainte-Adèle.",
+        "1176-2012",
     ),
 ]
 
 
-@pytest.mark.parametrize("pdf,title", EXPECT_TITLES)
-def test_extract_titles(pdf, title):
+@pytest.mark.parametrize("pdf,title,numero", EXPECT_TITLES)
+def test_extract_titles(pdf, title, numero):
     with redirect_stdout(StringIO()) as out:
         extract_main(ExtractArgs(pdf=TOPDIR / pdf, pages="1,2"))
     reg = Reglement.model_validate_json(out.getvalue())
     assert reg.titre == title
+    assert reg.numero == numero
 
 
 def test_extract_toc():

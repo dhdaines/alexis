@@ -148,7 +148,7 @@ class Formatteur:
 
     def extract_titre(self, texte: str):
         if m := re.search(
-            r"r[eè]glement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
+            r"r[eè]glement(?:\s+(?:de|d'|sur|relatif aux?))?\s+(.*)\s+numéro\s+(\S+)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -156,7 +156,7 @@ class Formatteur:
             self.numero = m.group(2)
             self.titre = re.sub(r"\s+", " ", m.group(0))
         elif m := re.search(
-            r"r[eè]glement\s+(?:numéro|no\.)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux|concernant))?\s+(.*)",
+            r"r[eè]glement(?:\s+(?:numéro|no\.))\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux?|concernant))?\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -164,14 +164,29 @@ class Formatteur:
             self.numero = m.group(1)
             self.objet = m.group(2)
         elif m := re.search(
-            r"r[eè]glement\s+(?:numéro|no\.)?\s+(\S+)",
+            r"r[eè]glement(?:\s+(?:numéro|no\.))\s+(\S+)",
+            texte,
+            re.IGNORECASE,
+        ):
+            self.titre = m.group(0)
+            self.numero = m.group(1)
+        elif m := re.search(
+            r"r[eè]glement\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux?|concernant))?\s+(.*)",
+            texte,
+            re.IGNORECASE | re.DOTALL,
+        ):
+            self.titre = m.group(0)
+            self.numero = m.group(1)
+            self.objet = m.group(2)
+        elif m := re.search(
+            r"r[eè]glement\s+(\S+)",
             texte,
             re.IGNORECASE,
         ):
             self.titre = m.group(0)
             self.numero = m.group(1)
         elif m := re.match(
-            r"(?:de|d'|sur|relatif\saux|concernant)\s+(.*)",
+            r"(?:de|d'|sur|relatif\saux?|concernant)\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
