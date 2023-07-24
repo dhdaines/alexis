@@ -29,38 +29,18 @@ def index(outdir: Path, jsons: List[Path]):
     writer = ix.writer()
     for path in jsons:
         reg = Reglement.parse_file(path)
-        for contenu in reg.contenus:
+        for texte in reg.textes:
             titre = [f"Règlement {reg.numero}"]
-            if hasattr(contenu, "article"):
-                titre.append(f"Article {contenu.article}")
-            if hasattr(contenu, "annexe"):
-                titre.append(f"Annexe {contenu.annexe}")
-            if contenu.titre is not None:
-                titre.append(contenu.titre)
+            if hasattr(texte, "article"):
+                titre.append(f"Article {texte.article}")
+            elif hasattr(texte, "annexe"):
+                titre.append(f"Annexe {texte.annexe}")
+            if texte.titre is not None:
+                titre.append(texte.titre)
             writer.add_document(
                 document=str(reg.fichier),
-                page=contenu.pages[0],
+                page=texte.pages[0],
                 titre=" ".join(titre),
-                contenu="\n\n".join(contenu.alineas),
+                contenu="\n\n".join(c.texte for c in texte.contenu),
             )
-        for chapitre in reg.chapitres:
-            for section in chapitre.sections:
-
-                def make_contenu_texte(c):
-                    alineas = []
-                    if hasattr(c, "article"):  # implies titre
-                        alineas.append(f"{c.article}. {c.titre}\n")
-                    return "\n\n".join(alineas)
-
-                writer.add_document(
-                    document=str(reg.fichier),
-                    page=section.pages[0],
-                    titre=f"Règlement {reg.numero} Section {chapitre.numero}.{section.numero}\n{section.titre}",
-                    contenu="\n\n".join(
-                        make_contenu_texte(c)
-                        for c in reg.contenus[
-                            section.contenus[0] : section.contenus[1] + 1
-                        ]
-                    ),
-                )
     writer.commit()

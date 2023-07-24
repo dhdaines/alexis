@@ -2,7 +2,6 @@
 
 import itertools
 import logging
-
 from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
@@ -17,10 +16,11 @@ def get_tables(page):
     d = deque(st)
     while d:
         el = d.popleft()
-        if "children" in el:
-            d.extend(el["children"])
         if el["type"] == "Table":
             yield el
+        elif "children" in el:
+            # On ne traîte pas des tableaux imbriqués
+            d.extend(el["children"])
 
 
 def get_child_mcids(el):
@@ -33,21 +33,6 @@ def get_child_mcids(el):
             yield from el["mcids"]
 
 
-def unify_bbox(objects):
-    itor = iter(objects)
-    obj = next(itor)
-    x0 = obj["x0"]
-    top = obj["top"]
-    x1 = obj["x1"]
-    bottom = obj["bottom"]
-    for obj in itor:
-        x0 = min(x0, obj["x0"])
-        x1 = max(x1, obj["x1"])
-        top = min(top, obj["top"])
-        bottom = max(bottom, obj["bottom"])
-    return (x0, top, x1, bottom)
-
-
 def bbox_overlap(w, bbox):
     x0, top, x1, bottom = bbox
     return w["x0"] < x1 and w["x1"] > x0 and w["top"] < bottom and w["bottom"] > top
@@ -55,7 +40,7 @@ def bbox_overlap(w, bbox):
 
 def get_element_bbox(page, el):
     mcids = set(get_child_mcids(el))
-    return unify_bbox(
+    return pdfplumber.utils.objects_to_bbox(
         c for c in itertools.chain(page.chars, page.images) if c.get("mcid") in mcids
     )
 
@@ -80,7 +65,9 @@ class Converteur:
                 tbox = get_element_bbox(p, t)
                 tboxes.append(tbox)
                 if self.imgdir is not None:
-                    img = p.crop(add_margin(tbox, 10)).to_image(antialias=True)
+                    img = p.crop(add_margin(tbox, 10)).to_image(
+                        resolution=150, antialias=True
+                    )
                     img.save(self.imgdir / f"page{p.page_number}-table{idx + 1}.png")
 
             # Index characters for lookup
@@ -90,21 +77,15 @@ class Converteur:
             for w in words:
                 # Extract colour from first character (FIXME: assumes RGB space)
                 if c := chars.get((w["x0"], w["top"])):
-                    # OMG WTF pdfplumber!!!
-                    if isinstance(c["stroking_color"], list) or isinstance(
-                        c["stroking_color"], tuple
-                    ):
-                        if len(c["stroking_color"]) == 1:
-                            w["r"] = w["g"] = w["b"] = c["stroking_color"][0]
-                        elif len(c["stroking_color"]) == 3:
-                            w["r"], w["g"], w["b"] = c["stroking_color"]
-                        else:
-                            LOGGER.warning(
-                                "Espace couleur non pris en charge: %s",
-                                c["stroking_color"],
-                            )
+                    if len(c["stroking_color"]) == 1:
+                        w["r"] = w["g"] = w["b"] = c["stroking_color"][0]
+                    elif len(c["stroking_color"]) == 3:
+                        w["r"], w["g"], w["b"] = c["stroking_color"]
                     else:
-                        w["r"] = w["g"] = w["b"] = c["stroking_color"]
+                        LOGGER.warning(
+                            "Espace couleur non pris en charge: %s",
+                            c["stroking_color"],
+                        )
                 w["page"] = p.page_number
                 w["page_height"] = round(float(p.height))
                 w["page_width"] = round(float(p.width))

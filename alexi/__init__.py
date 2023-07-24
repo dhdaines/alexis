@@ -107,12 +107,14 @@ def json_main(args):
     conv = Formatteur(fichier=args.name)
     reader = csv.DictReader(args.csv)
     doc = conv(reader)
-    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
+    print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def extract_main(args):
     """Convertir un PDF en JSON"""
-    converteur = Converteur()
+    if args.images is not None:
+        args.images.mkdir(parents=True, exist_ok=True)
+    converteur = Converteur(imgdir=args.images)
     segmenteur = Segmenteur()
     classificateur = Classificateur()
     formatteur = Formatteur(fichier=Path(args.pdf.name).name)
@@ -121,7 +123,7 @@ def extract_main(args):
     doc = segmenteur(doc)
     doc = classificateur(doc)
     doc = formatteur(doc)
-    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
+    print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def index_main(args):
@@ -137,6 +139,9 @@ def search_main(args):
 def make_argparse() -> argparse.ArgumentParser:
     """Make the argparse"""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "-v", "--verbose", help="Émettre des messages", action="store_true"
+    )
     subp = parser.add_subparsers(required=True)
     subp.add_parser(
         "download", help="Télécharger les documents plus récents du site web"
@@ -168,9 +173,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     convert.add_argument(
         "--images", help="Répertoire pour écrire des images des tableaux", type=Path
-    )
-    convert.add_argument(
-        "-v", "--verbose", help="Émettre des messages", action="store_true"
     )
     convert.set_defaults(func=convert_main)
 
@@ -205,7 +207,7 @@ def make_argparse() -> argparse.ArgumentParser:
         "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
     )
     extract.add_argument(
-        "-v", "--verbose", help="Émettre des messages", action="store_true"
+        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
     extract.set_defaults(func=extract_main)
 
@@ -238,4 +240,5 @@ def make_argparse() -> argparse.ArgumentParser:
 def main():
     parser = make_argparse()
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
     args.func(args)
