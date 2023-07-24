@@ -110,6 +110,7 @@ class Classificateur:
     in_toc: bool = False
     debut_chapitre: bool = False
     head_chapitre: Optional[str] = None
+    prev_x0: int = 72
 
     def classify_alinea(
         self,
@@ -137,11 +138,11 @@ class Classificateur:
             tag = "Attendu"
             if re.match(r".*avis de motion", text, re.IGNORECASE):
                 tag = "Avis"
-        elif word == "chapitre":
+        elif word == "chapitre" and paragraph[1]["text"] != "X":
             tag = "Chapitre"
-        elif word == "section":
+        elif word == "section" and paragraph[1]["text"] != "X":
             tag = "Section"
-        elif word == "sous-section":
+        elif word == "sous-section" and paragraph[1]["text"] != "X.X":
             tag = "SousSection"
         elif (
             re.match(
@@ -161,7 +162,7 @@ class Classificateur:
             and int(paragraph[0]["page"]) < 3
         ):
             tag = "Titre"
-        elif text.isupper() and self.head_chapitre:
+        elif (text.isupper() or text == "T1.2 Récréation") and self.head_chapitre:
             # "CHAPITRE N" is an image, so check for upper-case text
             # on a page by itself with a chapter defined in the header
             n_nonhead_words = sum(
@@ -171,6 +172,13 @@ class Classificateur:
             )
             if n_nonhead_words == len(paragraph):
                 tag = "Chapitre"
+            elif (
+                # Rough heurstic for "SOUS-SECTION N.N" as an image
+                any(w["text"].isalpha() for w in paragraph)
+                and int(paragraph[0]["x0"]) - int(self.prev_x0) > 100
+            ):
+                if text != "CHAPITRE X":
+                    tag = "SousSection"
 
         return tag
 
@@ -216,6 +224,7 @@ class Classificateur:
         self, tag: str, paragraph: Sequence[dict[str, Any]]
     ) -> Iterator[dict[str, Any]]:
         word = paragraph[0]
+        cur_x0 = word["x0"]
         if tag == "O":
             word["tag"] = "O"
         else:
@@ -227,6 +236,7 @@ class Classificateur:
             else:
                 word["tag"] = f"I-{tag}"
             yield word
+        self.prev_x0 = cur_x0
 
     def classify_heuristic(
         self, words: Iterable[dict[str, Any]]

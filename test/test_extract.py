@@ -92,3 +92,25 @@ def test_extract_chapitres(pdf, pages, nchap):
         extract_main(ExtractArgs(pdf=TOPDIR / pdf, pages=pages))
     reg = Reglement.model_validate_json(out.getvalue())
     assert len(reg.chapitres) == nchap
+
+
+EXPECT_SECTIONS = [
+    (
+        "data/train/Rgl-1314-2021-PC-version-en-vigueur-20230509.pdf",
+        "20,21,22,23,24,25,26",
+        1,
+        4,
+    ),
+    ("data/train/Rgl-1314-2021-L-Lotissement.pdf", "5,6,7,8,9,10,11", 5, 0),
+    ("test/data/zonage_sections.pdf", None, 4, 3),
+    ("test/data/zonage_zones.pdf", None, 3, 6),
+]
+
+
+@pytest.mark.parametrize("pdf,pages,nsec,nssec", EXPECT_SECTIONS)
+def test_extract_sections(pdf, pages, nsec, nssec):
+    with redirect_stdout(StringIO()) as out:
+        extract_main(ExtractArgs(pdf=TOPDIR / pdf, pages=pages))
+    reg = Reglement.model_validate_json(out.getvalue())
+    assert sum(len(c.sections) for c in reg.chapitres) == nsec
+    assert sum(len(s.sous_sections) for s in reg.chapitres[0].sections) == nssec
