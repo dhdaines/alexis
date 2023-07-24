@@ -77,14 +77,16 @@ class Converteur:
             for w in words:
                 # Extract colour from first character (FIXME: assumes RGB space)
                 if c := chars.get((w["x0"], w["top"])):
-                    if len(c["stroking_color"]) == 1:
-                        w["r"] = w["g"] = w["b"] = c["stroking_color"][0]
-                    elif len(c["stroking_color"]) == 3:
-                        w["r"], w["g"], w["b"] = c["stroking_color"]
+                    if c.get("non_stroking_color") is None:
+                        w["r"] = w["g"] = w["b"] = 0
+                    elif len(c["non_stroking_color"]) == 1:
+                        w["r"] = w["g"] = w["b"] = c["non_stroking_color"][0]
+                    elif len(c["non_stroking_color"]) == 3:
+                        w["r"], w["g"], w["b"] = c["non_stroking_color"]
                     else:
                         LOGGER.warning(
                             "Espace couleur non pris en charge: %s",
-                            c["stroking_color"],
+                            c["non_stroking_color"],
                         )
                 w["page"] = p.page_number
                 w["page_height"] = round(float(p.height))
