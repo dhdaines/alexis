@@ -84,8 +84,12 @@ def convert_main(args):
     """Convertir les PDF en CSV"""
     if args.images is not None:
         args.images.mkdir(parents=True, exist_ok=True)
+    if args.pages:
+        pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
+    else:
+        pages = None
     conv = Converteur(imgdir=args.images)
-    write_csv(conv(args.pdf), sys.stdout)
+    write_csv(conv(args.pdf, pages), sys.stdout)
 
 
 def segment_main(args):
@@ -119,7 +123,11 @@ def extract_main(args):
     classificateur = Classificateur()
     formatteur = Formatteur(fichier=Path(args.pdf.name).name)
 
-    doc = converteur(args.pdf)
+    if args.pages:
+        pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
+    else:
+        pages = None
+    doc = converteur(args.pdf, pages)
     doc = segmenteur(doc)
     doc = classificateur(doc)
     doc = formatteur(doc)
@@ -174,6 +182,9 @@ def make_argparse() -> argparse.ArgumentParser:
     convert.add_argument(
         "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
+    convert.add_argument(
+        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
+    )
     convert.set_defaults(func=convert_main)
 
     segment = subp.add_parser("segment", help="Extraire les unités de texte des CSV")
@@ -205,6 +216,9 @@ def make_argparse() -> argparse.ArgumentParser:
     extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
     extract.add_argument(
         "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
+    )
+    extract.add_argument(
+        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
     )
     extract.add_argument(
         "--images", help="Répertoire pour écrire des images des tableaux", type=Path

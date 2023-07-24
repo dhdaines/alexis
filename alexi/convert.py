@@ -56,8 +56,13 @@ class Converteur:
     def __init__(self, imgdir=None):
         self.imgdir = imgdir
 
-    def extract_words(self, pdf: pdfplumber.PDF) -> Iterator[dict[str, Any]]:
-        for p in pdf.pages:
+    def extract_words(
+        self, pdf: pdfplumber.PDF, pages: Optional[list[int]] = None
+    ) -> Iterator[dict[str, Any]]:
+        if pages is None:
+            pages = list(range(len(pdf.pages)))
+        for idx in pages:
+            p = pdf.pages[idx]
             words = p.extract_words()
             tables = list(get_tables(p))
             tboxes = []
@@ -105,6 +110,8 @@ class Converteur:
                     w[field] = round(float(w[field]))
                 yield w
 
-    def __call__(self, infh: Any) -> Iterable[dict[str, Any]]:
+    def __call__(
+        self, infh: Any, pages: Optional[list[int]] = None
+    ) -> Iterable[dict[str, Any]]:
         with pdfplumber.open(infh) as pdf:
-            return self.extract_words(pdf)
+            yield from self.extract_words(pdf, pages)
