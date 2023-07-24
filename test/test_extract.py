@@ -123,3 +123,15 @@ def test_extract_sections(pdf, pages, nsec, nssec):
     reg = Reglement.model_validate_json(out.getvalue())
     assert sum(len(c.sections) for c in reg.chapitres) == nsec
     assert sum(len(s.sous_sections) for s in reg.chapitres[0].sections) == nssec
+
+
+def test_enumerations_articles():
+    with redirect_stdout(StringIO()) as out:
+        extract_main(
+            ExtractArgs(
+                pdf=TOPDIR / "data/train/Rgl-1314-2021-TM-Travaux-municipaux.pdf",
+                pages="4,5,6",
+            )
+        )
+    reg = Reglement.model_validate_json(out.getvalue())
+    assert [text.article for text in reg.textes] == list(range(1, 13))

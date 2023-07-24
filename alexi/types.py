@@ -66,7 +66,7 @@ class Texte(BaseModel):
 
     titre: Optional[str] = None
     pages: Tuple[int, int]
-    contenu: List[SerializeAsAny[Contenu]] = Field(
+    contenu: List[Contenu | Tableau] = Field(
         [], description="Contenus (alinéas, tableaux, images) de ce texte"
     )
 
@@ -135,7 +135,7 @@ class Document(BaseModel):
         None, description="Titre du document (tel qu'il apparaît sur le site web)"
     )
     chapitres: List[Chapitre] = []
-    textes: List[SerializeAsAny[Texte]] = []
+    textes: List[Article | Attendus | Annexe | Texte] = []
 
 
 class Reglement(Document):
