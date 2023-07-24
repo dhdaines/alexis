@@ -148,7 +148,7 @@ class Formatteur:
             self.numero = m.group(2)
             self.titre = re.sub(r"\s+", " ", m.group(0))
         elif m := re.search(
-            r"règlement(?:\s+numéro)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)",
+            r"règlement(?:\s+numéro)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux|concernant))?\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -162,6 +162,13 @@ class Formatteur:
         ):
             self.titre = m.group(0)
             self.numero = m.group(1)
+        elif m := re.match(
+            r"(?:de|d'|sur|relatif\saux|concernant)\s+(.*)",
+            texte,
+            re.IGNORECASE | re.DOTALL,
+        ):
+            self.titre = "\n".join((self.titre, m.group(0)))
+            self.objet = m.group(1)
         else:
             self.titre = texte
 

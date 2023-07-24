@@ -92,7 +92,7 @@ def detect_margins(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
 
 def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
     """Détection heuristique très simple des alinéas.  Un nouvel alinéa
-    est marqué lorsque l'interligne dépasse 1,666 fois la hauteur de
+    est marqué lorsque l'interligne dépasse 1,5 fois la hauteur de
     la ligne précédente.
     """
     prev_top = 0

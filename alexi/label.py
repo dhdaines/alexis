@@ -3,8 +3,8 @@
 import itertools
 import logging
 import re
-from enum import Enum
 from collections.abc import Iterable, Sequence
+from enum import Enum
 from typing import Any, Iterator, Optional
 
 LOGGER = logging.getLogger("label")
@@ -175,11 +175,20 @@ class Classificateur:
             tag = "Chapitre"
         elif (
             re.match(
-                r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
+                r"r[eè]glement ?(?:de|d'|sur|relatif aux|concernant)?",
                 text,
                 re.IGNORECASE,
             )
-            and int(paragraph[0]["page"]) < 5
+            and int(paragraph[0]["page"]) < 3
+        ):
+            tag = "Titre"
+        elif (
+            re.match(
+                r"(?:de|d'|sur|relatif aux|concernant)",
+                text,
+                re.IGNORECASE,
+            )
+            and int(paragraph[0]["page"]) < 3
         ):
             tag = "Titre"
 
@@ -200,6 +209,7 @@ class Classificateur:
             self.in_toc = True
         if self.in_toc:
             # FIXME: Not entirely reliable way to detect end of TOC
+            # (should use structure tree in convert)
             if tag == "Tete" and re.match(".*chapitre", text, re.IGNORECASE):
                 self.in_toc = False
             elif tag not in ("Pied", "Tete"):
