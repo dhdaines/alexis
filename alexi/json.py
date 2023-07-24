@@ -2,22 +2,16 @@
 Extraire la structure du document à partir de CSV étiqueté
 """
 
+import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Iterable, Any
+from typing import Any, Dict, Iterable, List, Optional
 
 from alexi.label import line_breaks
-from alexi.types import (
-    Annexe,
-    Article,
-    Attendus,
-    Contenu,
-    Chapitre,
-    Dates,
-    Reglement,
-    Section,
-    SousSection,
-)
+from alexi.types import (Annexe, Article, Attendus, Chapitre, Contenu, Dates,
+                         Reglement, Section, SousSection, Tableau, Texte)
+
+LOGGER = logging.getLogger("json")
 
 
 class Formatteur:
@@ -33,14 +27,15 @@ class Formatteur:
     attendus: Optional[Attendus] = None
     artidx: int = -1
     pageidx: int = -1
+    tableidx: int = -1
     sous_section_idx: int = 0
     chapitre_idx: int = 1
 
     def __init__(self, fichier: Path):
-        self.fichier = fichier
+        self.fichier = Path(fichier)
         self.pages: List[str] = []
         self.chapitres: List[Chapitre] = []
-        self.contenus: List[Contenu] = []
+        self.textes: List[Texte] = []
         self.dates: Dict[str, str] = {"Adoption": "INCONNU"}
 
     def process_bloc(self, tag: str, bloc: List[dict]):
@@ -48,6 +43,9 @@ class Formatteur:
         texte = "\n".join(
             " ".join(w["text"] for w in line) for line in line_breaks(bloc)
         )
+        contenu = Contenu(texte=texte)
+        # Ne sera utilisé que si on n'a pas de structure défini
+        paragraphe = Texte(pages=(self.pageidx, self.pageidx), contenu=[contenu])
         if tag == "Titre":
             self.extract_titre(texte)
         elif tag in (
@@ -68,18 +66,37 @@ class Formatteur:
             self.extract_sous_section(texte)
         elif tag == "Annexe":
             self.extract_annexe(texte)
-        elif tag == "Attendu":
-            self.extract_attendu(texte)
         elif tag == "Article":
             if self.extract_article(texte) is None:
-                self.extract_alinea(texte, bloc)
-        elif tag in ("Alinea", "Enumeration"):
+                self.textes.append(paragraphe)
+        elif tag == "Attendu":
+            self.extract_attendu(contenu)
+        elif tag == "Tableau":
+            assert self.tableidx > 0
+            tableau = Tableau(
+                texte=texte,
+                tableau=Path(self.fichier.stem)
+                / f"page{self.pageidx}-table{self.tableidx}.png",
+            )
+            LOGGER.info("Tableau sur page %d: %s", self.pageidx, tableau.tableau)
+            self.tableidx += 1
             if self.annexe:
-                self.annexe.alineas.append(texte)
+                self.annexe.contenu.append(tableau)
             elif self.article:
-                self.article.alineas.append(texte)
+                self.article.contenu.append(tableau)
             else:
-                self.extract_alinea(texte, bloc)
+                paragraphe = Texte(
+                    pages=(self.pageidx, self.pageidx), contenu=[tableau]
+                )
+                self.textes.append(paragraphe)
+        elif tag in ("Alinea", "Enumeration"):
+            # FIXME: à l'avenir on va prendre en charge les listes/énumérations
+            if self.annexe:
+                self.annexe.contenu.append(contenu)
+            elif self.article:
+                self.article.contenu.append(contenu)
+            else:
+                self.textes.append(paragraphe)
 
     def close_annexe(self):
         """Clore la derniere annexe (et chapitre, et section, etc)"""
@@ -92,7 +109,7 @@ class Formatteur:
         """Clore le dernier chapitre (et section, etc)"""
         if self.chapitre:
             self.chapitre.pages = (self.chapitre.pages[0], self.pageidx)
-            self.chapitre.contenus = (self.chapitre.contenus[0], len(self.contenus) - 1)
+            self.chapitre.textes = (self.chapitre.textes[0], len(self.textes) - 1)
         self.chapitre = None
         self.close_section()
 
@@ -100,7 +117,7 @@ class Formatteur:
         """Clore la derniere section (et sous-section, etc)"""
         if self.section:
             self.section.pages = (self.section.pages[0], self.pageidx)
-            self.section.contenus = (self.section.contenus[0], len(self.contenus) - 1)
+            self.section.textes = (self.section.textes[0], len(self.textes) - 1)
         self.section = None
         self.close_sous_section()
 
@@ -108,9 +125,9 @@ class Formatteur:
         """Clore la derniere sous-section"""
         if self.sous_section:
             self.sous_section.pages = (self.sous_section.pages[0], self.pageidx)
-            self.sous_section.contenus = (
-                self.sous_section.contenus[0],
-                len(self.contenus) - 1,
+            self.sous_section.textes = (
+                self.sous_section.textes[0],
+                len(self.textes) - 1,
             )
         self.sous_section = None
         self.close_article()
@@ -154,7 +171,8 @@ class Formatteur:
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
         m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
-            # problème de pdfplumber ou qqch
+            # texte "CHAPITRE" manquant (c'est un osti d'image, WTF!)
+            # FIXME: detecter l'image en question dans convert.py
             titre = texte
             numero = str(self.chapitre_idx)
             self.chapitre_idx += 1
@@ -165,7 +183,7 @@ class Formatteur:
             numero=numero,
             titre=titre,
             pages=(self.pageidx, self.pageidx),
-            contenus=(len(self.contenus), len(self.contenus)),
+            textes=(len(self.textes), len(self.textes)),
         )
         self.close_chapitre()
         self.chapitre = chapitre
@@ -186,7 +204,7 @@ class Formatteur:
         # Mettre à jour les indices de pages de la derniere annexe, chapitre, section, etc
         self.close_annexe()
         self.annexe = annexe
-        self.contenus.append(self.annexe)
+        self.textes.append(self.annexe)
         return annexe
 
     def extract_section(self, ligne: str) -> Optional[Section]:
@@ -199,7 +217,7 @@ class Formatteur:
             numero=sec,
             titre=titre,
             pages=(self.pageidx, self.pageidx),
-            contenus=(len(self.contenus), len(self.contenus)),
+            textes=(len(self.textes), len(self.textes)),
         )
         self.close_section()
         if self.chapitre:
@@ -213,9 +231,10 @@ class Formatteur:
             r"(?:sous-section\s+)\d+\.(\d+)\s+(.*)", ligne, re.IGNORECASE | re.DOTALL
         )
         if m is None:
-            # problème de pdfplumber ou qqch
+            # texte "SOUS-SECTION" manquant (c'est un osti d'image, WTF!)
+            # FIXME: detecter l'image en question dans convert.py
             titre = ligne
-            sec = self.sous_section_idx
+            sec = str(self.sous_section_idx)
             self.sous_section_idx += 1
         else:
             sec = m.group(1)
@@ -224,7 +243,7 @@ class Formatteur:
             numero=sec,
             titre=titre,
             pages=(self.pageidx, self.pageidx),
-            contenus=(len(self.contenus), len(self.contenus)),
+            textes=(len(self.textes), len(self.textes)),
         )
         self.close_sous_section()
         if self.section:
@@ -243,7 +262,7 @@ class Formatteur:
             alineas=[],
         )
         self.close_article()
-        self.contenus.append(article)
+        self.textes.append(article)
         self.article = article
         return article
 
@@ -258,17 +277,14 @@ class Formatteur:
         self.artidx = num
         return self.new_article(num, m.group(2))
 
-    def extract_attendu(self, texte: str) -> Contenu:
+    def extract_attendu(self, contenu: Contenu):
         if self.attendus is None:
-            self.attendus = Contenu(pages=(self.pageidx, self.pageidx), alineas=[texte])
+            self.attendus = Attendus(
+                attendu=True, pages=(self.pageidx, self.pageidx), contenu=[contenu]
+            )
         else:
-            self.attendus.alineas.append(texte)
+            self.attendus.contenu.append(contenu)
         return self.attendus
-
-    def extract_alinea(self, texte: str, bloc: List[dict]) -> Contenu:
-        contenu = Contenu(pages=(self.pageidx, self.pageidx), alineas=[texte])
-        self.contenus.append(contenu)
-        return contenu
 
     def make_dates(self) -> Dates:
         return Dates(
@@ -288,10 +304,12 @@ class Formatteur:
         bloc: List[dict] = []
         tag = newtag = "O"
         # Extraire les blocs de texte etiquettes
-        self.pageidx = 0
         for word in self.rows:
             label = word["tag"]
             page = int(word["page"])
+            if page != self.pageidx:
+                self.pageidx = page
+                self.tableidx = 1
             if label == "":  # Should not happen! Ignore!
                 continue
             if label != "O":
@@ -300,7 +318,6 @@ class Formatteur:
                 if bloc and tag:
                     self.process_bloc(tag, bloc)
                     bloc = []
-                    self.pageidx = page
                 tag = newtag
             if label != "O":
                 bloc.append(word)
@@ -317,7 +334,7 @@ class Formatteur:
             dates=self.make_dates(),
             chapitres=self.chapitres,
             attendus=self.attendus,
-            contenus=self.contenus,
+            textes=self.textes,
         )
 
     def __call__(self, words: Iterable[dict[str, Any]]) -> Reglement:
