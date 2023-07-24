@@ -84,3 +84,6 @@ distance du bord de page), soit les détecter avec un script.
 
 Dans ce cas (comme d'autres) il vaudrait la peine d'essayer la façon
 programmatique d'abord, ce qui nous guidera pour la suite.
+
+Notez que dans certains cas les en-têtes et pieds sont marqués dans le
+PDF par des "marked content sections".

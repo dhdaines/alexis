@@ -145,34 +145,12 @@ class Classificateur:
             if re.match(r".*avis de motion", text, re.IGNORECASE):
                 tag = "Avis"
         elif word == "chapitre":
-            # voyons donc (faut du machine learning chose)
-            if (
-                self.chapitre is not None
-                and "dispositions déclaratoires" in self.chapitre
-                and int(paragraph[0]["top"]) > 200
-            ):
-                pass
-            else:
-                tag = "Chapitre"
-                self.chapitre = text.lower()
+            tag = "Chapitre"
+            self.chapitre = text.lower()
         elif word == "section":
             tag = "Section"
         elif word == "sous-section":
-            # voyons donc #2
-            if (
-                self.chapitre is not None
-                and "dispositions déclaratoires" in self.chapitre
-                and int(paragraph[0]["top"]) > 200
-            ):
-                pass
-            else:
-                tag = "SousSection"
-        elif text.isupper() and int(paragraph[0]["x0"]) == 193:
-            # voyons donc #3 (problème de pdfplumber...?)
             tag = "SousSection"
-        elif text.isupper() and self.debut_chapitre:
-            # voyons donc #4 (problème de pdfplumber...?)
-            tag = "Chapitre"
         elif (
             re.match(
                 r"r[eè]glement ?(?:de|d'|sur|relatif aux|concernant)?",
