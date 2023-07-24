@@ -45,6 +45,10 @@ EXPECT_TITLES = [
         "data/train/xx-2020-04-20-RGL-1289-Formation-CCE-adopte_1.pdf",
         "RÈGLEMENT 1289\nconcernant formation d’un Comité consultatif en\nenvironnement",
     ),
+    (
+        "test/data/RGL-1176-2012-Vente-de-garages-et-bazars-COMPILATION-ADMINISTRATIVE.pdf",
+        "Règlement numéro 1176-2012 concernant les ventes de garage et les bazars\nsur le territoire de la Ville de Sainte-Adèle.",
+    ),
 ]
 
 
@@ -83,6 +87,11 @@ EXPECT_CHAPTERS = [
     ("data/train/Rgl-1314-2021-TM-Travaux-municipaux.pdf", "1,4,9", 2),
     ("data/train/xx-2020-04-20-RGL-1289-Formation-CCE-adopte_1.pdf", None, 0),
     ("test/data/piia_chapitres.pdf", None, 12),
+    (
+        "test/data/RGL-1176-2012-Vente-de-garages-et-bazars-COMPILATION-ADMINISTRATIVE.pdf",
+        None,
+        3,
+    ),
 ]
 
 

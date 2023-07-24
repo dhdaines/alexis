@@ -148,7 +148,7 @@ class Formatteur:
 
     def extract_titre(self, texte: str):
         if m := re.search(
-            r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
+            r"r[eè]glement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -156,7 +156,7 @@ class Formatteur:
             self.numero = m.group(2)
             self.titre = re.sub(r"\s+", " ", m.group(0))
         elif m := re.search(
-            r"règlement(?:\s+numéro)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux|concernant))?\s+(.*)",
+            r"r[eè]glement\s+(?:numéro|no\.)?\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux|concernant))?\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -164,7 +164,7 @@ class Formatteur:
             self.numero = m.group(1)
             self.objet = m.group(2)
         elif m := re.search(
-            r"règlement(?:\s+numéro)?\s+(\S+)",
+            r"r[eè]glement\s+(?:numéro|no\.)?\s+(\S+)",
             texte,
             re.IGNORECASE,
         ):
@@ -184,7 +184,9 @@ class Formatteur:
         self.dates[tag] = texte
 
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
-        m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
+        m = re.match(
+            r"(?:chapitre\s+)?(\d+|[XIV]+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL
+        )
         if m is None:
             numero = self.head_chapitre
             titre = texte
@@ -263,7 +265,7 @@ class Formatteur:
         self.sous_section = sous_section
         return sous_section
 
-    def new_article(self, num: int, titre: str) -> Article:
+    def new_article(self, num: int, titre: str, contenu: Optional[str]) -> Article:
         article = Article(
             chapitre=len(self.chapitres) - 1,
             section=(len(self.chapitre.sections) - 1 if self.chapitre else -1),
@@ -271,23 +273,29 @@ class Formatteur:
             article=num,
             titre=titre,
             pages=(self.pageidx, self.pageidx),
-            alineas=[],
+            contenu=[Contenu(texte=contenu)] if contenu else [],
         )
         self.close_article()
         self.textes.append(article)
         self.article = article
         return article
 
-    def extract_article(self, ligne: str) -> Optional[Article]:
-        m = re.match(r"(?:article\s+)?(\d+)\s*[\.:]?\s*(.*)", ligne, re.IGNORECASE)
-        if m is None:
+    def extract_article(self, texte: str) -> Optional[Article]:
+        if m := re.match(r"(?:article\s+)?(\d+)\s*[\.:]?\s*(.*)", texte, re.IGNORECASE):
+            num = int(m.group(1))
+            title = m.group(2)
+            contenu = None
+        elif m := re.match(r"([^\n]+)\n(\d+)[\)\.]\s*(.*)", texte, re.DOTALL):
+            num = int(m.group(2))
+            title = m.group(1)
+            contenu = m.group(3)
+        else:
             return None
-        num = int(m.group(1))
         if num <= self.artidx:
             # C'est une énumération mal étiquetée
             return None
         self.artidx = num
-        return self.new_article(num, m.group(2))
+        return self.new_article(num, title, contenu)
 
     def extract_attendu(self, contenu: Contenu):
         if self.attendus is None:

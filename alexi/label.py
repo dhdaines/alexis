@@ -45,9 +45,13 @@ def line_breaks(
     xdeltas.extend(
         int(b["x0"]) - int(a["x0"]) for a, b in itertools.pairwise(paragraph)
     )
+    ydeltas = [int(paragraph[0]["top"])]
+    ydeltas.extend(
+        int(b["top"]) - int(a["top"]) for a, b in itertools.pairwise(paragraph)
+    )
     line = []
-    for word, xdelta in zip(paragraph, xdeltas):
-        if xdelta < 0:
+    for word, xdelta, ydelta in zip(paragraph, xdeltas, ydeltas):
+        if xdelta <= 0 and ydelta > 0:  # CR, LF
             yield line
             line = []
         line.append(word)
@@ -106,10 +110,9 @@ def extract_enumeration(
 
 
 class Classificateur:
+    head_chapitre: Optional[str] = None
     article_idx: int = 0
     in_toc: bool = False
-    debut_chapitre: bool = False
-    head_chapitre: Optional[str] = None
     prev_x0: int = 72
 
     def classify_alinea(
@@ -123,6 +126,9 @@ class Classificateur:
             return tag
         word = paragraph[0]["text"].lower()
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
+            tag = "Article"
+            self.article_idx = int(m.group(1))
+        elif m := re.match(r".*\n(\d+)[\)\.]", text):
             tag = "Article"
             self.article_idx = int(m.group(1))
         elif m := re.match(r"(\d+)[\)\.]?", text):
@@ -140,6 +146,8 @@ class Classificateur:
                 tag = "Avis"
         elif word == "chapitre" and paragraph[1]["text"] != "X":
             tag = "Chapitre"
+        elif word == "annexe" and paragraph[1]["text"] != "X":
+            tag = "Annexe"
         elif word == "section" and paragraph[1]["text"] != "X":
             tag = "Section"
         elif word == "sous-section" and paragraph[1]["text"] != "X.X":
@@ -162,17 +170,8 @@ class Classificateur:
             and int(paragraph[0]["page"]) < 3
         ):
             tag = "Titre"
-        elif (text.isupper() or text == "T1.2 Récréation") and self.head_chapitre:
-            # "CHAPITRE N" is an image, so check for upper-case text
-            # on a page by itself with a chapter defined in the header
-            n_nonhead_words = sum(
-                1
-                for w in page_words
-                if w["tag"] not in ("B-Tete", "I-Tete", "B-Pied", "I-Pied")
-            )
-            if n_nonhead_words == len(paragraph):
-                tag = "Chapitre"
-            elif (
+        elif text.isupper() or text == "T1.2 Récréation":
+            if (
                 # Rough heurstic for "SOUS-SECTION N.N" as an image
                 any(w["text"].isalpha() for w in paragraph)
                 and int(paragraph[0]["x0"]) - int(self.prev_x0) > 100
@@ -194,17 +193,36 @@ class Classificateur:
         """
         if len(paragraph) == 0:
             return []
-        text = " ".join(w["text"] for w in paragraph)
+        text = "\n".join(
+            " ".join(w["text"] for w in line) for line in line_breaks(paragraph)
+        )
 
         if re.match("^table des mati[èe]res", text, re.IGNORECASE):
             self.in_toc = True
+
         if tag == "Tete":
             if m := re.match(r".*(chapitre)\s+(\S+)", text, re.IGNORECASE):
                 self.head_chapitre = m.group(2)
             else:
                 self.head_chapitre = None
 
+        # "CHAPITRE N" is sometimes an image, so check for upper-case text
+        # on a page by itself
+        n_nonhead_words = sum(
+            1
+            for w in page_words
+            if w["tag"] not in ("B-Tete", "I-Tete", "B-Pied", "I-Pied")
+        )
+        if (
+            text.isupper()
+            and "ANNEXE" not in text
+            and n_nonhead_words == len(paragraph)
+        ):
+            self.in_toc = False
+            return [("Chapitre", paragraph)]
+
         if self.in_toc:
+            # If we found a chapter name in the header then end the TOC
             if self.head_chapitre is not None:
                 self.in_toc = False
             elif tag not in ("Pied", "Tete"):
@@ -213,6 +231,8 @@ class Classificateur:
         # Detecter les dates dans des tableaux
         if tag == "Tableau" and "avis de motion" in text.lower():
             return extract_dates(paragraph)
+        # FIXME: diverses autres façons de spécifier les
+        # dates... besoin d'un vrai taggeur!
 
         tag = self.classify_alinea(tag, paragraph, text, page_words)
 
