@@ -173,7 +173,7 @@ class Classificateur:
             tag = "Titre"
         elif (
             re.match(
-                r"(?:sur|relatif aux?|concernant|numero|numéro|no\.)",
+                r"(?:afin de|sur|relatif aux?|concernant|numero|numéro|no\.)",
                 text,
                 re.DOTALL | re.IGNORECASE,
             )

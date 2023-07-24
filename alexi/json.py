@@ -48,7 +48,9 @@ class Formatteur:
         paragraphe = Texte(pages=(self.pageidx, self.pageidx), contenu=[contenu])
         if tag == "Tete":
             self.extract_tete(texte)
-        elif tag == "Titre":
+        elif tag == "Titre" and (
+            self.titre is None or self.numero is None or self.objet is None
+        ):
             self.extract_titre(texte)
         elif tag in (
             "Avis",
@@ -148,7 +150,7 @@ class Formatteur:
 
     def extract_titre(self, texte: str):
         if m := re.search(
-            r"r[eè]glement(?:\s+(?:de|d'|sur|relatif aux?))?\s+(.*)\s+numéro\s+(\S+)",
+            r"r[eè]glement(?:\s+(?:de|d'|sur|relatif aux?|concernant|afin\sde))?\s+(.*)\s+numéro\s+(\S+)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -156,7 +158,7 @@ class Formatteur:
             self.numero = m.group(2)
             self.titre = re.sub(r"\s+", " ", m.group(0))
         elif m := re.search(
-            r"r[eè]glement(?:\s+(?:numéro|no\.))\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux?|concernant))?\s+(.*)",
+            r"r[eè]glement(?:\s+(?:numéro|no\.))\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux?|concernant|afin\sde))?\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -171,7 +173,7 @@ class Formatteur:
             self.titre = m.group(0)
             self.numero = m.group(1)
         elif m := re.search(
-            r"r[eè]glement\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux?|concernant))?\s+(.*)",
+            r"r[eè]glement\s+(\S+)(?:\s+(?:de|d'|sur|relatif\saux?|concernant|afin\sde))?\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
@@ -186,7 +188,7 @@ class Formatteur:
             self.titre = m.group(0)
             self.numero = m.group(1)
         elif m := re.match(
-            r"(?:de|d'|sur|relatif\saux?|concernant)\s+(.*)",
+            r"(?:de|d'|sur|relatif\saux?|concernant|afin\sde)\s+(.*)",
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
