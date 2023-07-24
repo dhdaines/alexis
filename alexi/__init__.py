@@ -117,8 +117,11 @@ def json_main(args):
 def extract_main(args):
     """Convertir un PDF en JSON"""
     if args.images is not None:
-        args.images.mkdir(parents=True, exist_ok=True)
-    converteur = Converteur(imgdir=args.images)
+        imgdir = args.images / Path(args.pdf.name).stem
+        imgdir.mkdir(parents=True, exist_ok=True)
+        converteur = Converteur(imgdir=imgdir)
+    else:
+        converteur = Converteur()
     segmenteur = Segmenteur()
     classificateur = Classificateur()
     formatteur = Formatteur(fichier=Path(args.pdf.name).name)
