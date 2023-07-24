@@ -106,27 +106,20 @@ def extract_enumeration(
 
 
 class Classificateur:
-    chapitre: Optional[str] = None
-    en_tete: Optional[str] = None
     article_idx: int = 0
     in_toc: bool = False
     debut_chapitre: bool = False
+    head_chapitre: Optional[str] = None
 
     def classify_alinea(
-        self, tag: str, paragraph: Sequence[dict[str, Any]], text: str
+        self,
+        tag: str,
+        paragraph: Sequence[dict[str, Any]],
+        text: str,
+        page_words: Sequence[dict[str, Any]],
     ) -> str:
-        if tag == "Tete":
-            # enregistrer l'en-tete pour assister en classification
-            en_tete = text.lower()
-            if en_tete != self.en_tete:
-                self.en_tete = en_tete
-                self.debut_chapitre = True
-            else:
-                self.debut_chapitre = False
+        if tag in ("Tete", "Pied"):
             return tag
-        elif tag == "Pied":
-            return tag
-
         word = paragraph[0]["text"].lower()
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
@@ -146,7 +139,6 @@ class Classificateur:
                 tag = "Avis"
         elif word == "chapitre":
             tag = "Chapitre"
-            self.chapitre = text.lower()
         elif word == "section":
             tag = "Section"
         elif word == "sous-section":
@@ -169,11 +161,24 @@ class Classificateur:
             and int(paragraph[0]["page"]) < 3
         ):
             tag = "Titre"
+        elif text.isupper() and self.head_chapitre:
+            # "CHAPITRE N" is an image, so check for upper-case text
+            # on a page by itself with a chapter defined in the header
+            n_nonhead_words = sum(
+                1
+                for w in page_words
+                if w["tag"] not in ("B-Tete", "I-Tete", "B-Pied", "I-Pied")
+            )
+            if n_nonhead_words == len(paragraph):
+                tag = "Chapitre"
 
         return tag
 
     def classify_paragraph_heuristic(
-        self, tag: str, paragraph: Sequence[dict[str, Any]]
+        self,
+        tag: str,
+        paragraph: Sequence[dict[str, Any]],
+        page_words: Sequence[dict[str, Any]],
     ) -> Iterable[tuple[str, Sequence[dict[str, Any]]]]:
         """Classification heuristique très simplistique d'un alinéa, suffisant
         pour détecter les articles, énumérations, et parfois les dates
@@ -185,10 +190,14 @@ class Classificateur:
 
         if re.match("^table des mati[èe]res", text, re.IGNORECASE):
             self.in_toc = True
+        if tag == "Tete":
+            if m := re.match(r".*(chapitre)\s+(\S+)", text, re.IGNORECASE):
+                self.head_chapitre = m.group(2)
+            else:
+                self.head_chapitre = None
+
         if self.in_toc:
-            # FIXME: Not entirely reliable way to detect end of TOC
-            # (should use structure tree in convert)
-            if tag == "Tete" and re.match(".*chapitre", text, re.IGNORECASE):
+            if self.head_chapitre is not None:
                 self.in_toc = False
             elif tag not in ("Pied", "Tete"):
                 return [("TOC", paragraph)]
@@ -197,7 +206,7 @@ class Classificateur:
         if tag == "Tableau" and "avis de motion" in text.lower():
             return extract_dates(paragraph)
 
-        tag = self.classify_alinea(tag, paragraph, text)
+        tag = self.classify_alinea(tag, paragraph, text, page_words)
 
         if tag == "Enumeration":
             return extract_enumeration(paragraph)
@@ -225,12 +234,18 @@ class Classificateur:
         """Classification heuristique très simplistique des alinéas, suffisant
         pour détecter les articles, énumérations, et parfois les dates
         d'adoption."""
-        for tag, paragraph in group_paragraphs(words):
-            if not paragraph:
-                return
-            # FIXME: Can split but not join paragraphs
-            for t, p in self.classify_paragraph_heuristic(tag, paragraph):
-                yield from self.output_paragraph(t, p)
+        for page_number, page_words in itertools.groupby(
+            words, key=lambda x: x["page"]
+        ):
+            page_words_list = list(page_words)
+            for tag, paragraph in group_paragraphs(page_words_list):
+                if not paragraph:
+                    continue
+                # FIXME: Can split but not join paragraphs
+                for t, p in self.classify_paragraph_heuristic(
+                    tag, paragraph, page_words_list
+                ):
+                    yield from self.output_paragraph(t, p)
 
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         words = self.classify_heuristic(words)

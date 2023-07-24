@@ -82,6 +82,7 @@ EXPECT_CHAPTERS = [
     ),
     ("data/train/Rgl-1314-2021-TM-Travaux-municipaux.pdf", "1,4,9", 2),
     ("data/train/xx-2020-04-20-RGL-1289-Formation-CCE-adopte_1.pdf", None, 0),
+    ("test/data/piia_chapitres.pdf", None, 12),
 ]
 
 

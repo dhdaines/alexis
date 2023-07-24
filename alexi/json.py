@@ -29,7 +29,7 @@ class Formatteur:
     pageidx: int = -1
     tableidx: int = -1
     sous_section_idx: int = 0
-    chapitre_idx: int = 1
+    head_chapitre: Optional[str] = None
 
     def __init__(self, fichier: Path):
         self.fichier = Path(fichier)
@@ -46,7 +46,9 @@ class Formatteur:
         contenu = Contenu(texte=texte)
         # Ne sera utilisé que si on n'a pas de structure défini
         paragraphe = Texte(pages=(self.pageidx, self.pageidx), contenu=[contenu])
-        if tag == "Titre":
+        if tag == "Tete":
+            self.extract_tete(texte)
+        elif tag == "Titre":
             self.extract_titre(texte)
         elif tag in (
             "Avis",
@@ -138,6 +140,12 @@ class Formatteur:
             self.article.pages = (self.article.pages[0], self.pageidx)
         self.article = None
 
+    def extract_tete(self, texte: str):
+        if m := re.match(r".*(chapitre)\s+(\S+)", texte, re.IGNORECASE):
+            self.head_chapitre = m.group(2)
+        else:
+            self.head_chapitre = None
+
     def extract_titre(self, texte: str):
         if m := re.search(
             r"règlement(?:\s+(?:de|d'|sur|relatif aux))?\s+(.*)\s+numéro\s+(\S+)",
@@ -178,11 +186,8 @@ class Formatteur:
     def extract_chapitre(self, texte) -> Optional[Chapitre]:
         m = re.match(r"(?:chapitre\s+)?(\d+)\s+(.*)$", texte, re.IGNORECASE | re.DOTALL)
         if m is None:
-            # texte "CHAPITRE" manquant (c'est un osti d'image, WTF!)
-            # FIXME: detecter l'image en question dans convert.py
+            numero = self.head_chapitre
             titre = texte
-            numero = str(self.chapitre_idx)
-            self.chapitre_idx += 1
         else:
             numero = m.group(1)
             titre = m.group(2)
