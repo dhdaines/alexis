@@ -128,11 +128,12 @@ class Classificateur:
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
             self.article_idx = int(m.group(1))
-        elif m := re.match(r".*\n(\d+)[\)\.]", text):
+        elif m := re.match(r"(?!\d+[\)\.]).*\n(\d+)[\)\.]", text):
             tag = "Article"
             self.article_idx = int(m.group(1))
         elif m := re.match(r"(\d+)[\)\.]?", text):
             idx = int(m.group(1))
+            # FIXME: Bad heuristic! Bad!
             if idx == self.article_idx + 1:
                 self.article_idx = idx
                 tag = "Article"
