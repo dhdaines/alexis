@@ -135,7 +135,7 @@ class Document(BaseModel):
         None, description="Titre du document (tel qu'il apparaît sur le site web)"
     )
     chapitres: List[Chapitre] = []
-    textes: List[Texte] = []
+    textes: List[SerializeAsAny[Texte]] = []
 
 
 class Reglement(Document):
