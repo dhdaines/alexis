@@ -102,7 +102,7 @@ def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]
             pass
         elif word["top"] - prev_top < 0:
             word["tag"] = "B-Alinea"
-        elif word["top"] - prev_top > 1.666 * prev_height:
+        elif word["top"] - prev_top > 1.5 * prev_height:
             word["tag"] = "B-Alinea"
         else:
             word["tag"] = "I-Alinea"
