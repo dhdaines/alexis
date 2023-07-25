@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from pydantic import BaseModel, Field, SerializeAsAny
+from pydantic import BaseModel, Field
 
 
 class Ancrage(BaseModel):
