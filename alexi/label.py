@@ -128,7 +128,7 @@ class Classificateur:
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
             self.article_idx = int(m.group(1))
-        elif m := re.match(r"(?!\d+[\)\.]).*\n([1-9]\d*)[\)\.]", text):
+        elif m := re.match(r"(?!\d+[\)\.]).*\n([1-9]\d*)[\)\.](?!\d)", text):
             tag = "Article"
             self.article_idx = int(m.group(1))
         elif m := re.match(r"(\d+)[\)\.]?", text):
@@ -238,11 +238,14 @@ class Classificateur:
             elif tag not in ("Pied", "Tete"):
                 return [("TOC", paragraph)]
 
-        # Detecter les dates dans des tableaux
-        if tag == "Tableau" and "avis de motion" in text.lower():
-            return extract_dates(paragraph)
-        # FIXME: diverses autres façons de spécifier les
-        # dates... besoin d'un vrai taggeur!
+        if tag == "Tableau":
+            # Detecter les dates dans des tableaux.
+            # FIXME: diverses autres façons de spécifier les
+            # dates... besoin d'un vrai taggeur!
+            if "avis de motion" in text.lower():
+                return extract_dates(paragraph)
+            # Sinon, les laisser tranquilles!
+            return [(tag, paragraph)]
 
         tag = self.classify_alinea(tag, paragraph, text, page_words)
 
