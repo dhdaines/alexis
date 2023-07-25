@@ -244,8 +244,12 @@ class Classificateur:
             # dates... besoin d'un vrai taggeur!
             if "avis de motion" in text.lower():
                 return extract_dates(paragraph)
-            # Sinon, les laisser tranquilles!
-            return [(tag, paragraph)]
+            # Detecter les titres aussi...
+            if re.match(r"r[eè]glement\s+\d+", text, re.IGNORECASE):
+                pass
+            else:
+                # Sinon, les laisser tranquilles!
+                return [(tag, paragraph)]
 
         tag = self.classify_alinea(tag, paragraph, text, page_words)
 
