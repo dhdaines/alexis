@@ -128,7 +128,7 @@ class Classificateur:
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
             self.article_idx = int(m.group(1))
-        elif m := re.match(r"(?!\d+[\)\.]).*\n(\d+)[\)\.]", text):
+        elif m := re.match(r"(?!\d+[\)\.]).*\n([1-9]\d*)[\)\.]", text):
             tag = "Article"
             self.article_idx = int(m.group(1))
         elif m := re.match(r"(\d+)[\)\.]?", text):
