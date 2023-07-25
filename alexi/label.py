@@ -245,7 +245,11 @@ class Classificateur:
             if "avis de motion" in text.lower():
                 return extract_dates(paragraph)
             # Detecter les titres aussi...
-            if re.match(r"r[eè]glement\s+\d+", text, re.IGNORECASE):
+            if re.match(
+                r"(?:ville de sainte-ad[eè]le\s*)?r[eè]glement\s+(?:relatif|sur|de|\d|d)",
+                text,
+                re.IGNORECASE,
+            ):
                 pass
             else:
                 # Sinon, les laisser tranquilles!
