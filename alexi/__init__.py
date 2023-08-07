@@ -108,7 +108,7 @@ def label_main(args):
 
 def json_main(args):
     """Convertir un CSV segmenté en JSON"""
-    conv = Formatteur(fichier=args.name)
+    conv = Formatteur(fichier=args.name, imgdir=args.images)
     reader = csv.DictReader(args.csv)
     doc = conv(reader)
     print(doc.model_dump_json(indent=2, exclude_defaults=True))
@@ -120,11 +120,12 @@ def extract_main(args):
         imgdir = args.images / Path(args.pdf.name).stem
         imgdir.mkdir(parents=True, exist_ok=True)
         converteur = Converteur(imgdir=imgdir)
+        formatteur = Formatteur(fichier=Path(args.pdf.name).name, imgdir=imgdir)
     else:
         converteur = Converteur()
+        formatteur = Formatteur(fichier=Path(args.pdf.name).name)
     segmenteur = Segmenteur()
     classificateur = Classificateur()
-    formatteur = Formatteur(fichier=Path(args.pdf.name).name)
 
     if args.pages:
         pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
@@ -213,6 +214,9 @@ def make_argparse() -> argparse.ArgumentParser:
     json.add_argument(
         "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
     )
+    json.add_argument(
+        "--images", help="Répertoire où trouver des images de figures", type=Path
+    )
     json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     json.set_defaults(func=json_main)
 
@@ -259,3 +263,7 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
     args.func(args)
+
+
+if __name__ == "__main__":
+    main()

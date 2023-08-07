@@ -59,6 +59,12 @@ class Tableau(Contenu):
     tableau: Path = Field(description="Fichier avec la représentation du tableau")
 
 
+class Figure(Contenu):
+    """Figure, associée à une image"""
+
+    figure: Optional[Path] = Field(None, description="Fichier avec la figure")
+
+
 class Texte(BaseModel):
     """Modèle de base pour un unité atomique (indexable) de texte, dont un
     article, une liste d'attendus, ou un annexe.
@@ -66,7 +72,7 @@ class Texte(BaseModel):
 
     titre: Optional[str] = None
     pages: Tuple[int, int]
-    contenu: List[Contenu | Tableau] = Field(
+    contenu: List[Contenu | Tableau | Figure] = Field(
         [], description="Contenus (alinéas, tableaux, images) de ce texte"
     )
 

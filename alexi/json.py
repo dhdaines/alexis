@@ -4,18 +4,21 @@ Extraire la structure du document à partir de CSV étiqueté
 
 import logging
 import re
+from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from alexi.label import line_breaks
 from alexi.types import (Annexe, Article, Attendus, Chapitre, Contenu, Dates,
-                         Reglement, Section, SousSection, Tableau, Texte)
+                         Figure, Reglement, Section, SousSection, Tableau,
+                         Texte)
 
 LOGGER = logging.getLogger("json")
 
 
 class Formatteur:
     fichier: Path
+    imgdir: Path
     numero: str = "INCONNU"
     objet: Optional[str] = None
     titre: Optional[str] = None
@@ -31,8 +34,9 @@ class Formatteur:
     sous_section_idx: int = 0
     head_chapitre: Optional[str] = None
 
-    def __init__(self, fichier: Path):
+    def __init__(self, fichier: PathLike, imgdir: Path):
         self.fichier = Path(fichier)
+        self.imgdir = imgdir
         self.pages: List[str] = []
         self.chapitres: List[Chapitre] = []
         self.textes: List[Texte] = []
@@ -75,6 +79,47 @@ class Formatteur:
                 self.textes.append(paragraphe)
         elif tag == "Attendu":
             self.extract_attendu(contenu)
+        elif tag == "Figure":
+            # Look for an existing figure in output directory (not ideal but...)
+            figures = list(self.imgdir.glob(f"page{self.pageidx}-figure-*"))
+            if len(figures) == 0:
+                figure = Figure(texte=texte)
+            elif len(figures) == 1:
+                LOGGER.info(
+                    "Figure seul sur page %d: %s", self.pageidx, figures[0].name
+                )
+                figure = Figure(
+                    texte=texte, figure=Path(self.fichier.stem) / figures[0].name
+                )
+            else:
+                # Find a figure adjacent to this line of text
+                adjacent = None
+                for figure in figures:
+                    m = re.search(r"figure-(\d+),(\d+),(\d+),(\d+)", figure.name)
+                    assert m is not None
+                    # FIXME: Ideally we would ensure it's *between* two text blocks
+                    x0, top, x1, bottom = (int(x) for x in m.groups())
+                    from_bottom = top - bloc[-1]["bottom"]
+                    from_top = bloc[0]["top"] - bottom
+                    if (
+                        from_bottom > 0
+                        and from_bottom < 72
+                        or from_top > 0
+                        and from_top < 72
+                    ):
+                        adjacent = Path(self.fichier.stem) / figure.name
+                        LOGGER.info(
+                            "Figure adjacent sur page %d: %s", self.pageidx, adjacent
+                        )
+                        break
+                figure = Figure(texte=texte, figure=adjacent)
+            if self.annexe:
+                self.annexe.contenu.append(figure)
+            elif self.article:
+                self.article.contenu.append(figure)
+            else:
+                paragraphe = Texte(pages=(self.pageidx, self.pageidx), contenu=[figure])
+                self.textes.append(paragraphe)
         elif tag == "Tableau":
             assert self.tableidx > 0
             tableau = Tableau(
@@ -93,7 +138,7 @@ class Formatteur:
                     pages=(self.pageidx, self.pageidx), contenu=[tableau]
                 )
                 self.textes.append(paragraphe)
-        elif tag in ("Alinea", "Enumeration"):
+        elif tag in ("Alinea", "Enumeration", "Figure"):
             # FIXME: à l'avenir on va prendre en charge les listes/énumérations
             if self.annexe:
                 self.annexe.contenu.append(contenu)

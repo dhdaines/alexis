@@ -141,6 +141,8 @@ class Classificateur:
                 tag = "Enumeration"
         elif re.match(r"[a-z][\)\.]|[•-]", text):
             tag = "Enumeration"
+        elif m := re.match(r"figure\s+(\d+)", text, re.IGNORECASE):
+            tag = "Figure"
         elif word == "attendu":
             tag = "Attendu"
             if re.match(r".*avis de motion", text, re.IGNORECASE):

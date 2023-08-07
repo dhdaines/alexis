@@ -1,5 +1,6 @@
 #!/bin/sh
 
+rm -rf "../serafim/public/img"
 for i in $(cat data/urbanisme.txt); do
     echo $i
     bn=$(basename $i .pdf)
