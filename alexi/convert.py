@@ -2,12 +2,12 @@
 
 import itertools
 import logging
-
 from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
+from pdfplumber.utils import obj_to_bbox
 
 LOGGER = logging.getLogger("convert")
 
@@ -17,10 +17,25 @@ def get_tables(page):
     d = deque(st)
     while d:
         el = d.popleft()
-        if "children" in el:
-            d.extend(el["children"])
         if el["type"] == "Table":
             yield el
+        elif "children" in el:
+            # On ne traîte pas des tableaux imbriqués
+            d.extend(el["children"])
+
+
+def get_figures(page):
+    st = page.structure_tree
+    d = deque(st)
+    while d:
+        el = d.popleft()
+        if el["type"] == "Table":
+            # Ignorer les figures à l'intérieur d'un tableau
+            continue
+        if el["type"] == "Figure":
+            yield el
+        elif "children" in el:
+            d.extend(el["children"])
 
 
 def get_child_mcids(el):
@@ -33,31 +48,22 @@ def get_child_mcids(el):
             yield from el["mcids"]
 
 
-def unify_bbox(objects):
-    itor = iter(objects)
-    obj = next(itor)
-    x0 = obj["x0"]
-    top = obj["top"]
-    x1 = obj["x1"]
-    bottom = obj["bottom"]
-    for obj in itor:
-        x0 = min(x0, obj["x0"])
-        x1 = max(x1, obj["x1"])
-        top = min(top, obj["top"])
-        bottom = max(bottom, obj["bottom"])
-    return (x0, top, x1, bottom)
-
-
-def bbox_overlap(w, bbox):
+def bbox_overlaps(obox, bbox):
+    ox0, otop, ox1, obottom = obox
     x0, top, x1, bottom = bbox
-    return w["x0"] < x1 and w["x1"] > x0 and w["top"] < bottom and w["bottom"] > top
+    return ox0 < x1 and ox1 > x0 and otop < bottom and obottom > top
 
 
 def get_element_bbox(page, el):
     mcids = set(get_child_mcids(el))
-    return unify_bbox(
-        c for c in itertools.chain(page.chars, page.images) if c.get("mcid") in mcids
-    )
+    mcid_objs = [
+        c
+        for c in itertools.chain.from_iterable(page.objects.values())
+        if c.get("mcid") in mcids
+    ]
+    if not mcid_objs:
+        return None
+    return pdfplumber.utils.objects_to_bbox(mcid_objs)
 
 
 def add_margin(bbox, margin):
@@ -71,17 +77,49 @@ class Converteur:
     def __init__(self, imgdir=None):
         self.imgdir = imgdir
 
-    def extract_words(self, pdf: pdfplumber.PDF) -> Iterator[dict[str, Any]]:
-        for p in pdf.pages:
-            words = p.extract_words()
+    def extract_words(
+        self, pdf: pdfplumber.PDF, pages: Optional[list[int]] = None
+    ) -> Iterator[dict[str, Any]]:
+        if pages is None:
+            pages = list(range(len(pdf.pages)))
+        for idx in pages:
+            p = pdf.pages[idx]
+            words = p.extract_words(y_tolerance=1)
             tables = list(get_tables(p))
             tboxes = []
             for idx, t in enumerate(tables):
                 tbox = get_element_bbox(p, t)
+                if tbox is None:
+                    continue
                 tboxes.append(tbox)
                 if self.imgdir is not None:
-                    img = p.crop(add_margin(tbox, 10)).to_image(antialias=True)
+                    img = p.crop(add_margin(tbox, 10)).to_image(
+                        resolution=150, antialias=True
+                    )
                     img.save(self.imgdir / f"page{p.page_number}-table{idx + 1}.png")
+            for idx, f in enumerate(get_figures(p)):
+                fbox = get_element_bbox(p, f)
+                if fbox is None:
+                    continue
+                in_table = False
+                for tbox in tboxes:
+                    if bbox_overlaps(fbox, tbox):
+                        in_table = True
+                if in_table:
+                    continue
+                if self.imgdir is not None:
+                    try:
+                        img = p.crop(fbox).to_image(resolution=150, antialias=True)
+                        fboxtxt = ",".join(str(round(x)) for x in fbox)
+                        img.save(
+                            self.imgdir / f"page{p.page_number}-figure-{fboxtxt}.png"
+                        )
+                    except ValueError:
+                        LOGGER.warning(
+                            "Failed to save figure on page %d at %s",
+                            p.page_number,
+                            fbox,
+                        )
 
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in p.chars)
@@ -90,26 +128,23 @@ class Converteur:
             for w in words:
                 # Extract colour from first character (FIXME: assumes RGB space)
                 if c := chars.get((w["x0"], w["top"])):
-                    # OMG WTF pdfplumber!!!
-                    if isinstance(c["stroking_color"], list) or isinstance(
-                        c["stroking_color"], tuple
-                    ):
-                        if len(c["stroking_color"]) == 1:
-                            w["r"] = w["g"] = w["b"] = c["stroking_color"][0]
-                        elif len(c["stroking_color"]) == 3:
-                            w["r"], w["g"], w["b"] = c["stroking_color"]
-                        else:
-                            LOGGER.warning(
-                                "Espace couleur non pris en charge: %s",
-                                c["stroking_color"],
-                            )
+                    if c.get("non_stroking_color") is None:
+                        w["r"] = w["g"] = w["b"] = 0
+                    elif len(c["non_stroking_color"]) == 1:
+                        w["r"] = w["g"] = w["b"] = c["non_stroking_color"][0]
+                    elif len(c["non_stroking_color"]) == 3:
+                        w["r"], w["g"], w["b"] = c["non_stroking_color"]
                     else:
-                        w["r"] = w["g"] = w["b"] = c["stroking_color"]
+                        LOGGER.warning(
+                            "Espace couleur non pris en charge: %s",
+                            c["non_stroking_color"],
+                        )
                 w["page"] = p.page_number
                 w["page_height"] = round(float(p.height))
                 w["page_width"] = round(float(p.width))
+                # Find words inside tables and tag accordingly
                 for table, tbox in zip(tables, tboxes):
-                    if bbox_overlap(w, tbox):
+                    if bbox_overlaps(obj_to_bbox(w), tbox):
                         if id(table) != prev_table:
                             w["tag"] = "B-Tableau"
                         else:
@@ -122,6 +157,8 @@ class Converteur:
                     w[field] = round(float(w[field]))
                 yield w
 
-    def __call__(self, infh: Any) -> Iterable[dict[str, Any]]:
+    def __call__(
+        self, infh: Any, pages: Optional[list[int]] = None
+    ) -> Iterable[dict[str, Any]]:
         with pdfplumber.open(infh) as pdf:
-            return self.extract_words(pdf)
+            yield from self.extract_words(pdf, pages)

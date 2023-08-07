@@ -84,8 +84,12 @@ def convert_main(args):
     """Convertir les PDF en CSV"""
     if args.images is not None:
         args.images.mkdir(parents=True, exist_ok=True)
+    if args.pages:
+        pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
+    else:
+        pages = None
     conv = Converteur(imgdir=args.images)
-    write_csv(conv(args.pdf), sys.stdout)
+    write_csv(conv(args.pdf, pages), sys.stdout)
 
 
 def segment_main(args):
@@ -104,24 +108,34 @@ def label_main(args):
 
 def json_main(args):
     """Convertir un CSV segmenté en JSON"""
-    conv = Formatteur(fichier=args.name)
+    conv = Formatteur(fichier=args.name, imgdir=args.images)
     reader = csv.DictReader(args.csv)
     doc = conv(reader)
-    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
+    print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def extract_main(args):
     """Convertir un PDF en JSON"""
-    converteur = Converteur()
+    if args.images is not None:
+        imgdir = args.images / Path(args.pdf.name).stem
+        imgdir.mkdir(parents=True, exist_ok=True)
+        converteur = Converteur(imgdir=imgdir)
+        formatteur = Formatteur(fichier=Path(args.pdf.name).name, imgdir=imgdir)
+    else:
+        converteur = Converteur()
+        formatteur = Formatteur(fichier=Path(args.pdf.name).name)
     segmenteur = Segmenteur()
     classificateur = Classificateur()
-    formatteur = Formatteur(fichier=Path(args.pdf.name).name)
 
-    doc = converteur(args.pdf)
+    if args.pages:
+        pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
+    else:
+        pages = None
+    doc = converteur(args.pdf, pages)
     doc = segmenteur(doc)
     doc = classificateur(doc)
     doc = formatteur(doc)
-    print(doc.json(indent=2, exclude_defaults=True, ensure_ascii=False))
+    print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def index_main(args):
@@ -137,6 +151,9 @@ def search_main(args):
 def make_argparse() -> argparse.ArgumentParser:
     """Make the argparse"""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "-v", "--verbose", help="Émettre des messages", action="store_true"
+    )
     subp = parser.add_subparsers(required=True)
     subp.add_parser(
         "download", help="Télécharger les documents plus récents du site web"
@@ -170,7 +187,7 @@ def make_argparse() -> argparse.ArgumentParser:
         "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
     convert.add_argument(
-        "-v", "--verbose", help="Émettre des messages", action="store_true"
+        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
     )
     convert.set_defaults(func=convert_main)
 
@@ -197,6 +214,9 @@ def make_argparse() -> argparse.ArgumentParser:
     json.add_argument(
         "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
     )
+    json.add_argument(
+        "--images", help="Répertoire où trouver des images de figures", type=Path
+    )
     json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     json.set_defaults(func=json_main)
 
@@ -205,7 +225,10 @@ def make_argparse() -> argparse.ArgumentParser:
         "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
     )
     extract.add_argument(
-        "-v", "--verbose", help="Émettre des messages", action="store_true"
+        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
+    )
+    extract.add_argument(
+        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
     extract.set_defaults(func=extract_main)
 
@@ -238,4 +261,9 @@ def make_argparse() -> argparse.ArgumentParser:
 def main():
     parser = make_argparse()
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
     args.func(args)
+
+
+if __name__ == "__main__":
+    main()

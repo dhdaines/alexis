@@ -14,9 +14,9 @@ class Ancrage(BaseModel):
     pages: Tuple[int, int] = Field(
         description="Première et dernière indices de pages (en partant de 0) de cette partie"
     )
-    contenus: Tuple[int, int] = Field(
+    textes: Tuple[int, int] = Field(
         (-1, -1),
-        description="Première et dernière indices de contenus (articles, alinéas, tableaux, etc)",
+        description="Première et dernière indices de textes",
     )
 
 
@@ -47,26 +47,49 @@ class Chapitre(Ancrage):
 
 
 class Contenu(BaseModel):
-    """Modèle de base pour du contenu textuel."""
+    """Modèle de base pour un élément du contenu, dont un alinéa, une énumération,
+    un tableau, une image, etc."""
+
+    texte: str = Field(description="Texte indexable pour ce contenu")
+
+
+class Tableau(Contenu):
+    """Tableau, représenté pour le moment en image (peut-être HTML à l'avenir)"""
+
+    tableau: Path = Field(description="Fichier avec la représentation du tableau")
+
+
+class Figure(Contenu):
+    """Figure, associée à une image"""
+
+    figure: Optional[Path] = Field(None, description="Fichier avec la figure")
+
+
+class Texte(BaseModel):
+    """Modèle de base pour un unité atomique (indexable) de texte, dont un
+    article, une liste d'attendus, ou un annexe.
+    """
 
     titre: Optional[str] = None
     pages: Tuple[int, int]
-    alineas: List[str] = []
+    contenu: List[Contenu | Tableau | Figure] = Field(
+        [], description="Contenus (alinéas, tableaux, images) de ce texte"
+    )
 
 
-class Annexe(Contenu):
-    """Annexe du texte."""
+class Annexe(Texte):
+    """Annexe d'un document ou règlement."""
 
-    annexe: str
+    annexe: str = Field(description="Numéro de cet annexe")
 
 
-class Attendus(Contenu):
+class Attendus(Texte):
     """Attendus d'un reglement ou resolution."""
 
-    pass
+    attendu: bool = True
 
 
-class Article(Contenu):
+class Article(Texte):
     """Article du texte."""
 
     article: int = Field(
@@ -118,8 +141,7 @@ class Document(BaseModel):
         None, description="Titre du document (tel qu'il apparaît sur le site web)"
     )
     chapitres: List[Chapitre] = []
-    attendus: Optional[Attendus] = None
-    contenus: List[Contenu] = []
+    textes: List[Article | Attendus | Annexe | Texte] = []
 
 
 class Reglement(Document):

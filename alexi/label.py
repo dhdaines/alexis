@@ -3,8 +3,8 @@
 import itertools
 import logging
 import re
-from enum import Enum
 from collections.abc import Iterable, Sequence
+from enum import Enum
 from typing import Any, Iterator, Optional
 
 LOGGER = logging.getLogger("label")
@@ -45,9 +45,13 @@ def line_breaks(
     xdeltas.extend(
         int(b["x0"]) - int(a["x0"]) for a, b in itertools.pairwise(paragraph)
     )
+    ydeltas = [int(paragraph[0]["top"])]
+    ydeltas.extend(
+        int(b["top"]) - int(a["top"]) for a, b in itertools.pairwise(paragraph)
+    )
     line = []
-    for word, xdelta in zip(paragraph, xdeltas):
-        if xdelta < 0:
+    for word, xdelta, ydelta in zip(paragraph, xdeltas, ydeltas):
+        if xdelta <= 0 and ydelta > 0:  # CR, LF
             yield line
             line = []
         line.append(word)
@@ -106,33 +110,30 @@ def extract_enumeration(
 
 
 class Classificateur:
-    chapitre: Optional[str] = None
-    en_tete: Optional[str] = None
+    head_chapitre: Optional[str] = None
     article_idx: int = 0
     in_toc: bool = False
-    debut_chapitre: bool = False
+    prev_x0: int = 72
 
     def classify_alinea(
-        self, tag: str, paragraph: Sequence[dict[str, Any]], text: str
+        self,
+        tag: str,
+        paragraph: Sequence[dict[str, Any]],
+        text: str,
+        page_words: Sequence[dict[str, Any]],
     ) -> str:
-        if tag == "Tete":
-            # enregistrer l'en-tete pour assister en classification
-            en_tete = text.lower()
-            if en_tete != self.en_tete:
-                self.en_tete = en_tete
-                self.debut_chapitre = True
-            else:
-                self.debut_chapitre = False
+        if tag in ("Tete", "Pied"):
             return tag
-        elif tag == "Pied":
-            return tag
-
         word = paragraph[0]["text"].lower()
         if m := re.match(r"article (\d+)", text, re.IGNORECASE):
             tag = "Article"
             self.article_idx = int(m.group(1))
+        elif m := re.match(r"(?!\d+[\)\.]).*\n([1-9]\d*)[\)\.](?!\d)", text):
+            tag = "Article"
+            self.article_idx = int(m.group(1))
         elif m := re.match(r"(\d+)[\)\.]?", text):
             idx = int(m.group(1))
+            # FIXME: Bad heuristic! Bad!
             if idx == self.article_idx + 1:
                 self.article_idx = idx
                 tag = "Article"
@@ -140,53 +141,63 @@ class Classificateur:
                 tag = "Enumeration"
         elif re.match(r"[a-z][\)\.]|[•-]", text):
             tag = "Enumeration"
+        elif m := re.match(r"figure\s+(\d+)", text, re.IGNORECASE):
+            tag = "Figure"
         elif word == "attendu":
             tag = "Attendu"
             if re.match(r".*avis de motion", text, re.IGNORECASE):
                 tag = "Avis"
-        elif word == "chapitre":
-            # voyons donc (faut du machine learning chose)
-            if (
-                self.chapitre is not None
-                and "dispositions déclaratoires" in self.chapitre
-                and int(paragraph[0]["top"]) > 200
-            ):
-                pass
-            else:
-                tag = "Chapitre"
-                self.chapitre = text.lower()
-        elif word == "section":
-            tag = "Section"
-        elif word == "sous-section":
-            # voyons donc #2
-            if (
-                self.chapitre is not None
-                and "dispositions déclaratoires" in self.chapitre
-                and int(paragraph[0]["top"]) > 200
-            ):
-                pass
-            else:
-                tag = "SousSection"
-        elif text.isupper() and int(paragraph[0]["x0"]) == 193:
-            # voyons donc #3 (problème de pdfplumber...?)
-            tag = "SousSection"
-        elif text.isupper() and self.debut_chapitre:
-            # voyons donc #4 (problème de pdfplumber...?)
+        elif word == "chapitre" and paragraph[1]["text"] != "X":
             tag = "Chapitre"
+        elif word == "annexe" and paragraph[1]["text"] != "X":
+            tag = "Annexe"
+        elif word == "section" and paragraph[1]["text"] != "X":
+            tag = "Section"
+        elif word == "sous-section" and paragraph[1]["text"] != "X.X":
+            tag = "SousSection"
         elif (
             re.match(
-                r"r[eè]glement ?(?:de|d'|sur|relatif aux)?",
+                r"(?:ville de sainte-adèle.*)?r[eè]glement.*(?:de|d'|sur|relatif aux?|concernant|numero|numéro|no\.)",
                 text,
-                re.IGNORECASE,
+                re.DOTALL | re.IGNORECASE,
             )
-            and int(paragraph[0]["page"]) < 5
+            and int(paragraph[0]["page"]) < 3
         ):
             tag = "Titre"
+        elif (
+            re.match(
+                r"^r[eè]glement\s+(?:numero|numéro|no\.\s+)?(\S+)$",
+                text,
+                re.DOTALL | re.IGNORECASE,
+            )
+            and int(paragraph[0]["page"]) < 3
+        ):
+            tag = "Titre"
+        elif (
+            re.match(
+                r"(?:afin de|sur|relatif aux?|concernant|numero|numéro|no\.)",
+                text,
+                re.DOTALL | re.IGNORECASE,
+            )
+            and int(paragraph[0]["page"]) < 3
+        ):
+            tag = "Titre"
+        elif text.isupper() or text == "T1.2 Récréation":
+            if (
+                # Rough heurstic for "SOUS-SECTION N.N" as an image
+                any(w["text"].isalpha() for w in paragraph)
+                and int(paragraph[0]["x0"]) - int(self.prev_x0) > 100
+            ):
+                if text != "CHAPITRE X":
+                    tag = "SousSection"
 
         return tag
 
     def classify_paragraph_heuristic(
-        self, tag: str, paragraph: Sequence[dict[str, Any]]
+        self,
+        tag: str,
+        paragraph: Sequence[dict[str, Any]],
+        page_words: Sequence[dict[str, Any]],
     ) -> Iterable[tuple[str, Sequence[dict[str, Any]]]]:
         """Classification heuristique très simplistique d'un alinéa, suffisant
         pour détecter les articles, énumérations, et parfois les dates
@@ -194,22 +205,59 @@ class Classificateur:
         """
         if len(paragraph) == 0:
             return []
-        text = " ".join(w["text"] for w in paragraph)
+        text = "\n".join(
+            " ".join(w["text"] for w in line) for line in line_breaks(paragraph)
+        )
 
         if re.match("^table des mati[èe]res", text, re.IGNORECASE):
             self.in_toc = True
+
+        if tag == "Tete":
+            if m := re.match(r".*(chapitre)\s+(\S+)", text, re.IGNORECASE):
+                self.head_chapitre = m.group(2)
+            else:
+                self.head_chapitre = None
+
+        # "CHAPITRE N" is sometimes an image, so check for upper-case text
+        # on a page by itself
+        n_nonhead_words = sum(
+            1
+            for w in page_words
+            if w["tag"] not in ("B-Tete", "I-Tete", "B-Pied", "I-Pied")
+        )
+        if (
+            text.isupper()
+            and "ANNEXE" not in text
+            and n_nonhead_words == len(paragraph)
+        ):
+            self.in_toc = False
+            return [("Chapitre", paragraph)]
+
         if self.in_toc:
-            # FIXME: Not entirely reliable way to detect end of TOC
-            if tag == "Tete" and re.match(".*chapitre", text, re.IGNORECASE):
+            # If we found a chapter name in the header then end the TOC
+            if self.head_chapitre is not None:
                 self.in_toc = False
             elif tag not in ("Pied", "Tete"):
                 return [("TOC", paragraph)]
 
-        # Detecter les dates dans des tableaux
-        if tag == "Tableau" and "avis de motion" in text.lower():
-            return extract_dates(paragraph)
+        if tag == "Tableau":
+            # Detecter les dates dans des tableaux.
+            # FIXME: diverses autres façons de spécifier les
+            # dates... besoin d'un vrai taggeur!
+            if "avis de motion" in text.lower():
+                return extract_dates(paragraph)
+            # Detecter les titres aussi...
+            if re.match(
+                r"(?:ville de sainte-ad[eè]le\s*)?r[eè]glement\s+(?:relatif|sur|de|\d|d)",
+                text,
+                re.IGNORECASE,
+            ):
+                pass
+            else:
+                # Sinon, les laisser tranquilles!
+                return [(tag, paragraph)]
 
-        tag = self.classify_alinea(tag, paragraph, text)
+        tag = self.classify_alinea(tag, paragraph, text, page_words)
 
         if tag == "Enumeration":
             return extract_enumeration(paragraph)
@@ -219,6 +267,7 @@ class Classificateur:
         self, tag: str, paragraph: Sequence[dict[str, Any]]
     ) -> Iterator[dict[str, Any]]:
         word = paragraph[0]
+        cur_x0 = word["x0"]
         if tag == "O":
             word["tag"] = "O"
         else:
@@ -230,6 +279,7 @@ class Classificateur:
             else:
                 word["tag"] = f"I-{tag}"
             yield word
+        self.prev_x0 = cur_x0
 
     def classify_heuristic(
         self, words: Iterable[dict[str, Any]]
@@ -237,12 +287,18 @@ class Classificateur:
         """Classification heuristique très simplistique des alinéas, suffisant
         pour détecter les articles, énumérations, et parfois les dates
         d'adoption."""
-        for tag, paragraph in group_paragraphs(words):
-            if not paragraph:
-                return
-            # FIXME: Can split but not join paragraphs
-            for t, p in self.classify_paragraph_heuristic(tag, paragraph):
-                yield from self.output_paragraph(t, p)
+        for page_number, page_words in itertools.groupby(
+            words, key=lambda x: x["page"]
+        ):
+            page_words_list = list(page_words)
+            for tag, paragraph in group_paragraphs(page_words_list):
+                if not paragraph:
+                    continue
+                # FIXME: Can split but not join paragraphs
+                for t, p in self.classify_paragraph_heuristic(
+                    tag, paragraph, page_words_list
+                ):
+                    yield from self.output_paragraph(t, p)
 
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         words = self.classify_heuristic(words)
