@@ -36,7 +36,6 @@ class Formatteur:
     chapitre: Optional[Chapitre] = None
     section: Optional[Section] = None
     sous_section: Optional[SousSection] = None
-    intention: Optional[Texte] = None
     annexe: Optional[Annexe] = None
     article: Optional[Article] = None
     attendus: Optional[Attendus] = None
@@ -158,9 +157,7 @@ class Formatteur:
                 self.textes.append(paragraphe)
         elif tag in ("Alinea", "Enumeration", "Figure"):
             # FIXME: à l'avenir on va prendre en charge les listes/énumérations
-            if self.intention:
-                self.intention.contenu.append(contenu)
-            elif self.annexe:
+            if self.annexe:
                 self.annexe.contenu.append(contenu)
             elif self.article:
                 self.article.contenu.append(contenu)
@@ -199,7 +196,6 @@ class Formatteur:
                 len(self.textes) - 1,
             )
         self.sous_section = None
-        self.close_intention()
         self.close_article()
 
     def close_article(self):
@@ -207,12 +203,6 @@ class Formatteur:
         if self.article:
             self.article.pages = (self.article.pages[0], self.pageidx)
         self.article = None
-
-    def close_intention(self):
-        """Clore la derniere section (et sous-section, etc)"""
-        if self.intention:
-            self.intention.pages = (self.intention.pages[0], self.pageidx)
-        self.intention = None
 
     def extract_tete(self, texte: str):
         if m := re.match(r".*(chapitre)\s+(\S+)", texte, re.IGNORECASE):
@@ -362,7 +352,9 @@ class Formatteur:
         self.sous_section = sous_section
         return sous_section
 
-    def new_article(self, num: int, titre: str, contenu: Optional[str]) -> Article:
+    def new_article(
+        self, titre: str, contenu: Optional[str] = None, num: int = -1
+    ) -> Article:
         article = Article(
             chapitre=len(self.chapitres) - 1,
             section=(len(self.chapitre.sections) - 1 if self.chapitre else -1),
@@ -392,7 +384,7 @@ class Formatteur:
             # C'est une énumération mal étiquetée
             return None
         self.artidx = num
-        return self.new_article(num, title, contenu)
+        return self.new_article(title, contenu, num)
 
     def extract_attendu(self, contenu: Contenu):
         if self.attendus is None:
@@ -404,11 +396,9 @@ class Formatteur:
         return self.attendus
 
     def extract_intention(self, texte: str):
-        self.close_intention()
-        if self.intention is None:
-            self.intention = Texte(titre=texte, pages=(self.pageidx, self.pageidx))
-            self.textes.append(self.intention)
-        return self.intention
+        """Les préfaces "INTENTION" des types de milieux sont considérés
+        commes des articles sans numéro."""
+        return self.new_article(texte)
 
     def make_dates(self) -> Dates:
         return Dates(
