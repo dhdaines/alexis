@@ -1,6 +1,6 @@
 upload/documents/10.1R-Projet-rgl-1000-2008-PPC-2-AM.pdf
-upload/documents/2023-07-17-RGL-1314-2021-Z-10-AM.pdf
-upload/documents/2023-07-17-RGL-1314-2021-PC-3-AM.pdf
+upload/documents/2023-07-17-RGL-1314-2021-Z-10-AM_1.pdf
+upload/documents/2023-07-17-RGL-1314-2021-PC-3-AM_1.pdf
 upload/documents/2023-07-17-Rgl-1337-Type-Parapluie-2023-AM-.pdf
 upload/documents/2023-07-17-Rgl-1338-rue-du-Valais-AM-.pdf
 upload/documents/2023-07-12-RGL-SQ-2023-01-AM.pdf
@@ -25,7 +25,7 @@ upload/documents/2019-08-19-Reglement-1275-Citation-Maison-Olivier-Rolland-adopt
 upload/documents/2019-08-19-Reglement-1276-Citation-Maison-Claude-H-Grignon-adoption-.pdf
 upload/documents/2019-08-19-Reglement-1277-Citation-Maison-Biroleau-McGuire-adoption-.pdf
 upload/documents/2019-08-19-Reglement-1278-Citation-Maison-Wilfrid-Grignon-adoption-.pdf
-upload/documents/2023-04-11-1290-CODIFICATION.pdf
+upload/documents/2023-07-19-1290-CODIFICATION.pdf
 upload/documents/2020-06-15-RGL-1292-Optimisation-ressources-Adoption.pdf
 upload/documents/xx-2020-10-31-RGL-1293-district-electoraux-adoption-COMPLET.pdf
 upload/documents/RGL-1307-Identification-ORolland-adoption-COMPLET.pdf
@@ -140,6 +140,7 @@ upload/documents/RGL-1331-Travaux-refection-rue-Lanthier-Adopte.pdf
 upload/documents/RGL-1332-Mises-aux-normes-PPompage-117E-Adopte.pdf
 upload/documents/RGL-1335-Generatrices-Riverdale-Ronchamp-Adopte.pdf
 upload/documents/xx2023-03-20-Rgl-1336-rue-Skieur-Adopte.pdf
+upload/documents/2023-07-31-Rgl-1337-Type-Parapluie-2023-adoption-.pdf
 upload/documents/RGL-1144-2010-Parc-canin.pdf
 upload/documents/RGL-1174-2012-Interdiction-fumer-parcs.pdf
 upload/documents/2015-06-20-Reglement-1223-circulation-des-vehicules-lourds-et-ANNEXES.pdf
@@ -171,6 +172,8 @@ upload/documents/Rgl-1314-2021-PU-refonte-Plan-d-urbanisme.pdf
 upload/documents/Rgl-1314-2021-TM-Travaux-municipaux.pdf
 upload/documents/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
 upload/documents/Rgl-1314-2021-Z-en-vigueur-20230614.pdf
+upload/documents/19213-Plan-de-zonage-VZ-6-Tout-20221014.pdf
+upload/documents/19213-Plan-de-zonage-V5R2-Zoom.pdf
 upload/documents/xx-2022-01-24-Reglement-1314-2021-Z-1-adopte-et-signe_1.pdf
 upload/documents/2022-02-21-Reglement-1314-2021-Z-2-adopte-_1.pdf
 upload/documents/2022-03-21-Rgl-1314-2021-Z-3-Omnibus-Adopte.pdf
@@ -182,3 +185,4 @@ upload/documents/xx2023-04-17-Rgl-1314-2021-Z-8-Adopte.pdf
 upload/documents/xx2023-05-15-Rgl-1314-2021-Z-9-Adopte.pdf
 upload/documents/2022-03-21-Reglement-PAE-Adopte.pdf
 upload/documents/2022-04-19-Rgl-1324-redevances-adopte.pdf
+upload/documents/derogation-mineure-2013.pdf
