@@ -114,6 +114,7 @@ class Classificateur:
     article_idx: int = 0
     in_toc: bool = False
     prev_x0: int = 72
+    prev_sous_x0: str = ""
 
     def classify_alinea(
         self,
@@ -155,6 +156,7 @@ class Classificateur:
             tag = "Section"
         elif word == "sous-section" and paragraph[1]["text"] != "X.X":
             tag = "SousSection"
+            self.prev_sous_x0 = paragraph[0]["x0"]
         elif (
             re.match(
                 r"(?:ville de sainte-adèle.*)?r[eè]glement.*(?:de|d'|sur|relatif aux?|concernant|numero|numéro|no\.)",
@@ -186,10 +188,14 @@ class Classificateur:
             if (
                 # Rough heurstic for "SOUS-SECTION N.N" as an image
                 any(w["text"].isalpha() for w in paragraph)
-                and int(paragraph[0]["x0"]) - int(self.prev_x0) > 100
+                and (
+                    int(paragraph[0]["x0"]) - int(self.prev_x0) > 100
+                    or paragraph[0]["x0"] == self.prev_sous_x0
+                )
             ):
                 if text != "CHAPITRE X":
                     tag = "SousSection"
+                    self.prev_sous_x0 = paragraph[0]["x0"]
 
         return tag
 
