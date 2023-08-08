@@ -81,7 +81,11 @@ class Formatteur:
             self.extract_attendu(contenu)
         elif tag == "Figure":
             # Look for an existing figure in output directory (not ideal but...)
-            figures = list(self.imgdir.glob(f"page{self.pageidx}-figure-*"))
+            figures = (
+                list(self.imgdir.glob(f"page{self.pageidx}-figure-*"))
+                if self.imgdir
+                else []
+            )
             if len(figures) == 0:
                 figure = Figure(texte=texte)
             elif len(figures) == 1:
