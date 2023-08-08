@@ -158,7 +158,6 @@ class Classificateur:
             tag = "Section"
         elif word == "sous-section" and paragraph[1]["text"] != "X.X":
             tag = "SousSection"
-            self.prev_sous_x0 = paragraph[0]["x0"]
         elif (
             re.match(
                 r"(?:ville de sainte-adèle.*)?r[eè]glement.*(?:de|d'|sur|relatif aux?|concernant|numero|numéro|no\.)",
