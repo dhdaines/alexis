@@ -9,9 +9,20 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from alexi.label import line_breaks
-from alexi.types import (Annexe, Article, Attendus, Chapitre, Contenu, Dates,
-                         Figure, Reglement, Section, SousSection, Tableau,
-                         Texte)
+from alexi.types import (
+    Annexe,
+    Article,
+    Attendus,
+    Chapitre,
+    Contenu,
+    Dates,
+    Figure,
+    Reglement,
+    Section,
+    SousSection,
+    Tableau,
+    Texte,
+)
 
 LOGGER = logging.getLogger("json")
 
@@ -25,6 +36,7 @@ class Formatteur:
     chapitre: Optional[Chapitre] = None
     section: Optional[Section] = None
     sous_section: Optional[SousSection] = None
+    intention: Optional[Texte] = None
     annexe: Optional[Annexe] = None
     article: Optional[Article] = None
     attendus: Optional[Attendus] = None
@@ -72,6 +84,8 @@ class Formatteur:
             self.extract_section(texte)
         elif tag == "SousSection":
             self.extract_sous_section(texte)
+        elif tag == "Intention":  # FIXME: should be general unnumber section
+            self.extract_intention(texte)
         elif tag == "Annexe":
             self.extract_annexe(texte)
         elif tag == "Article":
@@ -144,7 +158,9 @@ class Formatteur:
                 self.textes.append(paragraphe)
         elif tag in ("Alinea", "Enumeration", "Figure"):
             # FIXME: à l'avenir on va prendre en charge les listes/énumérations
-            if self.annexe:
+            if self.intention:
+                self.intention.contenu.append(contenu)
+            elif self.annexe:
                 self.annexe.contenu.append(contenu)
             elif self.article:
                 self.article.contenu.append(contenu)
@@ -183,6 +199,7 @@ class Formatteur:
                 len(self.textes) - 1,
             )
         self.sous_section = None
+        self.close_intention()
         self.close_article()
 
     def close_article(self):
@@ -190,6 +207,12 @@ class Formatteur:
         if self.article:
             self.article.pages = (self.article.pages[0], self.pageidx)
         self.article = None
+
+    def close_intention(self):
+        """Clore la derniere section (et sous-section, etc)"""
+        if self.intention:
+            self.intention.pages = (self.intention.pages[0], self.pageidx)
+        self.intention = None
 
     def extract_tete(self, texte: str):
         if m := re.match(r".*(chapitre)\s+(\S+)", texte, re.IGNORECASE):
@@ -379,6 +402,13 @@ class Formatteur:
         else:
             self.attendus.contenu.append(contenu)
         return self.attendus
+
+    def extract_intention(self, texte: str):
+        self.close_intention()
+        if self.intention is None:
+            self.intention = Texte(titre=texte, pages=(self.pageidx, self.pageidx))
+            self.textes.append(self.intention)
+        return self.intention
 
     def make_dates(self) -> Dates:
         return Dates(

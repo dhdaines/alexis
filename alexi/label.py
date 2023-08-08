@@ -148,6 +148,8 @@ class Classificateur:
             tag = "Attendu"
             if re.match(r".*avis de motion", text, re.IGNORECASE):
                 tag = "Avis"
+        elif word == "intention":
+            tag = "Intention"
         elif word == "chapitre" and paragraph[1]["text"] != "X":
             tag = "Chapitre"
         elif word == "annexe" and paragraph[1]["text"] != "X":
