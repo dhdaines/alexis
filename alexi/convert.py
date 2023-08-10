@@ -66,6 +66,17 @@ def get_element_bbox(page, el):
     return pdfplumber.utils.objects_to_bbox(mcid_objs)
 
 
+def get_table_bbox(page, table):
+    bbox = table.get("attributes", {}).get("BBox", None)
+    if bbox is not None:
+        x0, y0, x1, y1 = bbox
+        top = page.height - y1
+        bottom = page.height - y0
+        return (x0, top, x1, bottom)
+    else:
+        return get_element_bbox(page, table)
+
+
 def add_margin(bbox, margin):
     x0, top, x1, bottom = bbox
     return (max(0, x0 - margin), max(0, top - margin), x1 + margin, bottom + margin)
@@ -86,12 +97,10 @@ class Converteur:
             p = pdf.pages[idx]
             words = p.extract_words(y_tolerance=1)
             tables = list(get_tables(p))
-            tboxes = []
-            for idx, t in enumerate(tables):
-                tbox = get_element_bbox(p, t)
+            tboxes = [get_table_bbox(p, table) for table in tables]
+            for idx, tbox in enumerate(tboxes):
                 if tbox is None:
                     continue
-                tboxes.append(tbox)
                 if self.imgdir is not None:
                     img = p.crop(add_margin(tbox, 10)).to_image(
                         resolution=150, antialias=True
@@ -114,11 +123,12 @@ class Converteur:
                         img.save(
                             self.imgdir / f"page{p.page_number}-figure-{fboxtxt}.png"
                         )
-                    except ValueError:
+                    except ValueError as e:
                         LOGGER.warning(
-                            "Failed to save figure on page %d at %s",
+                            "Failed to save figure on page %d at %s: %s",
                             p.page_number,
                             fbox,
+                            e,
                         )
 
             # Index characters for lookup
@@ -144,6 +154,8 @@ class Converteur:
                 w["page_width"] = round(float(p.width))
                 # Find words inside tables and tag accordingly
                 for table, tbox in zip(tables, tboxes):
+                    if tbox is None:
+                        continue
                     if bbox_overlaps(obj_to_bbox(w), tbox):
                         if id(table) != prev_table:
                             w["tag"] = "B-Tableau"
