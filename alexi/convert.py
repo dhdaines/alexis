@@ -66,15 +66,15 @@ def get_element_bbox(page, el):
     return pdfplumber.utils.objects_to_bbox(mcid_objs)
 
 
-def get_table_bbox(page, table):
-    bbox = table.get("attributes", {}).get("BBox", None)
+def get_thingy_bbox(page, thingy):
+    bbox = thingy.get("attributes", {}).get("BBox", None)
     if bbox is not None:
         x0, y0, x1, y1 = bbox
         top = page.height - y1
         bottom = page.height - y0
         return (x0, top, x1, bottom)
     else:
-        return get_element_bbox(page, table)
+        return get_element_bbox(page, thingy)
 
 
 def add_margin(bbox, margin):
@@ -97,7 +97,7 @@ class Converteur:
             p = pdf.pages[idx]
             words = p.extract_words(y_tolerance=1)
             tables = list(get_tables(p))
-            tboxes = [get_table_bbox(p, table) for table in tables]
+            tboxes = [get_thingy_bbox(p, table) for table in tables]
             for idx, tbox in enumerate(tboxes):
                 if tbox is None:
                     continue
@@ -107,10 +107,11 @@ class Converteur:
                     )
                     img.save(self.imgdir / f"page{p.page_number}-table{idx + 1}.png")
             for idx, f in enumerate(get_figures(p)):
-                fbox = get_element_bbox(p, f)
+                fbox = get_thingy_bbox(p, f)
                 if fbox is None:
                     continue
                 in_table = False
+                # get_figures is supposed to prevent this, but doesn't, it seems
                 for tbox in tboxes:
                     if bbox_overlaps(fbox, tbox):
                         in_table = True
