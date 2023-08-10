@@ -29,7 +29,7 @@ LOGGER = logging.getLogger("json")
 
 class Formatteur:
     fichier: Path
-    imgdir: Path
+    imgdir: Optional[Path]
     numero: str = "INCONNU"
     objet: Optional[str] = None
     titre: Optional[str] = None
@@ -45,7 +45,7 @@ class Formatteur:
     sous_section_idx: int = 0
     head_chapitre: Optional[str] = None
 
-    def __init__(self, fichier: PathLike, imgdir: Path):
+    def __init__(self, fichier: PathLike, imgdir: Optional[Path] = None):
         self.fichier = Path(fichier)
         self.imgdir = imgdir
         self.pages: List[str] = []
@@ -96,7 +96,7 @@ class Formatteur:
             # Look for an existing figure in output directory (not ideal but...)
             figures = (
                 list(self.imgdir.glob(f"page{self.pageidx}-figure-*"))
-                if self.imgdir
+                if self.imgdir is not None
                 else []
             )
             if len(figures) == 0:
