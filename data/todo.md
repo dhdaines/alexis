@@ -14,3 +14,11 @@ Liste de tâches
   - Leading dashes in chapters RGL-1132
   - Adoption vs. objet RGL-1132
   - Missing content in 1314-2021-PU
+  - Weird column titles in PIIA
+- Documents à ajouter:
+  - SQ
+  - Animal
+- Évaluation de la segmentation, CRF vs. heuristique
+  - Loading CSV features into CRFsuite
+  - Réannotation des CSV avec Tag, MCID
+  - Billet de blogue pour rationaliser la façon de faire
