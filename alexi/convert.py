@@ -10,6 +10,23 @@ import pdfplumber
 from pdfplumber.utils import obj_to_bbox
 
 LOGGER = logging.getLogger("convert")
+FIELDNAMES = [
+    "tag",
+    "text",
+    "page",
+    "page_width",
+    "page_height",
+    "r",
+    "g",
+    "b",
+    "x0",
+    "x1",
+    "top",
+    "bottom",
+    "doctop",
+    "mcid",
+    "mctag",
+]
 
 
 def get_tables(page):
@@ -150,6 +167,8 @@ class Converteur:
                             "Espace couleur non pris en charge: %s",
                             c["non_stroking_color"],
                         )
+                    w["mcid"] = c.get("mcid")
+                    w["mctag"] = c.get("tag")
                 w["page"] = p.page_number
                 w["page_height"] = round(float(p.height))
                 w["page_width"] = round(float(p.width))

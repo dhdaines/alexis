@@ -15,7 +15,7 @@ from typing import Any, Iterable, TextIO
 
 from bs4 import BeautifulSoup
 
-from .convert import Converteur
+from .convert import Converteur, FIELDNAMES
 from .index import index
 from .json import Formatteur
 from .label import Classificateur
@@ -23,21 +23,6 @@ from .search import search
 from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
-FIELDNAMES = [
-    "tag",
-    "text",
-    "page",
-    "page_width",
-    "page_height",
-    "r",
-    "g",
-    "b",
-    "x0",
-    "x1",
-    "top",
-    "bottom",
-    "doctop",
-]
 
 
 def download_main(args):
