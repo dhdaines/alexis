@@ -112,7 +112,7 @@ class Converteur:
             pages = list(range(len(pdf.pages)))
         for idx in pages:
             p = pdf.pages[idx]
-            words = p.extract_words(y_tolerance=1)
+            words = p.extract_words(y_tolerance=2)
             tables = list(get_tables(p))
             tboxes = [get_thingy_bbox(p, table) for table in tables]
             for idx, tbox in enumerate(tboxes):
