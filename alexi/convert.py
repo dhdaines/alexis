@@ -26,6 +26,7 @@ FIELDNAMES = [
     "doctop",
     "mcid",
     "mctag",
+    "tableau",
 ]
 
 
@@ -71,6 +72,12 @@ def bbox_overlaps(obox, bbox):
     return ox0 < x1 and ox1 > x0 and otop < bottom and obottom > top
 
 
+def bbox_contains(bbox, ibox):
+    x0, top, x1, bottom = bbox
+    ix0, itop, ix1, ibottom = ibox
+    return ix0 >= x0 and ix1 <= x1 and itop >= top and ibottom <= bottom
+
+
 def get_element_bbox(page, el):
     mcids = set(get_child_mcids(el))
     mcid_objs = [
@@ -112,6 +119,7 @@ class Converteur:
             pages = list(range(len(pdf.pages)))
         for idx in pages:
             p = pdf.pages[idx]
+            LOGGER.info("traitement de la page %d", p.page_number)
             words = p.extract_words(y_tolerance=2)
             tables = list(get_tables(p))
             tboxes = [get_thingy_bbox(p, table) for table in tables]
@@ -123,15 +131,18 @@ class Converteur:
                         resolution=150, antialias=True
                     )
                     img.save(self.imgdir / f"page{p.page_number}-table{idx + 1}.png")
-            for idx, f in enumerate(get_figures(p)):
-                fbox = get_thingy_bbox(p, f)
+            figures = list(get_figures(p))
+            fboxes = [get_thingy_bbox(p, figure) for figure in figures]
+            for idx, fbox in enumerate(fboxes):
                 if fbox is None:
                     continue
                 in_table = False
-                # get_figures is supposed to prevent this, but doesn't, it seems
                 for tbox in tboxes:
-                    if bbox_overlaps(fbox, tbox):
+                    # logical structure doesn't prevent this from happening
+                    if bbox_overlaps(tbox, fbox):
+                        LOGGER.info("Figure in table: %s in %s", fbox, tbox)
                         in_table = True
+                        break
                 if in_table:
                     continue
                 if self.imgdir is not None:
@@ -151,8 +162,7 @@ class Converteur:
 
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in p.chars)
-            LOGGER.info("traitement de la page %d", p.page_number)
-            prev_table = None
+            prev_tbox = None
             for w in words:
                 # Extract colour from first character (FIXME: assumes RGB space)
                 if c := chars.get((w["x0"], w["top"])):
@@ -173,15 +183,16 @@ class Converteur:
                 w["page_height"] = round(float(p.height))
                 w["page_width"] = round(float(p.width))
                 # Find words inside tables and tag accordingly
-                for table, tbox in zip(tables, tboxes):
+                for idx, tbox in enumerate(tboxes):
                     if tbox is None:
                         continue
-                    if bbox_overlaps(obj_to_bbox(w), tbox):
-                        if id(table) != prev_table:
+                    if bbox_contains(tbox, obj_to_bbox(w)):
+                        w["tableau"] = idx + 1
+                        if tbox != prev_tbox:
                             w["tag"] = "B-Tableau"
                         else:
                             w["tag"] = "I-Tableau"
-                        prev_table = id(table)
+                        prev_tbox = tbox
                         break
 
                 # Round positions to points
