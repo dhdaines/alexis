@@ -9,6 +9,8 @@ from typing import Iterable, Iterator, Union
 import sklearn_crfsuite as crfsuite
 from sklearn_crfsuite import metrics
 
+from alexi.convert import FIELDNAMES
+
 
 def sign(x: Union[int | float]):
     """Get the sign of a number (should exist...)"""
@@ -19,27 +21,16 @@ def sign(x: Union[int | float]):
     return 1
 
 
-def word2features(page, i):
+def word2features(word):
     features = ["bias"]
-    features.extend(f"{key}={value}" for key, value in page[i].items() if key != "tag")
-    for n in range(1, 3):
-        if i > n:
-            features.extend(
-                f"-{n}:{key}={value}"
-                for key, value in page[i - n].items()
-                if key != "tag"
-            )
-        if i < len(page) - n:
-            features.extend(
-                f"+{n}:{key}={value}"
-                for key, value in page[i + n].items()
-                if key != "tag"
-            )
+    featnames = [name for name in FIELDNAMES if name != "tag"]
+    features.extend(f"{key}={word.get(key,'')}" for key in featnames)
     return features
 
 
 def page2features(page):
-    return [word2features(page, i) for i in range(len(page))]
+    features = [word2features(w) for w in page]
+    return features
 
 
 TAGMAP = dict(
