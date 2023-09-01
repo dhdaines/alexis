@@ -20,75 +20,21 @@ def sign(x: Union[int | float]):
 
 
 def word2features(page, i):
-    word = page[i]["text"]
-    top = int(page[i]["top"])
-    bottom = int(page[i]["bottom"])
-    x0 = int(page[i]["x0"])
-    mcid = page[i].get("mcid", -1)
-    height = bottom - top
-
-    features = [
-        "bias",
-        "word.lower=%s" % word.lower(),
-        "word.isupper=%s" % word.isupper(),
-        "word.istitle=%s" % word.istitle(),
-        "word.isdigit=%s" % word.isdigit(),
-        "word.height5=%d" % round(height / 5),
-        "word.x0100=%d" % round(x0 / 100),
-        "word.top100=%d" % round(top / 100),
-        "word.mctag=" + page[i].get("mctag", ""),
-    ]
-    if i > 0:
-        word1 = page[i - 1]["text"]
-        top1 = int(page[i - 1]["top"])
-        bottom1 = int(page[i - 1]["bottom"])
-        x11 = int(page[i - 1]["x1"])
-        mcid1 = page[i].get("mcid", -1)
-        height1 = bottom1 - top1
-        ydelta = top - bottom1
-        xdelta = x0 - x11
-        features.extend(
-            [
-                "-1:word.lower=%s" % word1.lower(),
-                "-1:word.istitle=%s" % word1.istitle(),
-                "-1:word.isupper=%s" % word1.isupper(),
-                "-1:word.height5=%d" % round(height1 / 5),
-                "word.ydelta5=%d" % round(ydelta / 5),
-                "word.ydelta100=%d" % round(ydelta / 100),
-                "word.xdelta100=%d" % round(xdelta / 100),
-                "word.ydelta.sign=%d" % sign(ydelta),
-                "word.xdelta.sign=%d" % sign(xdelta),
-                "word.newheight=%d" % int(height1 != height),
-                "word.newmcid=%d" % int(mcid1 != mcid),
-            ]
-        )
-    if i > 1:
-        word2 = page[i - 2]["text"]
-        features.extend(
-            [
-                "-2:word.lower=%s" % word2.lower(),
-                "-2:word.istitle=%s" % word2.istitle(),
-                "-2:word.isupper=%s" % word2.isupper(),
-            ]
-        )
-    if i < len(page) - 1:
-        word1 = page[i + 1]["text"]
-        features.extend(
-            [
-                "+1:word.lower=%s" % word1.lower(),
-                "+1:word.istitle=%s" % word1.istitle(),
-                "+1:word.isupper=%s" % word1.isupper(),
-            ]
-        )
-    if i < len(page) - 2:
-        word2 = page[i + 2]["text"]
-        features.extend(
-            [
-                "+2:word.lower=%s" % word2.lower(),
-                "+2:word.istitle=%s" % word2.istitle(),
-                "+2:word.isupper=%s" % word2.isupper(),
-            ]
-        )
+    features = ["bias"]
+    features.extend(f"{key}={value}" for key, value in page[i].items() if key != "tag")
+    for n in range(1, 3):
+        if i > n:
+            features.extend(
+                f"-{n}:{key}={value}"
+                for key, value in page[i - n].items()
+                if key != "tag"
+            )
+        if i < len(page) - n:
+            features.extend(
+                f"+{n}:{key}={value}"
+                for key, value in page[i + n].items()
+                if key != "tag"
+            )
     return features
 
 

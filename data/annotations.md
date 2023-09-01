@@ -54,3 +54,16 @@ présentation tabulaire.
 `Pied`: pied de page (pourrait être transformé en `O`)
 
 `TOC`: tableaux de contenu, mais pas leurs titres
+
+Necessite d'avoir TOC dans les ensembles dev/test (oups) - plus
+d'annotations a faire...
+
+Entrainement d'un modèle CRF pour segmentation
+==============================================
+
+- Modèle de base, utilisant tout simplement les mêmes traits qu'on
+  utilisait auparavant pour les heuristiques.
+- Quantisation des traits numeriques.
+- Normalisation des traits textuels.
+- Recherche d'hyperparametres
+- 
