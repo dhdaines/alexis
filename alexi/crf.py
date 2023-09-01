@@ -24,7 +24,7 @@ def word2features(page, i):
     top = int(page[i]["top"])
     bottom = int(page[i]["bottom"])
     x0 = int(page[i]["x0"])
-    mcid = page[i]["mcid"]
+    mcid = page[i].get("mcid", -1)
     height = bottom - top
 
     features = [
@@ -36,15 +36,14 @@ def word2features(page, i):
         "word.height5=%d" % round(height / 5),
         "word.x0100=%d" % round(x0 / 100),
         "word.top100=%d" % round(top / 100),
+        "word.mctag=" + page[i].get("mctag", ""),
     ]
-    if "mctag" in page[i]:
-        features.append("word.mctag=" + page[i]["mctag"])
     if i > 0:
         word1 = page[i - 1]["text"]
         top1 = int(page[i - 1]["top"])
         bottom1 = int(page[i - 1]["bottom"])
         x11 = int(page[i - 1]["x1"])
-        mcid1 = page[i]["mcid"]
+        mcid1 = page[i].get("mcid", -1)
         height1 = bottom1 - top1
         ydelta = top - bottom1
         xdelta = x0 - x11
@@ -141,8 +140,14 @@ def train(train_set: Iterable[dict]) -> crfsuite.CRF:
     y_train = [page2labels(s) for s in train_pages[:-nt]]
     X_dev = [page2features(s) for s in train_pages[-nt:]]
     y_dev = [page2labels(s) for s in train_pages[-nt:]]
+    # NOTE: Too much L1 will lead to predicting impossible transitions
     crf = crfsuite.CRF(
-        verbose="true", algorithm="lbfgs", max_iterations=200, c1=0.1, c2=0.01
+        verbose="true",
+        algorithm="lbfgs",
+        max_iterations=100,
+        c1=0.01,
+        c2=0.05,
+        all_possible_transitions=True,
     )
     crf.fit(X_train, y_train, X_dev=X_dev, y_dev=y_dev)
     return crf
