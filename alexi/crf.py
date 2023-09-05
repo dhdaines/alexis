@@ -11,6 +11,8 @@ from sklearn_crfsuite import metrics
 
 from alexi.convert import FIELDNAMES
 
+FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
+
 
 def sign(x: Union[int | float]):
     """Get the sign of a number (should exist...)"""
@@ -23,12 +25,16 @@ def sign(x: Union[int | float]):
 
 def word2features(word):
     features = ["bias"]
-    featnames = [name for name in FIELDNAMES if name != "tag"]
-    features.extend(f"{key}={word.get(key,'')}" for key in featnames)
+    for key in FEATNAMES:
+        feat = word.get(key)
+        if feat is None:
+            feat = ""
+        features.append("=".join((key, str(feat))))
     return features
 
 
 def page2features(page):
+    # Basic features
     features = [word2features(w) for w in page]
     return features
 
