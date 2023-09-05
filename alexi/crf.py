@@ -4,7 +4,7 @@ import csv
 import itertools
 import operator
 from pathlib import Path
-from typing import Iterable, Iterator, Union
+from typing import Callable, Iterable, Iterator, Union
 
 import mlflow
 import sklearn_crfsuite as crfsuite
@@ -25,7 +25,7 @@ def sign(x: Union[int | float]):
     return 1
 
 
-def literal(word):
+def literal(_, word):
     features = ["bias"]
     for key in FEATNAMES:
         feat = word.get(key)
@@ -35,8 +35,68 @@ def literal(word):
     return features
 
 
-FEATURES = {
+def make_delta() -> Callable[[int, str], list[str]]:
+    prev_word = None
+
+    def delta_one(idx, word):
+        nonlocal prev_word
+        if idx == 0:
+            prev_word = None
+        features = pruned(idx, word)
+        ph = float(word["page_height"])
+        pw = float(word["page_width"])
+        if prev_word is None:
+            dx = float(word["x0"])
+            dy = float(word["top"])
+        else:
+            dx = float(word["x0"]) - float(prev_word["x0"])
+            dy = float(word["top"]) - float(prev_word["bottom"])
+        features.extend(
+            [
+                "xdelta:" + str(round(dx / pw * 10)),
+                "ydelta:" + str(round(dy / ph * 10)),
+            ]
+        )
+        prev_word = word
+        return features
+
+    return delta_one
+
+
+def quantized(_, word):
+    features = pruned(_, word)
+    ph = float(word["page_height"])
+    pw = float(word["page_width"])
+    height = float(word["bottom"]) - float(word["top"])
+    features.extend(
+        [
+            "x0:" + str(round(float(word["x0"]) / pw * 10)),
+            "top:" + str(round(float(word["top"]) / ph * 10)),
+            "height:" + str(round(height / 5)),
+        ]
+    )
+    return features
+
+
+def pruned(_, word):
+    mcid = word.get("mcid")
+    if mcid is None:  # UGH ARG WTF
+        mcid = ""
+    features = [
+        "bias",
+        "lower3:" + word["text"][0:3].lower(),
+        "mctag:" + word.get("mctag", ""),
+        "mcid:" + str(mcid),
+        "tableau:" + str(word.get("tableau", "")),
+    ]
+    return features
+
+
+FEATURES: dict[str, Callable[[int, dict], list[str]]] = {
     "literal": literal,
+    "pruned": pruned,
+    "quantized": quantized,
+    "delta": make_delta(),
 }
 
 
@@ -44,7 +104,7 @@ def page2features(page, features="literal", n=1):
     log_param("features", features)
     log_param("n", n)
     f = FEATURES.get(features, literal)
-    features = [f(w) for w in page]
+    features = [f(i, w) for i, w in enumerate(page)]
 
     def adjacent(features, label):
         return (":".join((label, feature)) for feature in features)
@@ -81,8 +141,19 @@ def simplify(tag):
     return "-".join((bio, TAGMAP.get(name, name)))
 
 
-LABELS = {
+def bonly(tag):
+    bio, sep, name = tag.partition("-")
+    if not name:
+        return tag
+    if bio == "I":
+        return "I"
+    return "-".join((bio, TAGMAP.get(name, name)))
+
+
+LABELS: dict[str, Callable[str, str]] = {
+    "literal": lambda x: x,
     "simplify": simplify,
+    "bonly": bonly,
 }
 
 
@@ -108,7 +179,7 @@ def load(paths: Iterable[Path]) -> Iterator[dict]:
 
 
 def train(
-    train_set: Iterable[dict], features="literal", labels="simplify", n=1
+    train_set: Iterable[dict], features="literal", labels="simplify", n=1, niter=100
 ) -> crfsuite.CRF:
     train_pages = split_pages(train_set)
     nt = len(train_pages) // 10
@@ -120,7 +191,7 @@ def train(
         "c1": 0.01,
         "c2": 0.05,
         "algorithm": "lbfgs",
-        "max_iterations": 100,
+        "max_iterations": niter,
         "all_possible_transitions": True,
     }
     log_params(params)
