@@ -42,9 +42,24 @@ FEATURES = {
 
 def page2features(page, features="literal", n=1):
     log_param("features", features)
+    log_param("n", n)
     f = FEATURES.get(features, literal)
     features = [f(w) for w in page]
-    return features
+
+    def adjacent(features, label):
+        return (":".join((label, feature)) for feature in features)
+
+    ngram_features = [iter(f) for f in features]
+    for m in range(1, n):
+        for idx in range(len(features) - m):
+            ngram_features[idx] = itertools.chain(
+                ngram_features[idx], adjacent(features[idx + 1], f"+{m}")
+            )
+        for idx in range(m, len(features)):
+            ngram_features[idx] = itertools.chain(
+                ngram_features[idx], adjacent(features[idx - 1], f"-{m}")
+            )
+    return [list(f) for f in ngram_features]
 
 
 TAGMAP = dict(
@@ -145,10 +160,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--labels", default="simplify", help="Transformateur de classes"
     )
+    parser.add_argument("-n", default=1, type=int, help="Largeur du contexte de traits")
     args = parser.parse_args()
     train_set = load(Path("data/train").glob("*.csv"))
     test_set = load(Path("data/test").glob("*.csv"))
     mlflow.set_tracking_uri("http://127.0.0.1:5000")  # OMG WTF
     with mlflow.start_run():
-        crf = train(train_set, features=args.features, labels=args.labels)
-        test(crf, test_set, features=args.features, labels=args.labels)
+        crf = train(train_set, features=args.features, labels=args.labels, n=args.n)
+        test(crf, test_set, features=args.features, labels=args.labels, n=args.n)
