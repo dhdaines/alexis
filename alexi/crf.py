@@ -6,12 +6,14 @@ import operator
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Union
 
+import eli5
 import mlflow
 import sklearn_crfsuite as crfsuite
 from mlflow import log_metric, log_param, log_params, log_text
 from sklearn_crfsuite import metrics
 
 from alexi.convert import FIELDNAMES
+from alexi.label import Bullet
 
 FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
 
@@ -23,16 +25,6 @@ def sign(x: Union[int | float]):
     if x < 0:
         return -1
     return 1
-
-
-def literal(_, word):
-    features = ["bias"]
-    for key in FEATNAMES:
-        feat = word.get(key)
-        if feat is None:
-            feat = ""
-        features.append("=".join((key, str(feat))))
-    return features
 
 
 def make_delta() -> Callable[[int, str], list[str]]:
@@ -54,7 +46,9 @@ def make_delta() -> Callable[[int, str], list[str]]:
         features.extend(
             [
                 "xdelta:" + str(round(dx / pw * 10)),
+                "xdsign:" + str(sign(dx)),
                 "ydelta:" + str(round(dy / ph * 10)),
+                "ydsign:" + str(sign(dy)),
             ]
         )
         prev_word = word
@@ -71,7 +65,9 @@ def quantized(_, word):
     features.extend(
         [
             "x0:" + str(round(float(word["x0"]) / pw * 10)),
+            "x1:" + str(round(pw - float(word["x1"]) / ph * 10)),
             "top:" + str(round(float(word["top"]) / ph * 10)),
+            "bottom:" + str(round(ph - float(word["bottom"]) / ph * 10)),
             "height:" + str(round(height / 5)),
         ]
     )
@@ -82,13 +78,28 @@ def pruned(_, word):
     mcid = word.get("mcid")
     if mcid is None:  # UGH ARG WTF
         mcid = ""
+    bullet = ""
+    for pattern in Bullet:
+        if pattern.value.match(word["text"]):
+            bullet = pattern.name
     features = [
         "bias",
         "lower3:" + word["text"][0:3].lower(),
         "mctag:" + word.get("mctag", ""),
         "mcid:" + str(mcid),
         "tableau:" + str(word.get("tableau", "")),
+        "bullet:" + bullet,
     ]
+    return features
+
+
+def literal(_, word):
+    features = ["bias"]
+    for key in FEATNAMES:
+        feat = word.get(key)
+        if feat is None:
+            feat = ""
+        features.append("=".join((key, str(feat))))
     return features
 
 
@@ -201,6 +212,19 @@ def train(
     return crf
 
 
+HTML_HEAD = """
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+</head>
+<body>
+"""
+HTML_FOOT = """
+</body>
+</html>
+"""
+
+
 def test(
     crf: crfsuite.CRF,
     test_set: Iterable[dict],
@@ -220,6 +244,8 @@ def test(
     )
     report = metrics.flat_classification_report(y_test, y_pred, labels=sorted_labels)
     log_text(report, "report.txt")
+    explain = eli5.format_as_html(eli5.explain_weights(crf))
+    log_text("\n".join((HTML_HEAD, explain, HTML_FOOT)), "explain.html")
     print(report)
 
 
