@@ -35,20 +35,24 @@ def make_delta() -> Callable[[int, str], list[str]]:
         if idx == 0:
             prev_word = None
         features = pruned(idx, word)
-        ph = float(word["page_height"])
-        pw = float(word["page_width"])
+        height = float(word["bottom"]) - float(word["top"])
         if prev_word is None:
-            dx = float(word["x0"])
-            dy = float(word["top"])
+            dx = 0
+            dy = 0
+            dys = 1
         else:
             dx = float(word["x0"]) - float(prev_word["x0"])
-            dy = float(word["top"]) - float(prev_word["bottom"])
+            dy = float(word["top"]) - float(prev_word["top"])
+            line_gap = float(word["top"]) - float(prev_word["bottom"])
+            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
+            dys = line_gap / prev_height
         features.extend(
             [
-                "xdelta:" + str(round(dx / pw * 10)),
+                "xdelta:" + str(round(dx / height / 10)),
                 "xdsign:" + str(sign(dx)),
-                "ydelta:" + str(round(dy / ph * 10)),
+                "ydelta:" + str(round(dy / height / 10)),
                 "ydsign:" + str(sign(dy)),
+                "ldelta:" + str(round(dys)),
             ]
         )
         prev_word = word
@@ -65,10 +69,10 @@ def quantized(_, word):
     features.extend(
         [
             "x0:" + str(round(float(word["x0"]) / pw * 10)),
-            "x1:" + str(round(pw - float(word["x1"]) / ph * 10)),
+            "x1:" + str(round(pw - float(word["x1"]) / pw * 10)),
             "top:" + str(round(float(word["top"]) / ph * 10)),
             "bottom:" + str(round(ph - float(word["bottom"]) / ph * 10)),
-            "height:" + str(round(height / 5)),
+            "height:" + str(round(height / 10)),
         ]
     )
     return features
@@ -253,11 +257,11 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", default="literal", help="Extracteur de traits")
+    parser.add_argument("--features", default="delta", help="Extracteur de traits")
     parser.add_argument(
         "--labels", default="simplify", help="Transformateur de classes"
     )
-    parser.add_argument("-n", default=1, type=int, help="Largeur du contexte de traits")
+    parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
     args = parser.parse_args()
     train_set = load(Path("data/train").glob("*.csv"))
     test_set = load(Path("data/test").glob("*.csv"))

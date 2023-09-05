@@ -216,8 +216,9 @@ class Classificateur:
             " ".join(w["text"] for w in line) for line in line_breaks(paragraph)
         )
 
-        if re.match("^table des mati[èe]res", text, re.IGNORECASE):
+        if re.match("^table des (mati[èe]res|figures|tableaux)", text, re.IGNORECASE):
             self.in_toc = True
+            return [("Titre", paragraph)]
 
         if tag == "Tete":
             if m := re.match(r".*(chapitre)\s+(\S+)", text, re.IGNORECASE):
