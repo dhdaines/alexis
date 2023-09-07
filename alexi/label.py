@@ -82,10 +82,11 @@ def extract_dates(
 
 
 class Bullet(Enum):
-    NUMERIC = re.compile(r"(\d+)[\)\.]?")
-    ALPHABETIC = re.compile(r"([a-z])[\)\.]", re.IGNORECASE)
-    ROMAN = re.compile(r"([xiv]+)[\)\.]", re.IGNORECASE)
-    BULLET = re.compile(r"([•-])")
+    NUMERIC = re.compile(r"^(\d+)[\)\.]$")
+    LOWER = re.compile(r"^([a-z])[\)\.]$")
+    UPPER = re.compile(r"^([A-Z])[\)\.]$")
+    ROMAN = re.compile(r"^([xiv]+)[\)\.]$", re.IGNORECASE)
+    BULLET = re.compile(r"^([•-])$")  # FIXME: need more bullets
 
 
 def extract_enumeration(

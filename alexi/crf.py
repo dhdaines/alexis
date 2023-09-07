@@ -89,6 +89,7 @@ def pruned(_, word):
         "mcid:" + str(mcid),
         "tableau:" + str(word.get("tableau", "")),
         "bullet:" + bullet,
+        "page:" + str(word["page"]),
     ]
     return features
 
