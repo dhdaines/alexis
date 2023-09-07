@@ -17,7 +17,7 @@ from typing import Any, Iterable, TextIO
 from bs4 import BeautifulSoup
 
 from .convert import FIELDNAMES, Converteur
-from .crf import CRF
+from .crf import CRF, DEFAULT_MODEL
 from .index import index
 from .json import Formatteur
 from .label import Classificateur
@@ -203,7 +203,7 @@ def make_argparse() -> argparse.ArgumentParser:
     convert.set_defaults(func=convert_main)
 
     crf = subp.add_parser("crf", help="Segmenter PDF avec un CRF")
-    crf.add_argument("model", help="Modele CRF", type=Path)
+    crf.add_argument("--model", help="Modele CRF", type=Path, default=DEFAULT_MODEL)
     crf.add_argument(
         "csv",
         help="Fichier CSV à traiter",

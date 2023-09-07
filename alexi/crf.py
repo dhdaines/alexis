@@ -4,14 +4,15 @@ import csv
 import itertools
 import operator
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Optional, Union
+from typing import Any, Callable, Iterable, Iterator, Union
 
 import joblib
 
-from alexi.convert import FIELDNAMES, Converteur
+from alexi.convert import FIELDNAMES
 from alexi.label import Bullet
 
 FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
+DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 
 
 def sign(x: Union[int | float]):
@@ -188,7 +189,7 @@ def load(paths: Iterable[Path]) -> Iterator[dict]:
 
 
 class CRF:
-    def __init__(self, model):
+    def __init__(self, model=DEFAULT_MODEL):
         self.crf, self.n, self.features, self.labels = joblib.load(model)
 
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
