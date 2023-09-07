@@ -10,12 +10,14 @@ import logging
 import re
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
 from bs4 import BeautifulSoup
 
-from .convert import Converteur, FIELDNAMES
+from .convert import FIELDNAMES, Converteur
+from .crf import CRF
 from .index import index
 from .json import Formatteur
 from .label import Classificateur
@@ -65,6 +67,23 @@ def write_csv(
     writer.writerows(doc)
 
 
+def iob2xml(words):
+    cur_tag = None
+    words = []
+    for word in words:
+        bio, sep, tag = word["tag"].partition("-")
+        if bio == "B":
+            if cur_tag is not None:
+                if words:
+                    print("\n".join(textwrap.wrap(" ".join(words))))
+                print(f"</{cur_tag}>")
+            words = []
+            cur_tag = tag
+            print(f"<{tag}>")
+        if bio != "O":
+            words.append(word["text"])
+
+
 def convert_main(args):
     """Convertir les PDF en CSV"""
     if args.images is not None:
@@ -75,6 +94,13 @@ def convert_main(args):
         pages = None
     conv = Converteur(imgdir=args.images)
     write_csv(conv(args.pdf, pages), sys.stdout)
+
+
+def crf_main(args):
+    """Segmenter les PDF avec CRF"""
+    crf = CRF(args.model)
+    reader = csv.DictReader(args.csv)
+    write_csv(crf(reader), sys.stdout)
 
 
 def segment_main(args):
@@ -175,6 +201,15 @@ def make_argparse() -> argparse.ArgumentParser:
         "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
     )
     convert.set_defaults(func=convert_main)
+
+    crf = subp.add_parser("crf", help="Segmenter PDF avec un CRF")
+    crf.add_argument("model", help="Modele CRF", type=Path)
+    crf.add_argument(
+        "csv",
+        help="Fichier CSV à traiter",
+        type=argparse.FileType("rt"),
+    )
+    crf.set_defaults(func=crf_main)
 
     segment = subp.add_parser("segment", help="Extraire les unités de texte des CSV")
     segment.add_argument(
