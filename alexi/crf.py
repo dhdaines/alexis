@@ -13,6 +13,7 @@ from alexi.label import Bullet
 
 FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
+FeatureFunc = Callable[[int, dict], list[str]]
 
 
 def sign(x: Union[int | float]):
@@ -22,6 +23,89 @@ def sign(x: Union[int | float]):
     if x < 0:
         return -1
     return 1
+
+
+def make_visual_structural_literal() -> FeatureFunc:
+    prev_word = None
+    prev_line_height = None
+    prev_line_start = None
+
+    def visual_one(idx, word):
+        nonlocal prev_word, prev_line_height, prev_line_start
+        if idx == 0:  # page break
+            prev_word = None
+            prev_line_start = float(word["x0"])
+            prev_line_height = 1  # arbitrary
+        ph = float(word["page_height"])
+        pw = float(word["page_width"])
+        height = float(word["bottom"]) - float(word["top"])
+        features = [
+            "bias",
+            "lower:" + word["text"].lower(),
+            "x0:%.1f" % (float(word["x0"]) / pw),
+            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
+            "top:%.1f" % (float(word["top"]) / ph),
+            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
+            "height:%.1f" % (height / 10),
+            "bold:%s" % str("bold" in word["fontname"].lower()),
+            "italic:%s" % str("italic" in word["fontname"].lower()),
+        ]
+        newline = False
+        linedelta = 0.0
+        dx = 1
+        dy = 0
+        dh = 0
+        prev_height = 1
+        if prev_word is not None:
+            height = float(word["bottom"]) - float(word["top"])
+            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
+            dx = float(word["x0"]) - float(prev_word["x0"])
+            dy = float(word["top"]) - float(prev_word["top"])
+            dh = height - prev_height
+            if dx < 0 and dy >= prev_height:
+                prev_line_height = prev_height
+                newline = True
+                linedelta = float(word["x0"]) - prev_line_start
+                prev_line_start = float(word["x0"])
+        yhdelta = dy / prev_line_height
+        features.extend(
+            [
+                "xdsign:" + str(sign(dx)),
+                "ydsign:" + str(sign(dy)),
+                "hdsign:" + str(sign(dh)),
+                "xdelta:%.1f" % (dx / pw),
+                "ydelta:%.1f" % (dy / ph),
+                "hdelta:%.1f" % (dh / prev_height),
+                "newline:%s" % str(newline),
+                "linedelta:%.1f" % (linedelta / pw),
+                "yhdelta:%d" % round(min(yhdelta, 5.0)),
+            ]
+        )
+        prev_mcid = prev_word.get("mcid") if prev_word is not None else ""
+        elements = set(word.get("tagstack", "").split(";"))
+        #        features.extend( [
+        #            "mctag:" + word.get("mctag", ""),
+        #            "tableau:" + str("Table" in elements),
+        #            "figure:" + str("Figure" in elements),
+        #            "toc:" + str("TOC" in elements),
+        #            "newmcid:" + str(word.get("mcid") != prev_mcid),
+        #            ]
+        #        )
+        if word.get("mcid") != prev_mcid:
+            features.append("newmcid")
+        mctag = word.get("mctag")
+        if mctag:
+            features.append("mctag:" + mctag)
+        if "Table" in elements:
+            features.append("table")
+        if "Figure" in elements:
+            features.append("figure")
+        if "TOCI" in elements:
+            features.append("toc")
+        prev_word = word
+        return features
+
+    return visual_one
 
 
 def make_delta() -> Callable[[int, str], list[str]]:
@@ -103,17 +187,19 @@ def literal(_, word):
     return features
 
 
-FEATURES: dict[str, Callable[[int, dict], list[str]]] = {
+FEATURES: dict[str, FeatureFunc] = {
     "literal": literal,
     "pruned": pruned,
     "quantized": quantized,
     "delta": make_delta(),
+    "vsl": make_visual_structural_literal(),
 }
 
 
-def page2features(page, features="literal", n=1):
-    f = FEATURES.get(features, literal)
-    features = [f(i, w) for i, w in enumerate(page)]
+def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int = 1):
+    if isinstance(feature_func, str):
+        feature_func = FEATURES.get(feature_func, "literal")
+    features = [feature_func(i, w) for i, w in enumerate(page)]
 
     def adjacent(features, label):
         return (":".join((label, feature)) for feature in features)
@@ -159,16 +245,18 @@ def bonly(tag):
     return "-".join((bio, TAGMAP.get(name, name)))
 
 
-LABELS: dict[str, Callable[str, str]] = {
+LabelFunc = Callable[str, str]
+LABELS: dict[str, LabelFunc] = {
     "literal": lambda x: x,
     "simplify": simplify,
     "bonly": bonly,
 }
 
 
-def page2labels(page, labels="simplify"):
-    t = LABELS.get(labels, lambda x: x)
-    return [t(x["tag"]) for x in page]
+def page2labels(page, label_func: Union[str, LabelFunc] = "simplify"):
+    if isinstance(label_func, str):
+        label_func = LABELS.get(label_func, lambda x: x)
+    return [label_func(x["tag"]) for x in page]
 
 
 def page2tokens(page):

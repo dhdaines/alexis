@@ -54,7 +54,7 @@ def test(
     test = list(test_set)
     X_test = [page2features(test, features, n)]
     y_test = [page2labels(test, labels)]
-    labels = [c for c in crf.classes_ if c.startswith("B-")]
+    labels = [c for c in crf.classes_ if c.startswith("B-")] + ["O"]
     y_pred = crf.predict(X_test)
     sorted_labels = sorted(labels, key=lambda name: (name[1:], name[0]))
     report = metrics.flat_classification_report(y_test, y_pred, labels=sorted_labels)

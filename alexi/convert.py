@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
+from pdfplumber.structure import (PDFStructElement, PDFStructTree,
+                                  StructTreeMissing)
 from pdfplumber.utils import obj_to_bbox
 
 LOGGER = logging.getLogger("convert")
@@ -16,6 +18,7 @@ FIELDNAMES = [
     "page",
     "page_width",
     "page_height",
+    "fontname",
     "r",
     "g",
     "b",
@@ -26,7 +29,7 @@ FIELDNAMES = [
     "doctop",
     "mcid",
     "mctag",
-    "tableau",
+    "tagstack",
 ]
 
 
@@ -106,6 +109,30 @@ def add_margin(bbox, margin):
     return (max(0, x0 - margin), max(0, top - margin), x1 + margin, bottom + margin)
 
 
+def make_tag_stack(
+    tree: Optional[PDFStructTree], page_number: int
+) -> dict[int, PDFStructElement]:
+    """Construire une correspondance entre MCIDs et elements structurels"""
+    elmap = {}
+    if tree is None:
+        return elmap
+    d = deque(tree)
+    tagstack = deque()
+    while d:
+        el = d.pop()
+        if isinstance(el, str):
+            assert tagstack[-1] == el
+            tagstack.pop()
+        else:
+            d.append(el.type)
+            tagstack.append(el.type)
+            if el.page_number == page_number:
+                for mcid in el.mcids:
+                    elmap[mcid] = ";".join(tagstack)
+            d.extend(el.children)
+    return elmap
+
+
 class Converteur:
     imgdir: Optional[Path] = None
 
@@ -117,10 +144,21 @@ class Converteur:
     ) -> Iterator[dict[str, Any]]:
         if pages is None:
             pages = list(range(len(pdf.pages)))
+        try:
+            # Get the tree for the *entire* document since elements
+            # like the TOC may span multiple pages, and we won't find
+            # them if we look at the parent tree for other than the
+            # page in which the top element appears (this is the way
+            # the structure tree implementation in pdfplumber works,
+            # which might be a bug)
+            tree = PDFStructTree(pdf)
+        except StructTreeMissing:
+            tree = None
         for idx in pages:
             p = pdf.pages[idx]
             LOGGER.info("traitement de la page %d", p.page_number)
             words = p.extract_words(y_tolerance=2)
+            elmap = make_tag_stack(tree, p.page_number)
             tables = list(get_tables(p))
             tboxes = [get_thingy_bbox(p, table) for table in tables]
             for idx, tbox in enumerate(tboxes):
@@ -177,8 +215,15 @@ class Converteur:
                             "Espace couleur non pris en charge: %s",
                             c["non_stroking_color"],
                         )
-                    w["mcid"] = c.get("mcid")
+                    mcid = c.get("mcid")
+                    if mcid is None:
+                        w["mcid"] = ""
+                    else:
+                        w["mcid"] = mcid
+                        if mcid in elmap:
+                            w["tagstack"] = elmap[mcid]
                     w["mctag"] = c.get("tag")
+                    w["fontname"] = c.get("fontname")
                 w["page"] = p.page_number
                 w["page_height"] = round(float(p.height))
                 w["page_width"] = round(float(p.width))
