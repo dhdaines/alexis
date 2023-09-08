@@ -29,27 +29,30 @@ def make_delta() -> Callable[[int, str], list[str]]:
 
     def delta_one(idx, word):
         nonlocal prev_word
-        if idx == 0:
+        if idx == 0:  # page break
             prev_word = None
-        features = pruned(idx, word)
-        height = float(word["bottom"]) - float(word["top"])
+        features = quantized(idx, word)
+        ph = float(word["page_height"])
+        pw = float(word["page_width"])
         if prev_word is None:
-            dx = 0
+            dx = 1
             dy = 0
-            dys = 1
+            dh = 0
+            prev_height = 1
         else:
+            height = float(word["bottom"]) - float(word["top"])
+            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
             dx = float(word["x0"]) - float(prev_word["x0"])
             dy = float(word["top"]) - float(prev_word["top"])
-            line_gap = float(word["top"]) - float(prev_word["bottom"])
-            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
-            dys = line_gap / prev_height
+            dh = height - prev_height
         features.extend(
             [
-                "xdelta:" + str(round(dx / height / 10)),
                 "xdsign:" + str(sign(dx)),
-                "ydelta:" + str(round(dy / height / 10)),
                 "ydsign:" + str(sign(dy)),
-                "ldelta:" + str(round(dys)),
+                "hdsign:" + str(sign(dh)),
+                "xdelta:%.1f" % (dx / pw),
+                "ydelta:%.1f" % (dy / ph),
+                "hdelta:%.1f" % (dh / prev_height),
             ]
         )
         prev_word = word
@@ -65,32 +68,27 @@ def quantized(_, word):
     height = float(word["bottom"]) - float(word["top"])
     features.extend(
         [
-            "x0:" + str(round(float(word["x0"]) / pw * 10)),
-            "x1:" + str(round(pw - float(word["x1"]) / pw * 10)),
-            "top:" + str(round(float(word["top"]) / ph * 10)),
-            "bottom:" + str(round(ph - float(word["bottom"]) / ph * 10)),
-            "height:" + str(round(height / 10)),
+            "x0:%.1f" % (float(word["x0"]) / pw),
+            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
+            "top:%.1f" % (float(word["top"]) / ph),
+            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
+            "height:%.1f" % (height / 10),
         ]
     )
     return features
 
 
 def pruned(_, word):
-    mcid = word.get("mcid")
-    if mcid is None:  # UGH ARG WTF
-        mcid = ""
     bullet = ""
     for pattern in Bullet:
         if pattern.value.match(word["text"]):
             bullet = pattern.name
     features = [
         "bias",
-        "lower3:" + word["text"][0:3].lower(),
+        "lower:" + word["text"].lower(),
         "mctag:" + word.get("mctag", ""),
-        "mcid:" + str(mcid),
-        "tableau:" + str(word.get("tableau", "")),
+        "tableau:" + str(word.get("tableau") not in ("", None)),
         "bullet:" + bullet,
-        "page:" + str(word["page"]),
     ]
     return features
 
