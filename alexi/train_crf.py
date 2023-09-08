@@ -13,7 +13,7 @@ from alexi.crf import load, page2features, page2labels, split_pages
 
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", default="delta", help="Extracteur de traits")
+    parser.add_argument("--features", default="vsl", help="Extracteur de traits")
     parser.add_argument(
         "--labels", default="simplify", help="Transformateur de classes"
     )

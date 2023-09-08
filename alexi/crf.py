@@ -281,7 +281,9 @@ class CRF:
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         c1, c2 = itertools.tee(words)
         pred = itertools.chain.from_iterable(
-            self.crf.predict_single(page2features(p, features=self.features, n=self.n))
+            self.crf.predict_single(
+                page2features(p, feature_func=self.features, n=self.n)
+            )
             for p in split_pages(c1)
         )
         for label, word in zip(pred, c2):
