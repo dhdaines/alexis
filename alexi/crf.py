@@ -39,6 +39,11 @@ def make_visual_structural_literal() -> FeatureFunc:
         ph = float(word["page_height"])
         pw = float(word["page_width"])
         height = float(word["bottom"]) - float(word["top"])
+        bullet = None
+        for pattern in Bullet:
+            if pattern.value.match(word["text"]):
+                bullet = pattern.name
+                break
         features = [
             "bias",
             "lower:" + word["text"].lower(),
@@ -49,6 +54,7 @@ def make_visual_structural_literal() -> FeatureFunc:
             "height:%.1f" % (height / 10),
             "bold:%s" % str("bold" in word["fontname"].lower()),
             "italic:%s" % str("italic" in word["fontname"].lower()),
+            "bullet:%s" % bullet,
         ]
         newline = False
         linedelta = 0.0
