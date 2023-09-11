@@ -269,7 +269,7 @@ def page2tokens(page):
     return (x["text"] for x in page)
 
 
-def split_pages(words: Iterable[dict]) -> list[dict]:
+def split_pages(words: Iterable[dict]) -> Iterable[dict]:
     return (list(p) for idx, p in itertools.groupby(words, operator.itemgetter("page")))
 
 

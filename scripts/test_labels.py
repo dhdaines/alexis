@@ -2,16 +2,41 @@
 Use rule-based features and evaluate with CRF evaluator
 """
 
+import argparse
 from pathlib import Path
+from typing import Iterable
 
-import alexi.crf
+from alexi.crf import load, page2labels
 from alexi.label import Classificateur
 from alexi.segment import Segmenteur
 from sklearn_crfsuite import metrics
 
-test_set = list(alexi.crf.load(Path("data/test").glob("*.csv")))
-truth = alexi.crf.page2labels(test_set)
-pred = alexi.crf.page2labels(Classificateur()(Segmenteur()(test_set)))
 
-sorted_labels = "O B-Alinea B-Enumeration B-Pied B-TOC B-Tableau B-Tete B-Titre".split()
-print(metrics.flat_classification_report([truth], [pred], labels=sorted_labels))
+def make_argparse():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("csvs", nargs="+", help="Fichiers CSV de test", type=Path)
+    return parser
+
+
+def test(
+    test_set: Iterable[dict],
+    labels="simplify",
+):
+    test = list(test_set)
+    truth = page2labels(test, labels)
+    pred = page2labels(Classificateur()(Segmenteur()(test)), labels)
+    labels = set(c for c in truth if c.startswith("B-"))
+    labels.add("O")
+    sorted_labels = sorted(labels, key=lambda name: (name[1:], name[0]))
+    report = metrics.flat_classification_report([truth], [pred], labels=sorted_labels)
+    print(report)
+
+
+def main():
+    parser = make_argparse()
+    args = parser.parse_args()
+    test(load(args.csvs))
+
+
+if __name__ == "__main__":
+    main()
