@@ -111,8 +111,24 @@ def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]
         yield word
 
 
+def label_tables(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    """Marquer les mots à l'intérieur de tableaux (selon l'arbre structurel du PDF)"""
+    in_table = False
+    for word in words:
+        if "Table" in word.get("tagstack", ""):
+            if not in_table:
+                word["tag"] = "B-Tableau"
+            else:
+                word["tag"] = "I-Tableau"
+            in_table = True
+        else:
+            in_table = False
+        yield word
+
+
 class Segmenteur:
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         words = detect_margins(words)
+        words = label_tables(words)
         words = split_paragraphs(words)
         return words
