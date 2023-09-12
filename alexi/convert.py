@@ -216,14 +216,16 @@ class Converteur:
                             c["non_stroking_color"],
                         )
                     mcid = c.get("mcid")
-                    if mcid is None:
-                        w["mcid"] = ""
-                    else:
+                    if mcid is not None:
                         w["mcid"] = mcid
                         if mcid in elmap:
                             w["tagstack"] = elmap[mcid]
                     w["mctag"] = c.get("tag")
                     w["fontname"] = c.get("fontname")
+                # Ensure matching PDF/CSV behaviour with missing fields
+                for field in "mcid", "tag", "fontname", "tagstack":
+                    if field not in w or w[field] is None:
+                        w[field] = ""
                 w["page"] = p.page_number
                 w["page_height"] = round(float(p.height))
                 w["page_width"] = round(float(p.width))

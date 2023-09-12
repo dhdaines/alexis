@@ -1,5 +1,5 @@
 """
-Extraire la structure du document à partir de CSV étiqueté
+Formatter la structure extraite d'un PDF en JSON ou XML
 """
 
 import logging
@@ -9,20 +9,9 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from alexi.label import line_breaks
-from alexi.types import (
-    Annexe,
-    Article,
-    Attendus,
-    Chapitre,
-    Contenu,
-    Dates,
-    Figure,
-    Reglement,
-    Section,
-    SousSection,
-    Tableau,
-    Texte,
-)
+from alexi.types import (Annexe, Article, Attendus, Chapitre, Contenu, Dates,
+                         Figure, Reglement, Section, SousSection, Tableau,
+                         Texte)
 
 LOGGER = logging.getLogger("json")
 

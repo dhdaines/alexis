@@ -10,19 +10,20 @@ import logging
 import re
 import subprocess
 import sys
-import textwrap
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
+import lxml.etree as ET
 from bs4 import BeautifulSoup
 
 from .convert import FIELDNAMES, Converteur
 from .crf import CRF, DEFAULT_MODEL
+from .format import Formatteur
 from .index import index
-from .json import Formatteur
 from .label import Classificateur
 from .search import search
 from .segment import Segmenteur
+from .xml import iob2xml
 
 LOGGER = logging.getLogger("alexi")
 
@@ -67,23 +68,6 @@ def write_csv(
     writer.writerows(doc)
 
 
-def iob2xml(words):
-    cur_tag = None
-    words = []
-    for word in words:
-        bio, sep, tag = word["tag"].partition("-")
-        if bio == "B":
-            if cur_tag is not None:
-                if words:
-                    print("\n".join(textwrap.wrap(" ".join(words))))
-                print(f"</{cur_tag}>")
-            words = []
-            cur_tag = tag
-            print(f"<{tag}>")
-        if bio != "O":
-            words.append(word["text"])
-
-
 def convert_main(args):
     """Convertir les PDF en CSV"""
     if args.images is not None:
@@ -123,6 +107,13 @@ def json_main(args):
     reader = csv.DictReader(args.csv)
     doc = conv(reader)
     print(doc.model_dump_json(indent=2, exclude_defaults=True))
+
+
+def xml_main(args):
+    """Convertir un CSV segmenté en XML"""
+    reader = csv.DictReader(args.csv)
+    tree = iob2xml(reader)
+    print(ET.tostring(tree, encoding="unicode", pretty_print=True))
 
 
 def extract_main(args):
@@ -239,6 +230,13 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     json.set_defaults(func=json_main)
+
+    xml = subp.add_parser(
+        "xml",
+        help="Extraire la structure en format XML en partant du CSV étiquetté",
+    )
+    xml.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    xml.set_defaults(func=xml_main)
 
     extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
     extract.add_argument(

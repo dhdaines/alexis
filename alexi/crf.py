@@ -3,6 +3,7 @@
 import csv
 import itertools
 import operator
+from os import PathLike
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Union
 
@@ -87,7 +88,7 @@ def make_visual_structural_literal() -> FeatureFunc:
                 "yhdelta:%d" % round(min(yhdelta, 5.0)),
             ]
         )
-        prev_mcid = prev_word.get("mcid") if prev_word is not None else ""
+        prev_mcid = prev_word["mcid"] if prev_word is not None else ""
         elements = set(word.get("tagstack", "").split(";"))
         #        features.extend( [
         #            "mctag:" + word.get("mctag", ""),
@@ -97,7 +98,7 @@ def make_visual_structural_literal() -> FeatureFunc:
         #            "newmcid:" + str(word.get("mcid") != prev_mcid),
         #            ]
         #        )
-        if word.get("mcid") != prev_mcid:
+        if word["mcid"] != prev_mcid:
             features.append("newmcid")
         mctag = word.get("mctag")
         if mctag:
@@ -273,9 +274,9 @@ def split_pages(words: Iterable[dict]) -> Iterable[dict]:
     return (list(p) for idx, p in itertools.groupby(words, operator.itemgetter("page")))
 
 
-def load(paths: Iterable[Path]) -> Iterator[dict]:
+def load(paths: Iterable[PathLike]) -> Iterator[dict]:
     for p in paths:
-        with open(p, "rt") as infh:
+        with open(Path(p), "rt") as infh:
             reader = csv.DictReader(infh)
             yield from reader
 
