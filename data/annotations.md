@@ -39,10 +39,9 @@ nécessairement le titre du document au complet.  Les catégories
 pourraient être transformées en `Titre` pour fins de modélisation.
 
 `Alinea`: cette catégorie représente un bloc de texte qui n'a pas une
-présentation tabulaire.  Les catégories `Amendement`, `Attendu` sont
-retenues mais pourrait être transformées pour fins de modélisation.
+présentation tabulaire.
 
-`Enumeration`: cette catégorie représente un item d'une liste ou
+`Liste`: cette catégorie représente un item d'une liste ou
 énumération.  Elle est traîtée séparément des alinéas puisque ces
 items ont généralement une forme visuelle particulière.
 
@@ -53,10 +52,8 @@ présentation tabulaire.
 
 `Pied`: pied de page (pourrait être transformé en `O`)
 
-`TOC`: tableaux de contenu, mais pas leurs titres
+`TOC`: tableaux de matières, tableaux et figures
 
-Necessite d'avoir TOC dans les ensembles dev/test (oups) - plus
-d'annotations a faire...
 
 Entrainement d'un modèle CRF pour segmentation
 ==============================================
