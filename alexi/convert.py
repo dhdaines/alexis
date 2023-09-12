@@ -19,9 +19,7 @@ FIELDNAMES = [
     "page_width",
     "page_height",
     "fontname",
-    "r",
-    "g",
-    "b",
+    "rgb",
     "x0",
     "x1",
     "top",
@@ -133,6 +131,48 @@ def make_tag_stack(
     return elmap
 
 
+def get_rgb(c: dict) -> str:
+    """Convertir couleur en rgb hex"""
+    couleur = c.get("non_stroking_color", c.get("stroking_color"))
+    if couleur is None:
+        return "000"
+    elif len(couleur) == 1:
+        r = g = b = couleur[0]
+    elif len(couleur) == 3:
+        r, g, b = couleur
+    else:
+        LOGGER.warning("Espace couleur non pris en charge: %s", couleur)
+        return "000"
+    return "".join(("%x" % int(min(0.999, val) * 16) for val in (r, g, b)))
+
+
+def get_word_features(word, page, chars, elmap):
+    # Extract things from first character (we do not use
+    # extra_attrs because otherwise extract_words will
+    # insert word breaks)
+    feats = word.copy()
+    if c := chars.get((word["x0"], word["top"])):
+        feats["rgb"] = get_rgb(c)
+        mcid = c.get("mcid")
+        if mcid is not None:
+            feats["mcid"] = mcid
+            if mcid in elmap:
+                feats["tagstack"] = elmap[mcid]
+        feats["mctag"] = c.get("tag")
+        feats["fontname"] = c.get("fontname")
+    # Ensure matching PDF/CSV behaviour with missing fields
+    for field in "mcid", "tag", "fontname", "tagstack":
+        if field not in feats or feats[field] is None:
+            feats[field] = ""
+    feats["page"] = page.page_number
+    feats["page_height"] = round(float(page.height))
+    feats["page_width"] = round(float(page.width))
+    # Round positions to points
+    for field in "x0", "x1", "top", "bottom", "doctop":
+        feats[field] = round(float(word[field]))
+    return feats
+
+
 class Converteur:
     imgdir: Optional[Path] = None
 
@@ -155,97 +195,55 @@ class Converteur:
         except StructTreeMissing:
             tree = None
         for idx in pages:
-            p = pdf.pages[idx]
-            LOGGER.info("traitement de la page %d", p.page_number)
-            words = p.extract_words(y_tolerance=2)
-            elmap = make_tag_stack(tree, p.page_number)
-            tables = list(get_tables(p))
-            tboxes = [get_thingy_bbox(p, table) for table in tables]
-            for idx, tbox in enumerate(tboxes):
-                if tbox is None:
-                    continue
-                if self.imgdir is not None:
-                    img = p.crop(add_margin(tbox, 10)).to_image(
-                        resolution=150, antialias=True
-                    )
-                    img.save(self.imgdir / f"page{p.page_number}-table{idx + 1}.png")
-            figures = list(get_figures(p))
-            fboxes = [get_thingy_bbox(p, figure) for figure in figures]
-            for idx, fbox in enumerate(fboxes):
-                if fbox is None:
-                    continue
-                in_table = False
-                for tbox in tboxes:
-                    # logical structure doesn't prevent this from happening
-                    if bbox_overlaps(tbox, fbox):
-                        LOGGER.info("Figure in table: %s in %s", fbox, tbox)
-                        in_table = True
-                        break
-                if in_table:
-                    continue
-                if self.imgdir is not None:
-                    try:
-                        img = p.crop(fbox).to_image(resolution=150, antialias=True)
-                        fboxtxt = ",".join(str(round(x)) for x in fbox)
-                        img.save(
-                            self.imgdir / f"page{p.page_number}-figure-{fboxtxt}.png"
-                        )
-                    except ValueError as e:
-                        LOGGER.warning(
-                            "Failed to save figure on page %d at %s: %s",
-                            p.page_number,
-                            fbox,
-                            e,
-                        )
-
+            page = pdf.pages[idx]
+            LOGGER.info("traitement de la page %d", page.page_number)
+            words = page.extract_words(y_tolerance=2)
+            elmap = make_tag_stack(tree, page.page_number)
+            self.save_figures(page, elmap)
             # Index characters for lookup
-            chars = dict(((c["x0"], c["top"]), c) for c in p.chars)
-            prev_tbox = None
-            for w in words:
-                # Extract colour from first character (FIXME: assumes RGB space)
-                if c := chars.get((w["x0"], w["top"])):
-                    if c.get("non_stroking_color") is None:
-                        w["r"] = w["g"] = w["b"] = 0
-                    elif len(c["non_stroking_color"]) == 1:
-                        w["r"] = w["g"] = w["b"] = c["non_stroking_color"][0]
-                    elif len(c["non_stroking_color"]) == 3:
-                        w["r"], w["g"], w["b"] = c["non_stroking_color"]
-                    else:
-                        LOGGER.warning(
-                            "Espace couleur non pris en charge: %s",
-                            c["non_stroking_color"],
-                        )
-                    mcid = c.get("mcid")
-                    if mcid is not None:
-                        w["mcid"] = mcid
-                        if mcid in elmap:
-                            w["tagstack"] = elmap[mcid]
-                    w["mctag"] = c.get("tag")
-                    w["fontname"] = c.get("fontname")
-                # Ensure matching PDF/CSV behaviour with missing fields
-                for field in "mcid", "tag", "fontname", "tagstack":
-                    if field not in w or w[field] is None:
-                        w[field] = ""
-                w["page"] = p.page_number
-                w["page_height"] = round(float(p.height))
-                w["page_width"] = round(float(p.width))
-                # Find words inside tables and tag accordingly
-                for idx, tbox in enumerate(tboxes):
-                    if tbox is None:
-                        continue
-                    if bbox_contains(tbox, obj_to_bbox(w)):
-                        w["tableau"] = idx + 1
-                        if tbox != prev_tbox:
-                            w["tag"] = "B-Tableau"
-                        else:
-                            w["tag"] = "I-Tableau"
-                        prev_tbox = tbox
-                        break
+            chars = dict(((c["x0"], c["top"]), c) for c in page.chars)
+            for word in words:
+                yield get_word_features(word, page, chars, elmap)
 
-                # Round positions to points
-                for field in "x0", "x1", "top", "bottom", "doctop":
-                    w[field] = round(float(w[field]))
-                yield w
+    def save_figures(self, page, elmap):
+        tables = list(get_tables(page))
+        tboxes = [get_thingy_bbox(page, table) for table in tables]
+        for idx, tbox in enumerate(tboxes):
+            if tbox is None:
+                continue
+            if self.imgdir is not None:
+                img = page.crop(add_margin(tbox, 10)).to_image(
+                    resolution=150, antialias=True
+                )
+                img.save(self.imgdir / f"page{page.page_number}-table{idx + 1}.png")
+        figures = list(get_figures(page))
+        fboxes = [get_thingy_bbox(page, figure) for figure in figures]
+        for idx, fbox in enumerate(fboxes):
+            if fbox is None:
+                continue
+            in_table = False
+            for tbox in tboxes:
+                # logical structure doesn't prevent this from happening
+                if bbox_overlaps(tbox, fbox):
+                    LOGGER.info("Figure in table: %s in %s", fbox, tbox)
+                    in_table = True
+                    break
+            if in_table:
+                continue
+            if self.imgdir is not None:
+                try:
+                    img = page.crop(fbox).to_image(resolution=150, antialias=True)
+                    fboxtxt = ",".join(str(round(x)) for x in fbox)
+                    img.save(
+                        self.imgdir / f"page{page.page_number}-figure-{fboxtxt}.png"
+                    )
+                except ValueError as e:
+                    LOGGER.warning(
+                        "Failed to save figure on page %d at %s: %s",
+                        page.page_number,
+                        fbox,
+                        e,
+                    )
 
     def __call__(
         self, infh: Any, pages: Optional[list[int]] = None
