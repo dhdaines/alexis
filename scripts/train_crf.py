@@ -4,8 +4,8 @@ import argparse
 from pathlib import Path
 from typing import Iterable
 
-import joblib
-import sklearn_crfsuite as crfsuite
+import joblib  # type: ignore
+import sklearn_crfsuite as crfsuite  # type: ignore
 from alexi.crf import load, page2features, page2labels, split_pages
 
 

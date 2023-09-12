@@ -5,7 +5,7 @@ import itertools
 from pathlib import Path
 from typing import Iterable
 
-import sklearn_crfsuite as crfsuite
+import sklearn_crfsuite as crfsuite  # type: ignore
 from alexi.crf import CRF, load, page2features, page2labels, split_pages
 from sklearn_crfsuite import metrics
 

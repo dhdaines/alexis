@@ -49,7 +49,7 @@ def line_breaks(
     ydeltas.extend(
         int(b["top"]) - int(a["top"]) for a, b in itertools.pairwise(paragraph)
     )
-    line = []
+    line: list[dict[str, Any]] = []
     for word, xdelta, ydelta in zip(paragraph, xdeltas, ydeltas):
         if xdelta <= 0 and ydelta > 0:  # CR, LF
             yield line
@@ -98,16 +98,16 @@ def extract_enumeration(
         if pattern.value.match(word["text"]):
             break
     if pattern is None:
-        return [("Enumeration", paragraph)]
+        return [("Liste", paragraph)]
     item = [word]
     for word in paragraph[1:]:
         if pattern.value.match(word["text"]):
             if item:
-                yield ("Enumeration", item)
+                yield ("Liste", item)
                 item = []
         item.append(word)
     if item:
-        yield ("Enumeration", item)
+        yield ("Liste", item)
 
 
 class Classificateur:
@@ -140,9 +140,9 @@ class Classificateur:
                 self.article_idx = idx
                 tag = "Article"
             else:
-                tag = "Enumeration"
+                tag = "Liste"
         elif re.match(r"[a-z][\)\.]|[•-]", text):
-            tag = "Enumeration"
+            tag = "Liste"
         elif m := re.match(r"figure\s+(\d+)", text, re.IGNORECASE):
             tag = "Figure"
         elif word == "attendu":
@@ -268,7 +268,7 @@ class Classificateur:
 
         tag = self.classify_alinea(tag, paragraph, text, page_words)
 
-        if tag == "Enumeration":
+        if tag == "Liste":
             return extract_enumeration(paragraph)
         return [(tag, paragraph)]
 

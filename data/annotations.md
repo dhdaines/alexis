@@ -34,16 +34,14 @@ catégorie.
 
 `Titre`: cette catégorie réprésente les titres de documents,
 chapitres, sections, ou autres étendues de texte.  Elle *n'est pas*
-nécessairement le titre du document au complet.  Les catégories
-`Chapitre`, `Annexe`, `Section`, `Article`, etc. sont retenues mais
-pourraient être transformées en `Titre` pour fins de modélisation.
+nécessairement le titre du document au complet.
 
 `Alinea`: cette catégorie représente un bloc de texte qui n'a pas une
 présentation tabulaire.
 
-`Liste`: cette catégorie représente un item d'une liste ou
+`Liste`: cette catégorie représente un élément d'une liste ou
 énumération.  Elle est traîtée séparément des alinéas puisque ces
-items ont généralement une forme visuelle particulière.
+éléments ont généralement une forme visuelle particulière.
 
 `Tableau`: cette catégorie représente un bloc de texte avec
 présentation tabulaire.

@@ -9,7 +9,7 @@ from typing import Iterable
 from alexi.crf import load, page2labels
 from alexi.label import Classificateur
 from alexi.segment import Segmenteur
-from sklearn_crfsuite import metrics
+from sklearn_crfsuite import metrics  # type: ignore
 
 
 def make_argparse():

@@ -100,8 +100,8 @@ class Formatteur:
             else:
                 # Find a figure adjacent to this line of text
                 adjacent = None
-                for figure in figures:
-                    m = re.search(r"figure-(\d+),(\d+),(\d+),(\d+)", figure.name)
+                for figpath in figures:
+                    m = re.search(r"figure-(\d+),(\d+),(\d+),(\d+)", figpath.name)
                     assert m is not None
                     # FIXME: Ideally we would ensure it's *between* two text blocks
                     x0, top, x1, bottom = (int(x) for x in m.groups())
@@ -113,7 +113,7 @@ class Formatteur:
                         or from_top > 0
                         and from_top < 72
                     ):
-                        adjacent = Path(self.fichier.stem) / figure.name
+                        adjacent = Path(self.fichier.stem) / figpath.name
                         LOGGER.info(
                             "Figure adjacent sur page %d: %s", self.pageidx, adjacent
                         )
@@ -144,7 +144,7 @@ class Formatteur:
                     pages=(self.pageidx, self.pageidx), contenu=[tableau]
                 )
                 self.textes.append(paragraphe)
-        elif tag in ("Alinea", "Enumeration", "Figure"):
+        elif tag in ("Alinea", "Liste", "Figure"):
             # FIXME: à l'avenir on va prendre en charge les listes/énumérations
             if self.annexe:
                 self.annexe.contenu.append(contenu)
@@ -243,7 +243,7 @@ class Formatteur:
             texte,
             re.IGNORECASE | re.DOTALL,
         ):
-            self.titre = "\n".join((self.titre, m.group(0)))
+            self.titre = "\n".join((str(self.titre), m.group(0)))
             self.objet = m.group(1)
         else:
             self.titre = texte
@@ -264,7 +264,7 @@ class Formatteur:
             numero = m.group(1)
             titre = m.group(2)
         chapitre = Chapitre(
-            numero=numero,
+            numero=str(numero),
             titre=titre,
             pages=(self.pageidx, self.pageidx),
             textes=(len(self.textes), len(self.textes)),

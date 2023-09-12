@@ -64,7 +64,7 @@ class MyTagExtractor(PDFDevice):
         print("TAG", tag.name, props)
 
 
-def resolve_all(x: object, seen: set = None) -> Any:
+def resolve_all(x: object, seen: Optional[set] = None) -> Any:
     if seen is None:
         seen = set()
     else:

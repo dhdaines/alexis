@@ -7,7 +7,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Union
 
-import joblib
+import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
 from alexi.label import Bullet
@@ -115,7 +115,7 @@ def make_visual_structural_literal() -> FeatureFunc:
     return visual_one
 
 
-def make_delta() -> Callable[[int, str], list[str]]:
+def make_delta() -> FeatureFunc:
     prev_word = None
 
     def delta_one(idx, word):
@@ -205,7 +205,7 @@ FEATURES: dict[str, FeatureFunc] = {
 
 def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int = 1):
     if isinstance(feature_func, str):
-        feature_func = FEATURES.get(feature_func, "literal")
+        feature_func = FEATURES.get(feature_func, literal)
     features = [feature_func(i, w) for i, w in enumerate(page)]
 
     def adjacent(features, label):
@@ -252,7 +252,7 @@ def bonly(tag):
     return "-".join((bio, TAGMAP.get(name, name)))
 
 
-LabelFunc = Callable[str, str]
+LabelFunc = Callable[[str], str]
 LABELS: dict[str, LabelFunc] = {
     "literal": lambda x: x,
     "simplify": simplify,
@@ -270,7 +270,7 @@ def page2tokens(page):
     return (x["text"] for x in page)
 
 
-def split_pages(words: Iterable[dict]) -> Iterable[dict]:
+def split_pages(words: Iterable[dict]) -> Iterable[list[dict]]:
     return (list(p) for idx, p in itertools.groupby(words, operator.itemgetter("page")))
 
 

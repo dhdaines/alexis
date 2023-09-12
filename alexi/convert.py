@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
+from pdfplumber.page import Page
 from pdfplumber.structure import (PDFStructElement, PDFStructTree,
                                   StructTreeMissing)
-from pdfplumber.utils import obj_to_bbox
+from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 LOGGER = logging.getLogger("convert")
 FIELDNAMES = [
@@ -31,91 +32,98 @@ FIELDNAMES = [
 ]
 
 
-def get_tables(page):
-    st = page.structure_tree
-    d = deque(st)
+def get_tables(tree: PDFStructTree, page_number: int) -> Iterator[PDFStructElement]:
+    """Trouver les tableaux principaux dans un page (ignorer les tableaux
+    imbriqués)"""
+    d = deque(tree)
     while d:
         el = d.popleft()
-        if el["type"] == "Table":
-            yield el
-        elif "children" in el:
+        if el.type == "Table":
+            if el.page_number == page_number:
+                yield el
+        else:
             # On ne traîte pas des tableaux imbriqués
-            d.extend(el["children"])
+            d.extend(el.children)
 
 
-def get_figures(page):
-    st = page.structure_tree
-    d = deque(st)
+def get_figures(tree: PDFStructTree, page_number: int) -> Iterator[PDFStructElement]:
+    """Trouver les figures dans un page (ignorer celles imbriqués dans des
+    tableaux ou autres figures)"""
+    d = deque(tree)
     while d:
         el = d.popleft()
-        if el["type"] == "Table":
+        if el.type == "Table":
             # Ignorer les figures à l'intérieur d'un tableau
             continue
-        if el["type"] == "Figure":
-            yield el
-        elif "children" in el:
-            d.extend(el["children"])
+        elif el.type == "Figure":
+            if el.page_number == page_number:
+                yield el
+        else:
+            d.extend(el.children)
 
 
-def get_child_mcids(el):
-    d = deque([el])
+def get_child_mcids(el: PDFStructElement) -> Iterator[int]:
+    """Trouver tous les MCIDs à l'intérieur d'un élément structurel"""
+    yield from el.mcids
+    d = deque(el.children)
     while d:
         el = d.popleft()
-        if "children" in el:
-            d.extend(el["children"])
-        if "mcids" in el:
-            yield from el["mcids"]
+        yield from el.mcids
+        d.extend(el.children)
 
 
-def bbox_overlaps(obox, bbox):
+def bbox_overlaps(obox: T_bbox, bbox: T_bbox) -> bool:
+    """Déterminer si deux BBox ont une intersection."""
     ox0, otop, ox1, obottom = obox
     x0, top, x1, bottom = bbox
     return ox0 < x1 and ox1 > x0 and otop < bottom and obottom > top
 
 
-def bbox_contains(bbox, ibox):
+def bbox_contains(bbox: T_bbox, ibox: T_bbox) -> bool:
+    """Déterminer si une BBox est contenu entièrement par une autre."""
     x0, top, x1, bottom = bbox
     ix0, itop, ix1, ibottom = ibox
     return ix0 >= x0 and ix1 <= x1 and itop >= top and ibottom <= bottom
 
 
-def get_element_bbox(page, el):
-    mcids = set(get_child_mcids(el))
-    mcid_objs = [
-        c
-        for c in itertools.chain.from_iterable(page.objects.values())
-        if c.get("mcid") in mcids
-    ]
-    if not mcid_objs:
-        return None
-    return pdfplumber.utils.objects_to_bbox(mcid_objs)
-
-
-def get_thingy_bbox(page, thingy):
-    bbox = thingy.get("attributes", {}).get("BBox", None)
+def get_element_bbox(page: Page, el: PDFStructElement) -> T_bbox:
+    """Obtenir le BBox autour d'un élément structurel."""
+    bbox = el.attributes.get("BBox", None)
     if bbox is not None:
         x0, y0, x1, y1 = bbox
         top = page.height - y1
         bottom = page.height - y0
         return (x0, top, x1, bottom)
     else:
-        return get_element_bbox(page, thingy)
+        mcids = set(get_child_mcids(el))
+        mcid_objs = [
+            c
+            for c in itertools.chain.from_iterable(page.objects.values())
+            if c.get("mcid") in mcids
+        ]
+        if not mcid_objs:
+            return (-1, -1, -1, -1)  # An impossible BBox
+        return objects_to_bbox(mcid_objs)
 
 
-def add_margin(bbox, margin):
+def add_margin(bbox: T_bbox, page: Page, margin: int):
+    """Ajouter une marge autour d'un BBox"""
     x0, top, x1, bottom = bbox
-    return (max(0, x0 - margin), max(0, top - margin), x1 + margin, bottom + margin)
+    return (
+        max(0, x0 - margin),
+        max(0, top - margin),
+        min(page.width, x1 + margin),
+        min(page.height, bottom + margin),
+    )
 
 
-def make_tag_stack(
-    tree: Optional[PDFStructTree], page_number: int
-) -> dict[int, PDFStructElement]:
-    """Construire une correspondance entre MCIDs et elements structurels"""
-    elmap = {}
+def make_element_map(tree: Optional[PDFStructTree], page_number: int) -> dict[int, str]:
+    """Construire une correspondance entre MCIDs et types d'elements structurels"""
+    elmap: dict[int, str] = {}
     if tree is None:
         return elmap
-    d = deque(tree)
-    tagstack = deque()
+    d: deque[PDFStructElement | str] = deque(tree)
+    tagstack: deque[str] = deque()
     while d:
         el = d.pop()
         if isinstance(el, str):
@@ -132,7 +140,7 @@ def make_tag_stack(
 
 
 def get_rgb(c: dict) -> str:
-    """Convertir couleur en rgb hex"""
+    """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
     if couleur is None:
         return "000"
@@ -146,7 +154,12 @@ def get_rgb(c: dict) -> str:
     return "".join(("%x" % int(min(0.999, val) * 16) for val in (r, g, b)))
 
 
-def get_word_features(word, page, chars, elmap):
+def get_word_features(
+    word: dict,
+    page: Page,
+    chars: dict[tuple[int, int], dict[str, Any]],
+    elmap: dict[int, str],
+) -> dict:
     # Extract things from first character (we do not use
     # extra_attrs because otherwise extract_words will
     # insert word breaks)
@@ -198,26 +211,32 @@ class Converteur:
             page = pdf.pages[idx]
             LOGGER.info("traitement de la page %d", page.page_number)
             words = page.extract_words(y_tolerance=2)
-            elmap = make_tag_stack(tree, page.page_number)
-            self.save_figures(page, elmap)
+            elmap = make_element_map(tree, page.page_number)
+            self.save_figures(page, tree)
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in page.chars)
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
 
-    def save_figures(self, page, elmap):
-        tables = list(get_tables(page))
-        tboxes = [get_thingy_bbox(page, table) for table in tables]
+    def save_figures(self, page: Page, tree: Optional[PDFStructTree]):
+        if tree is None:
+            return
+        tboxes = [
+            get_element_bbox(page, table)
+            for table in get_tables(tree, page.page_number)
+        ]
         for idx, tbox in enumerate(tboxes):
             if tbox is None:
                 continue
             if self.imgdir is not None:
-                img = page.crop(add_margin(tbox, 10)).to_image(
+                img = page.crop(add_margin(tbox, page, 10)).to_image(
                     resolution=150, antialias=True
                 )
                 img.save(self.imgdir / f"page{page.page_number}-table{idx + 1}.png")
-        figures = list(get_figures(page))
-        fboxes = [get_thingy_bbox(page, figure) for figure in figures]
+        fboxes = [
+            get_element_bbox(page, figure)
+            for figure in get_figures(tree, page.page_number)
+        ]
         for idx, fbox in enumerate(fboxes):
             if fbox is None:
                 continue
