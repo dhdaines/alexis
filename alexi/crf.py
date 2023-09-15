@@ -224,43 +224,23 @@ def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int 
     return [list(f) for f in ngram_features]
 
 
-TAGMAP = dict(
-    Amendement="Alinea",
-    Attendu="Alinea",
-    Annexe="Titre",
-    Chapitre="Titre",
-    Section="Titre",
-    SousSection="Titre",
-    Figure="Titre",
-    Article="Titre",
-)
-
-
-def simplify(tag):
-    bio, sep, name = tag.partition("-")
-    if not name:
-        return tag
-    return "-".join((bio, TAGMAP.get(name, name)))
-
-
 def bonly(tag):
     bio, sep, name = tag.partition("-")
     if not name:
         return tag
     if bio == "I":
         return "I"
-    return "-".join((bio, TAGMAP.get(name, name)))
+    return "-".join((bio, name))
 
 
 LabelFunc = Callable[[str], str]
 LABELS: dict[str, LabelFunc] = {
     "literal": lambda x: x,
-    "simplify": simplify,
     "bonly": bonly,
 }
 
 
-def page2labels(page, label_func: Union[str, LabelFunc] = "simplify"):
+def page2labels(page, label_func: Union[str, LabelFunc] = "literal"):
     if isinstance(label_func, str):
         label_func = LABELS.get(label_func, lambda x: x)
     return [label_func(x["tag"]) for x in page]

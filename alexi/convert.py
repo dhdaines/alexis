@@ -8,8 +8,7 @@ from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
 from pdfplumber.page import Page
-from pdfplumber.structure import (PDFStructElement, PDFStructTree,
-                                  StructTreeMissing)
+from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 LOGGER = logging.getLogger("convert")
@@ -143,15 +142,15 @@ def get_rgb(c: dict) -> str:
     """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
     if couleur is None:
-        return "000"
+        return "#000"
     elif len(couleur) == 1:
         r = g = b = couleur[0]
     elif len(couleur) == 3:
         r, g, b = couleur
     else:
         LOGGER.warning("Espace couleur non pris en charge: %s", couleur)
-        return "000"
-    return "".join(("%x" % int(min(0.999, val) * 16) for val in (r, g, b)))
+        return "#000"
+    return "#" + "".join(("%x" % int(min(0.999, val) * 16) for val in (r, g, b)))
 
 
 def get_word_features(
