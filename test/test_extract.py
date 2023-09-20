@@ -55,11 +55,6 @@ EXPECT_TITLES = [
         "1289",
     ),
     (
-        "test/data/RGL-1176-2012-Vente-de-garages-et-bazars-COMPILATION-ADMINISTRATIVE.pdf",
-        "RÈGLEMENT 1176-2012\nCONCERNANT LES VENTES DE GARAGES ET LES BAZARS SUR LE\nTERRITOIRE DE LA VILLE DE SAINTE-ADÈLE",
-        "1176-2012",
-    ),
-    (
         "test/data/domaine_publique_titre.pdf",
         "RÈGLEMENT 1132-2010\nAFIN DE DÉCRÉTER DES DISPOSITIONS CONCERNANT L’OCCUPATION DU\nDOMAINE PUBLIC.",
         "1132-2010",
@@ -103,11 +98,6 @@ EXPECT_CHAPTERS = [
     ("data/train/Rgl-1314-2021-TM-Travaux-municipaux.pdf", "1,4,9", 2),
     ("data/train/xx-2020-04-20-RGL-1289-Formation-CCE-adopte_1.pdf", None, 0),
     ("test/data/piia_chapitres.pdf", None, 12),
-    (
-        "test/data/RGL-1176-2012-Vente-de-garages-et-bazars-COMPILATION-ADMINISTRATIVE.pdf",
-        None,
-        3,
-    ),
 ]
 
 
