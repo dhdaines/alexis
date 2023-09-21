@@ -4,23 +4,22 @@ Analyser un document étiquetté pour en extraire la structure.
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, NamedTuple
+from typing import Any, Iterable, Iterator
 
 T_obj = dict[str, Any]
 
 
 @dataclass
 class Bloc:
-    name: str
-    contents: list[T_obj]
+    type: str
+    contenus: list[T_obj]
 
     @property
     def texte(self) -> str:
-        return " ".join(x["text"] for x in self.contents)
+        return " ".join(x["text"] for x in self.contenus)
 
-    @property
     def xml(self) -> str:
-        return f"<{self.name}>{self.texte}</{self.name}>"
+        return f"<{self.type}>{self.texte}</{self.type}>"
 
 
 def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
@@ -29,19 +28,19 @@ def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
     for word in words:
         bio, sep, tag = word["tag"].partition("-")
         if bio in ("B", "O"):
-            if bloc.name != "":
+            if bloc.type != "":
                 yield bloc
             # Could create an empty tag if this is O
-            bloc = Bloc(name=tag, contents=[])
+            bloc = Bloc(type=tag, contenus=[])
         elif bio == "I":
             # Sometimes we are missing an initial B
-            if bloc.name == "":
-                bloc.name = tag
+            if bloc.type == "":
+                bloc.type = tag
         else:
             raise ValueError("Tag %s n'est pas I, O ou B" % word["tag"])
         if bio != "O":
-            bloc.contents.append(word)
-    if bloc.name != "":
+            bloc.contenus.append(word)
+    if bloc.type != "":
         yield bloc
 
 
@@ -74,9 +73,9 @@ class Document:
 
     def add_bloc(self, bloc: Bloc):
         """Ajouter un bloc de texte."""
-        if bloc.name in PALIERS:
+        if bloc.type in PALIERS:
             element = Element(
-                palier=bloc.name,
+                palier=bloc.type,
                 titre=bloc.texte,
                 debut=len(self.blocs),
                 fin=-1,
@@ -105,33 +104,12 @@ class Document:
                 previous = self.paliers[palier][-1]
                 if previous.fin == -1:
                     previous.sub.append(element)
-                break
-
-    def element_xml(self, el: Element, indent: int = 0) -> list[str]:
-        """Représentation structurel d'un élément."""
-        spacing = " " * indent
-        lines = [spacing + f"<{el.palier} titre='{el.titre}'>"]
-        idx = el.debut
-        fin = len(self.blocs) if el.fin == -1 else el.fin
-        subidx = 0
-        sub = el.sub[subidx] if subidx < len(el.sub) else None
-        while idx < fin:
-            if sub is not None and idx == sub.debut:
-                lines.extend(self.element_xml(sub, indent + 2))
-                idx = len(self.blocs) if sub.fin == -1 else sub.fin
-                subidx += 1
-                sub = el.sub[subidx] if subidx < len(el.sub) else None
-            else:
-                subspacing = " " * (indent + 2)
-                lines.append(subspacing + self.blocs[idx].xml)
-                idx += 1
-        lines.append(spacing + f"</{el.palier}>")
-        return lines
+                    break
 
     @property
-    def xml(self) -> str:
-        """Représentation structurel du document."""
-        return "\n".join(self.element_xml(self.paliers["Document"][0]))
+    def root(self) -> Element:
+        """Racine de l'arborescence structurel du document."""
+        return self.paliers["Document"][0]
 
 
 class Analyseur:

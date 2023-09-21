@@ -90,14 +90,6 @@ def make_visual_structural_literal() -> FeatureFunc:
         )
         prev_mcid = prev_word["mcid"] if prev_word is not None else ""
         elements = set(word.get("tagstack", "").split(";"))
-        #        features.extend( [
-        #            "mctag:" + word.get("mctag", ""),
-        #            "tableau:" + str("Table" in elements),
-        #            "figure:" + str("Figure" in elements),
-        #            "toc:" + str("TOC" in elements),
-        #            "newmcid:" + str(word.get("mcid") != prev_mcid),
-        #            ]
-        #        )
         if word["mcid"] != prev_mcid:
             features.append("newmcid")
         mctag = word.get("mctag")

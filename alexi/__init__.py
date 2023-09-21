@@ -13,17 +13,16 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
-import lxml.etree as ET
 from bs4 import BeautifulSoup
 
+from .analyse import Analyseur
 from .convert import FIELDNAMES, Converteur
 from .crf import CRF, DEFAULT_MODEL
-from .format import Formatteur
+from .format import Formatteur, format_html, format_xml
 from .index import index
 from .label import Classificateur
 from .search import search
 from .segment import Segmenteur
-from .xml import iob2xml
 
 LOGGER = logging.getLogger("alexi")
 
@@ -110,10 +109,17 @@ def json_main(args):
 
 
 def xml_main(args):
-    """Convertir un CSV segmenté en XML"""
+    """Convertir un CSV segmenté et étiquetté en XML"""
     reader = csv.DictReader(args.csv)
-    tree = iob2xml(reader)
-    print(ET.tostring(tree, encoding="unicode", pretty_print=True))
+    doc = Analyseur()(reader)
+    print(format_xml(doc))
+
+
+def html_main(args):
+    """Convertir un CSV segmenté et étiquetté en HTML"""
+    reader = csv.DictReader(args.csv)
+    doc = Analyseur()(reader)
+    print(format_html(doc))
 
 
 def extract_main(args):
@@ -237,6 +243,13 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     xml.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     xml.set_defaults(func=xml_main)
+
+    html = subp.add_parser(
+        "html",
+        help="Extraire la structure en format HTML en partant du CSV étiquetté",
+    )
+    html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    html.set_defaults(func=html_main)
 
     extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
     extract.add_argument(
