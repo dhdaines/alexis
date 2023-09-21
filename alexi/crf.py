@@ -210,7 +210,7 @@ def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int 
     features = [feature_func(i, w) for i, w in enumerate(page)]
 
     def adjacent(features, label):
-        return (":".join((label, feature)) for feature in features)
+        return (":".join((label, feature)) for feature in features if feature != "bias")
 
     ngram_features = [iter(f) for f in features]
     for m in range(1, n):
