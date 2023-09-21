@@ -18,11 +18,9 @@ from bs4 import BeautifulSoup
 from .analyse import Analyseur
 from .convert import FIELDNAMES, Converteur
 from .crf import CRF, DEFAULT_MODEL
-from .format import Formatteur, format_html, format_xml
+from .format import format_html, format_xml
 from .index import index
-from .label import Classificateur
 from .search import search
-from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
 
@@ -86,28 +84,6 @@ def crf_main(args):
     write_csv(crf(reader), sys.stdout)
 
 
-def segment_main(args):
-    """Extraire les unités de texte des CSV"""
-    seg = Segmenteur()
-    reader = csv.DictReader(args.csv)
-    write_csv(seg(reader), sys.stdout)
-
-
-def label_main(args):
-    """Étiquetter les unités de texte des CSV"""
-    classificateur = Classificateur()
-    reader = csv.DictReader(args.csv)
-    write_csv(classificateur(reader), sys.stdout)
-
-
-def json_main(args):
-    """Convertir un CSV segmenté en JSON"""
-    conv = Formatteur(fichier=args.name, imgdir=args.images)
-    reader = csv.DictReader(args.csv)
-    doc = conv(reader)
-    print(doc.model_dump_json(indent=2, exclude_defaults=True))
-
-
 def xml_main(args):
     """Convertir un CSV segmenté et étiquetté en XML"""
     reader = csv.DictReader(args.csv)
@@ -120,30 +96,6 @@ def html_main(args):
     reader = csv.DictReader(args.csv)
     doc = Analyseur()(reader)
     print(format_html(doc))
-
-
-def extract_main(args):
-    """Convertir un PDF en JSON"""
-    if args.images is not None:
-        imgdir = args.images / Path(args.pdf.name).stem
-        imgdir.mkdir(parents=True, exist_ok=True)
-        converteur = Converteur(imgdir=imgdir)
-        formatteur = Formatteur(fichier=Path(args.pdf.name).name, imgdir=imgdir)
-    else:
-        converteur = Converteur()
-        formatteur = Formatteur(fichier=Path(args.pdf.name).name)
-    segmenteur = Segmenteur()
-    classificateur = Classificateur()
-
-    if args.pages:
-        pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
-    else:
-        pages = None
-    doc = converteur(args.pdf, pages)
-    doc = segmenteur(doc)
-    doc = classificateur(doc)
-    doc = formatteur(doc)
-    print(doc.model_dump_json(indent=2, exclude_defaults=True))
 
 
 def index_main(args):
@@ -199,7 +151,7 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     convert.set_defaults(func=convert_main)
 
-    crf = subp.add_parser("crf", help="Segmenter PDF avec un CRF")
+    crf = subp.add_parser("crf", help="Segmenter et étiquetter un PDF avec un CRF")
     crf.add_argument("--model", help="Modele CRF", type=Path, default=DEFAULT_MODEL)
     crf.add_argument(
         "csv",
@@ -207,35 +159,6 @@ def make_argparse() -> argparse.ArgumentParser:
         type=argparse.FileType("rt"),
     )
     crf.set_defaults(func=crf_main)
-
-    segment = subp.add_parser("segment", help="Extraire les unités de texte des CSV")
-    segment.add_argument(
-        "csv",
-        help="Fichier CSV à traiter",
-        type=argparse.FileType("rt"),
-    )
-    segment.set_defaults(func=segment_main)
-
-    label = subp.add_parser("label", help="Étiquetter les unités de texte dans un CSV")
-    label.add_argument(
-        "csv",
-        help="Fichier CSV à traiter",
-        type=argparse.FileType("rt"),
-    )
-    label.set_defaults(func=label_main)
-
-    json = subp.add_parser(
-        "json",
-        help="Extraire la structure en format JSON en partant du CSV étiquetté",
-    )
-    json.add_argument(
-        "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
-    )
-    json.add_argument(
-        "--images", help="Répertoire où trouver des images de figures", type=Path
-    )
-    json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
-    json.set_defaults(func=json_main)
 
     xml = subp.add_parser(
         "xml",
@@ -250,18 +173,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     html.set_defaults(func=html_main)
-
-    extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
-    extract.add_argument(
-        "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
-    )
-    extract.add_argument(
-        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
-    )
-    extract.add_argument(
-        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
-    )
-    extract.set_defaults(func=extract_main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"

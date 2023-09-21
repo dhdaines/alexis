@@ -16,10 +16,8 @@ class Bloc:
 
     @property
     def texte(self) -> str:
+        """Contenu textuel du bloc."""
         return " ".join(x["text"] for x in self.contenus)
-
-    def xml(self) -> str:
-        return f"<{self.type}>{self.texte}</{self.type}>"
 
 
 def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:

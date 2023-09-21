@@ -21,8 +21,8 @@ def test_iob():
     with open(DATADIR / "iob_test.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         tagged = []
-        for element in group_iob(reader):
-            tagged.append(element.xml())
+        for bloc in group_iob(reader):
+            tagged.append(f"<{bloc.type}>{bloc.texte}</{bloc.type}>")
     assert tagged == IOBTEST
 
 

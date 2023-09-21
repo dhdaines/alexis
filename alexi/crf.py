@@ -3,6 +3,8 @@
 import csv
 import itertools
 import operator
+import re
+from enum import Enum
 from os import PathLike
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Union
@@ -10,11 +12,18 @@ from typing import Any, Callable, Iterable, Iterator, Union
 import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
-from alexi.label import Bullet
 
 FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 FeatureFunc = Callable[[int, dict], list[str]]
+
+
+class Bullet(Enum):
+    NUMERIC = re.compile(r"^(\d+)[\)\.°]$")
+    LOWER = re.compile(r"^([a-z])[\)\.]$")
+    UPPER = re.compile(r"^([A-Z])[\)\.]$")
+    ROMAN = re.compile(r"^([xiv]+)[\)\.]$", re.IGNORECASE)
+    BULLET = re.compile(r"^([•-])$")  # FIXME: need more bullets
 
 
 def sign(x: Union[int | float]):

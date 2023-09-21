@@ -8,7 +8,8 @@ from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
 from pdfplumber.page import Page
-from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
+from pdfplumber.structure import (PDFStructElement, PDFStructTree,
+                                  StructTreeMissing)
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 LOGGER = logging.getLogger("convert")
@@ -211,32 +212,32 @@ class Converteur:
             LOGGER.info("traitement de la page %d", page.page_number)
             words = page.extract_words(y_tolerance=2)
             elmap = make_element_map(tree, page.page_number)
-            self.save_figures(page, tree)
+            self.save_figures(page, tree, words)
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in page.chars)
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
 
-    def save_figures(self, page: Page, tree: Optional[PDFStructTree]):
+    def save_figures(
+        self, page: Page, tree: Optional[PDFStructTree], words: list[dict[str, Any]]
+    ):
         if tree is None:
             return
-        tboxes = [
-            get_element_bbox(page, table)
-            for table in get_tables(tree, page.page_number)
-        ]
-        for idx, tbox in enumerate(tboxes):
+        tboxes = []
+        for table in get_tables(tree, page.page_number):
+            tbox = get_element_bbox(page, table)
             if tbox is None:
                 continue
+            tboxes.append(tbox)
             if self.imgdir is not None:
                 img = page.crop(add_margin(tbox, page, 10)).to_image(
                     resolution=150, antialias=True
                 )
-                img.save(self.imgdir / f"page{page.page_number}-table{idx + 1}.png")
-        fboxes = [
-            get_element_bbox(page, figure)
-            for figure in get_figures(tree, page.page_number)
-        ]
-        for idx, fbox in enumerate(fboxes):
+                box = ",".join(str(round(x)) for x in tbox)
+                filename = f"page{page.page_number}-table-{box}.png"
+                img.save(self.imgdir / filename)
+        for figure in get_figures(tree, page.page_number):
+            fbox = get_element_bbox(page, figure)
             if fbox is None:
                 continue
             in_table = False
@@ -251,10 +252,9 @@ class Converteur:
             if self.imgdir is not None:
                 try:
                     img = page.crop(fbox).to_image(resolution=150, antialias=True)
-                    fboxtxt = ",".join(str(round(x)) for x in fbox)
-                    img.save(
-                        self.imgdir / f"page{page.page_number}-figure-{fboxtxt}.png"
-                    )
+                    boxtxt = ",".join(str(round(x)) for x in fbox)
+                    filename = f"page{page.page_number}-figure-{boxtxt}.png"
+                    img.save(self.imgdir / filename)
                 except ValueError as e:
                     LOGGER.warning(
                         "Failed to save figure on page %d at %s: %s",

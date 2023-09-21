@@ -11,7 +11,6 @@ from whoosh.index import create_in  # type: ignore
 from whoosh.support.charset import charset_table_to_dict  # type: ignore
 from whoosh.support.charset import default_charset
 
-from alexi.types import Reglement
 
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
@@ -27,6 +26,9 @@ def index(outdir: Path, jsons: List[Path]):
     )
     ix = create_in(outdir, schema)
     writer = ix.writer()
+
+
+"""
     for path in jsons:
         reg = Reglement.parse_file(path)
         for texte in reg.textes:
@@ -44,3 +46,4 @@ def index(outdir: Path, jsons: List[Path]):
                 contenu="\n\n".join(c.texte for c in texte.contenu),
             )
     writer.commit()
+"""
