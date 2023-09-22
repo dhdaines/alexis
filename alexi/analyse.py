@@ -4,10 +4,9 @@ Analyser un document étiquetté pour en extraire la structure.
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator, Optional
-from pdfplumber.utils.geometry import T_bbox, merge_bboxes
+from typing import Any, Iterable, Iterator
 
-from .convert import Image, bbox_contains, bbox_overlaps
+from pdfplumber.utils.geometry import T_bbox, merge_bboxes
 
 T_obj = dict[str, Any]
 
@@ -18,7 +17,6 @@ class Bloc:
 
     type: str
     contenus: list[T_obj]
-    image: Optional[Image] = None
 
     @property
     def texte(self) -> str:
@@ -132,27 +130,9 @@ def bbox_between(bbox: T_bbox, a: T_bbox, b: T_bbox) -> bool:
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
-    def __init__(self, images: Optional[list[Image]] = None):
-        self.images = [] if images is None else images
-
     def __call__(self, words: Iterable[T_obj]) -> Document:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
         doc = Document()
-        prev_bbox = (0, 0, 0, 0)
-        seen_images = set()
         for bloc in group_iob(words):
-            bbox = bloc.bbox
-            for image in self.images:
-                if bbox_contains(image.bbox, bbox):
-                    bloc.image = image
-                    seen_images.add(image)
-                    break
-                elif bbox_between(image.bbox, prev_bbox, bbox):
-                    doc.add_bloc(Bloc(type="Figure", image=image, contenus=[]))
-                    seen_images.add(image)
             doc.add_bloc(bloc)
-            prev_bbox = bbox
-        for image in self.images:
-            if image not in seen_images:
-                doc.add_bloc(Bloc(type="Figure", image=image, contenus=[]))
         return doc

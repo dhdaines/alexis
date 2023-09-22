@@ -16,7 +16,7 @@ from typing import Any, Iterable, TextIO
 from bs4 import BeautifulSoup
 
 from .analyse import Analyseur
-from .convert import FIELDNAMES, Converteur, Image
+from .convert import FIELDNAMES, Converteur
 from .crf import CRF, DEFAULT_MODEL
 from .format import format_html, format_xml
 from .index import index
@@ -67,13 +67,11 @@ def write_csv(
 
 def convert_main(args):
     """Convertir les PDF en CSV"""
-    if args.images is not None:
-        args.images.mkdir(parents=True, exist_ok=True)
     if args.pages:
         pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
     else:
         pages = None
-    conv = Converteur(imgdir=args.images)
+    conv = Converteur()
     write_csv(conv(args.pdf, pages), sys.stdout)
 
 
@@ -94,15 +92,7 @@ def xml_main(args):
 def html_main(args):
     """Convertir un CSV segmenté et étiquetté en HTML"""
     reader = csv.DictReader(args.csv)
-    images: list[Image] = []
-    if args.images:
-        for path in args.images.iterdir():
-            m = re.match(r"page(\d+)-(table|figure)-(\d+),(\d+),(\d+),(\d+)", path.name)
-            if m:
-                images.append(
-                    Image(path, m.group(2), tuple(int(x) for x in m.groups()[2:]))
-                )
-    doc = Analyseur(images)(reader)
+    doc = Analyseur()(reader)
     print(format_html(doc))
 
 
@@ -152,9 +142,6 @@ def make_argparse() -> argparse.ArgumentParser:
         "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
     )
     convert.add_argument(
-        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
-    )
-    convert.add_argument(
         "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
     )
     convert.set_defaults(func=convert_main)
@@ -178,9 +165,6 @@ def make_argparse() -> argparse.ArgumentParser:
     html = subp.add_parser(
         "html",
         help="Extraire la structure en format HTML en partant du CSV étiquetté",
-    )
-    html.add_argument(
-        "--images", help="Répertoire où trouver des images des tableaux", type=Path
     )
     html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     html.set_defaults(func=html_main)

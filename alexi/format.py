@@ -3,6 +3,8 @@ Formatter la structure extraite d'un PDF
 """
 
 import logging
+from pathlib import Path
+from typing import Optional
 
 from alexi.analyse import Bloc, Document, Element
 
@@ -67,12 +69,12 @@ BLOC = {
 }
 
 
-def format_html(doc: Document, indent: int = 2) -> str:
+def format_html(doc: Document, pdf: Optional[Path] = None, indent: int = 2) -> str:
     """Représentation HTML5 du document."""
 
     def bloc_html(bloc: Bloc) -> str:
-        if bloc.image is not None:
-            return f"<img alt='{bloc.texte}' src='{bloc.image.path}'>"
+        if pdf and bloc.type in ("Tableau", "Figure"):
+            return ""
         tag = BLOC[bloc.type]
         if tag == "":
             return ""

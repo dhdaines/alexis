@@ -3,13 +3,12 @@
 import itertools
 import logging
 from collections import deque
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
 from pdfplumber.page import Page
-from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
+from pdfplumber.structure import (PDFStructElement, PDFStructTree,
+                                  StructTreeMissing)
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 LOGGER = logging.getLogger("convert")
@@ -186,20 +185,7 @@ def get_word_features(
     return feats
 
 
-@dataclass(eq=True, frozen=True)
-class Image:
-    path: Path
-    type: str
-    bbox: T_bbox
-
-
 class Converteur:
-    imgdir: Optional[Path] = None
-
-    def __init__(self, imgdir=None):
-        self.imgdir = imgdir
-        self.images: list[Image] = []
-
     def extract_words(
         self, pdf: pdfplumber.PDF, pages: Optional[list[int]] = None
     ) -> Iterator[dict[str, Any]]:
@@ -220,56 +206,10 @@ class Converteur:
             LOGGER.info("traitement de la page %d", page.page_number)
             words = page.extract_words(y_tolerance=2)
             elmap = make_element_map(tree, page.page_number)
-            self.save_figures(page, tree, words)
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in page.chars)
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
-
-    def save_figures(
-        self, page: Page, tree: Optional[PDFStructTree], words: list[dict[str, Any]]
-    ):
-        if tree is None:
-            return
-        tboxes = []
-        for table in get_tables(tree, page.page_number):
-            tbox = get_element_bbox(page, table)
-            if tbox is None:
-                continue
-            tboxes.append(tbox)
-            if self.imgdir is not None:
-                img = page.crop(tbox).to_image(resolution=150, antialias=True)
-                box = ",".join(str(round(x)) for x in tbox)
-                path = self.imgdir / f"page{page.page_number}-table-{box}.png"
-                self.images.append(Image(path, "table", tbox))
-                img.save(path)
-        for figure in get_figures(tree, page.page_number):
-            fbox = get_element_bbox(page, figure)
-            if fbox is None:
-                continue
-            in_table = False
-            for tbox in tboxes:
-                # logical structure doesn't prevent this from happening
-                if bbox_overlaps(tbox, fbox):
-                    LOGGER.info("Figure in table: %s in %s", fbox, tbox)
-                    in_table = True
-                    break
-            if in_table:
-                continue
-            if self.imgdir is not None:
-                try:
-                    img = page.crop(fbox).to_image(resolution=150, antialias=True)
-                    boxtxt = ",".join(str(round(x)) for x in fbox)
-                    path = self.imgdir / f"page{page.page_number}-figure-{boxtxt}.png"
-                    self.images.append(Image(path, "figure", fbox))
-                    img.save(path)
-                except ValueError as e:
-                    LOGGER.warning(
-                        "Failed to save figure on page %d at %s: %s",
-                        page.page_number,
-                        fbox,
-                        e,
-                    )
 
     def __call__(
         self, infh: Any, pages: Optional[list[int]] = None
