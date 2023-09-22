@@ -4,25 +4,38 @@ Analyser un document étiquetté pour en extraire la structure.
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Optional
+from pdfplumber.utils.geometry import T_bbox, merge_bboxes
+
+from .convert import Image, bbox_contains, bbox_overlaps
 
 T_obj = dict[str, Any]
 
 
 @dataclass
 class Bloc:
+    """Élément de présentation (bloc de texte ou image)"""
+
     type: str
     contenus: list[T_obj]
+    image: Optional[Image] = None
 
     @property
     def texte(self) -> str:
-        """Contenu textuel du bloc."""
+        """Représentation textuel du bloc."""
         return " ".join(x["text"] for x in self.contenus)
+
+    @property
+    def bbox(self) -> T_bbox:
+        return merge_bboxes(
+            (int(word["x0"]), int(word["top"]), int(word["x1"]), int(word["bottom"]))
+            for word in self.contenus
+        )
 
 
 def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
     """Regrouper mots en blocs de texte selon leurs étiquettes IOB."""
-    bloc = Bloc("", [])
+    bloc = Bloc(type="", contenus=[])
     for word in words:
         bio, sep, tag = word["tag"].partition("-")
         if bio in ("B", "O"):
@@ -110,12 +123,36 @@ class Document:
         return self.paliers["Document"][0]
 
 
+def bbox_between(bbox: T_bbox, a: T_bbox, b: T_bbox) -> bool:
+    """Déterminer si une BBox se trouve entre deux autres."""
+    _, top, _, bottom = bbox
+    return top >= a[1] and bottom <= b[3]
+
+
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
+
+    def __init__(self, images: Optional[list[Image]] = None):
+        self.images = [] if images is None else images
 
     def __call__(self, words: Iterable[T_obj]) -> Document:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
         doc = Document()
+        prev_bbox = (0, 0, 0, 0)
+        seen_images = set()
         for bloc in group_iob(words):
+            bbox = bloc.bbox
+            for image in self.images:
+                if bbox_contains(image.bbox, bbox):
+                    bloc.image = image
+                    seen_images.add(image)
+                    break
+                elif bbox_between(image.bbox, prev_bbox, bbox):
+                    doc.add_bloc(Bloc(type="Figure", image=image, contenus=[]))
+                    seen_images.add(image)
             doc.add_bloc(bloc)
+            prev_bbox = bbox
+        for image in self.images:
+            if image not in seen_images:
+                doc.add_bloc(Bloc(type="Figure", image=image, contenus=[]))
         return doc

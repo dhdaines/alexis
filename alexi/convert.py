@@ -3,13 +3,13 @@
 import itertools
 import logging
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
 
 import pdfplumber
 from pdfplumber.page import Page
-from pdfplumber.structure import (PDFStructElement, PDFStructTree,
-                                  StructTreeMissing)
+from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 LOGGER = logging.getLogger("convert")
@@ -186,11 +186,19 @@ def get_word_features(
     return feats
 
 
+@dataclass(eq=True, frozen=True)
+class Image:
+    path: Path
+    type: str
+    bbox: T_bbox
+
+
 class Converteur:
     imgdir: Optional[Path] = None
 
     def __init__(self, imgdir=None):
         self.imgdir = imgdir
+        self.images: list[Image] = []
 
     def extract_words(
         self, pdf: pdfplumber.PDF, pages: Optional[list[int]] = None
@@ -230,12 +238,11 @@ class Converteur:
                 continue
             tboxes.append(tbox)
             if self.imgdir is not None:
-                img = page.crop(add_margin(tbox, page, 10)).to_image(
-                    resolution=150, antialias=True
-                )
+                img = page.crop(tbox).to_image(resolution=150, antialias=True)
                 box = ",".join(str(round(x)) for x in tbox)
-                filename = f"page{page.page_number}-table-{box}.png"
-                img.save(self.imgdir / filename)
+                path = self.imgdir / f"page{page.page_number}-table-{box}.png"
+                self.images.append(Image(path, "table", tbox))
+                img.save(path)
         for figure in get_figures(tree, page.page_number):
             fbox = get_element_bbox(page, figure)
             if fbox is None:
@@ -253,8 +260,9 @@ class Converteur:
                 try:
                     img = page.crop(fbox).to_image(resolution=150, antialias=True)
                     boxtxt = ",".join(str(round(x)) for x in fbox)
-                    filename = f"page{page.page_number}-figure-{boxtxt}.png"
-                    img.save(self.imgdir / filename)
+                    path = self.imgdir / f"page{page.page_number}-figure-{boxtxt}.png"
+                    self.images.append(Image(path, "figure", fbox))
+                    img.save(path)
                 except ValueError as e:
                     LOGGER.warning(
                         "Failed to save figure on page %d at %s: %s",

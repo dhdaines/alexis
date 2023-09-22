@@ -16,7 +16,7 @@ from typing import Any, Iterable, TextIO
 from bs4 import BeautifulSoup
 
 from .analyse import Analyseur
-from .convert import FIELDNAMES, Converteur
+from .convert import FIELDNAMES, Converteur, Image
 from .crf import CRF, DEFAULT_MODEL
 from .format import format_html, format_xml
 from .index import index
@@ -94,7 +94,15 @@ def xml_main(args):
 def html_main(args):
     """Convertir un CSV segmenté et étiquetté en HTML"""
     reader = csv.DictReader(args.csv)
-    doc = Analyseur()(reader)
+    images: list[Image] = []
+    if args.images:
+        for path in args.images.iterdir():
+            m = re.match(r"page(\d+)-(table|figure)-(\d+),(\d+),(\d+),(\d+)", path.name)
+            if m:
+                images.append(
+                    Image(path, m.group(2), tuple(int(x) for x in m.groups()[2:]))
+                )
+    doc = Analyseur(images)(reader)
     print(format_html(doc))
 
 
@@ -170,6 +178,9 @@ def make_argparse() -> argparse.ArgumentParser:
     html = subp.add_parser(
         "html",
         help="Extraire la structure en format HTML en partant du CSV étiquetté",
+    )
+    html.add_argument(
+        "--images", help="Répertoire où trouver des images des tableaux", type=Path
     )
     html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     html.set_defaults(func=html_main)

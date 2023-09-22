@@ -71,6 +71,8 @@ def format_html(doc: Document, indent: int = 2) -> str:
     """Représentation HTML5 du document."""
 
     def bloc_html(bloc: Bloc) -> str:
+        if bloc.image is not None:
+            return f"<img alt='{bloc.texte}' src='{bloc.image.path}'>"
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
