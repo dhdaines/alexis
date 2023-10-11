@@ -55,6 +55,7 @@ def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
 
 PALIERS = [
     "Document",
+    "Annexe",
     "Chapitre",
     "Section",
     "SousSection",

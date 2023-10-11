@@ -42,19 +42,19 @@ def format_xml(doc: Document, indent: int = 2) -> str:
 
 TAG = {
     "Document": "body",
+    "Annexe": "section",
     "Chapitre": "section",
     "Section": "section",
     "SousSection": "section",
     "Article": "article",
-    "Annexe": "section",
 }
 HEADER = {
     "Document": "h1",
+    "Annexe": "h1",
     "Chapitre": "h1",
     "Section": "h2",
     "SousSection": "h3",
     "Article": "h4",
-    "Annexe": "h1",
 }
 BLOC = {
     "Tete": "",
@@ -74,6 +74,7 @@ def format_html(doc: Document, pdf: Optional[Path] = None, indent: int = 2) -> s
 
     def bloc_html(bloc: Bloc) -> str:
         if pdf and bloc.type in ("Tableau", "Figure"):
+            # Extract image from PDF based on bloc bbox
             return ""
         tag = BLOC[bloc.type]
         if tag == "":
