@@ -31,7 +31,6 @@ def test_analyse():
         reader = csv.DictReader(infh)
         analyseur = Analyseur()
         doc = analyseur(reader)
-        print(doc.root)
         xml = format_xml(doc)
         assert xml.count("<Chapitre") == 1
         assert xml.count("<Section") == 4

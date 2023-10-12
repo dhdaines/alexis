@@ -65,7 +65,7 @@ PALIERS = [
 
 @dataclass
 class Element:
-    palier: str
+    type: str
     titre: str
     debut: int
     fin: int
@@ -76,36 +76,36 @@ class Document:
     """Document avec blocs de texte et structure."""
 
     def __init__(self) -> None:
-        self.blocs: list[Bloc] = []
+        self.contenu: list[Bloc] = []
         self.paliers: defaultdict[str, list[Element]] = defaultdict(list)
-        doc = Element(palier="Document", titre="", debut=0, fin=-1, sub=[])
+        doc = Element(type="Document", titre="", debut=0, fin=-1, sub=[])
         self.paliers["Document"].append(doc)
 
     def add_bloc(self, bloc: Bloc):
         """Ajouter un bloc de texte."""
         if bloc.type in PALIERS:
             element = Element(
-                palier=bloc.type,
+                type=bloc.type,
                 titre=bloc.texte,
-                debut=len(self.blocs),
+                debut=len(self.contenu),
                 fin=-1,
                 sub=[],
             )
             self.add_element(element)
         else:
-            self.blocs.append(bloc)
+            self.contenu.append(bloc)
 
     def add_element(self, element: Element):
         """Ajouter un élément au palier approprié."""
         # Fermer l'élément précédent du paliers actuel et inférieurs
-        pidx = PALIERS.index(element.palier)
+        pidx = PALIERS.index(element.type)
         for palier in PALIERS[pidx:]:
             if self.paliers[palier]:
                 previous = self.paliers[palier][-1]
                 if previous.fin == -1:
                     previous.fin = element.debut
         # Ajouter l'élément au palier actuel
-        self.paliers[element.palier].append(element)
+        self.paliers[element.type].append(element)
         # Ajouter à un élément supérieur s'il existe est s'il est ouvert
         if pidx == 0:
             return
@@ -117,7 +117,7 @@ class Document:
                     break
 
     @property
-    def root(self) -> Element:
+    def structure(self) -> Element:
         """Racine de l'arborescence structurel du document."""
         return self.paliers["Document"][0]
 

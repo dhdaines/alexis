@@ -6,6 +6,8 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
+import dataclasses
+import json
 import logging
 import re
 import subprocess
