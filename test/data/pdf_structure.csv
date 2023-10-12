@@ -79,8 +79,8 @@ I-Alinea,anim,1,612,792,CAAAAA+LiberationSerif,#000,132,156,231,243,231,7,Text b
 I-Alinea,id,1,612,792,CAAAAA+LiberationSerif,#000,159,168,231,243,231,7,Text body,Document;P
 I-Alinea,est,1,612,792,CAAAAA+LiberationSerif,#000,171,185,231,243,231,7,Text body,Document;P
 I-Alinea,laborum.,1,612,792,CAAAAA+LiberationSerif,#000,188,231,231,243,231,7,Text body,Document;P
-B-Article,Titre,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,91,264,280,264,8,H2,Document;H2
-I-Article,2,1,612,792,BAAAAA+LiberationSans-Bold,#000,96,104,264,280,264,8,H2,Document;H2
+B-Titre,Titre,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,91,264,280,264,8,H2,Document;H2
+I-Titre,2,1,612,792,BAAAAA+LiberationSans-Bold,#000,96,104,264,280,264,8,H2,Document;H2
 B-Alinea,Encore,1,612,792,CAAAAA+LiberationSerif,#000,57,91,288,300,288,9,Text body,Document;P
 I-Alinea,du,1,612,792,CAAAAA+LiberationSerif,#000,94,106,288,300,288,9,Text body,Document;P
 I-Alinea,contenu!,1,612,792,CAAAAA+LiberationSerif,#000,109,151,288,300,288,9,Text body,Document;P

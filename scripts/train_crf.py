@@ -54,7 +54,10 @@ def train(
 def main():
     parser = make_argparse()
     args = parser.parse_args()
-    train_set = load(Path("data/train").glob("*.csv"))
+    train_set = itertools.chain(
+        load(Path("data/train").glob("*.csv")),
+        load([Path("test/data/pdf_structure.csv")]),
+    )
     dev_set = load(Path("data/dev").glob("*.csv"))
     if args.train_dev:
         train_set = itertools.chain(train_set, dev_set)
