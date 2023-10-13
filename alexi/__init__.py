@@ -6,8 +6,6 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
-import dataclasses
-import json
 import logging
 import re
 import subprocess
@@ -73,8 +71,8 @@ def convert_main(args):
         pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
     else:
         pages = None
-    conv = Converteur()
-    write_csv(conv(args.pdf, pages), sys.stdout)
+    conv = Converteur(args.pdf)
+    write_csv(conv.extract_words(pages), sys.stdout)
 
 
 def crf_main(args):

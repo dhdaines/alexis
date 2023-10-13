@@ -3,9 +3,11 @@
 import itertools
 import logging
 from collections import deque
-from typing import Any, Iterable, Iterator, Optional
+from io import BufferedReader, BytesIO
+from pathlib import Path
+from typing import Any, Iterator, Optional, Union
 
-import pdfplumber
+from pdfplumber import PDF
 from pdfplumber.page import Page
 from pdfplumber.structure import (PDFStructElement, PDFStructTree,
                                   StructTreeMissing)
@@ -29,36 +31,6 @@ FIELDNAMES = [
     "mctag",
     "tagstack",
 ]
-
-
-def get_tables(tree: PDFStructTree, page_number: int) -> Iterator[PDFStructElement]:
-    """Trouver les tableaux principaux dans un page (ignorer les tableaux
-    imbriqués)"""
-    d = deque(tree)
-    while d:
-        el = d.popleft()
-        if el.type == "Table":
-            if el.page_number == page_number:
-                yield el
-        else:
-            # On ne traîte pas des tableaux imbriqués
-            d.extend(el.children)
-
-
-def get_figures(tree: PDFStructTree, page_number: int) -> Iterator[PDFStructElement]:
-    """Trouver les figures dans un page (ignorer celles imbriqués dans des
-    tableaux ou autres figures)"""
-    d = deque(tree)
-    while d:
-        el = d.popleft()
-        if el.type == "Table":
-            # Ignorer les figures à l'intérieur d'un tableau
-            continue
-        elif el.type == "Figure":
-            if el.page_number == page_number:
-                yield el
-        else:
-            d.extend(el.children)
 
 
 def get_child_mcids(el: PDFStructElement) -> Iterator[int]:
@@ -116,28 +88,6 @@ def add_margin(bbox: T_bbox, page: Page, margin: int):
     )
 
 
-def make_element_map(tree: Optional[PDFStructTree], page_number: int) -> dict[int, str]:
-    """Construire une correspondance entre MCIDs et types d'elements structurels"""
-    elmap: dict[int, str] = {}
-    if tree is None:
-        return elmap
-    d: deque[PDFStructElement | str] = deque(tree)
-    tagstack: deque[str] = deque()
-    while d:
-        el = d.pop()
-        if isinstance(el, str):
-            assert tagstack[-1] == el
-            tagstack.pop()
-        else:
-            d.append(el.type)
-            tagstack.append(el.type)
-            if el.page_number == page_number:
-                for mcid in el.mcids:
-                    elmap[mcid] = ";".join(tagstack)
-            d.extend(el.children)
-    return elmap
-
-
 def get_rgb(c: dict) -> str:
     """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
@@ -186,11 +136,15 @@ def get_word_features(
 
 
 class Converteur:
-    def extract_words(
-        self, pdf: pdfplumber.PDF, pages: Optional[list[int]] = None
-    ) -> Iterator[dict[str, Any]]:
-        if pages is None:
-            pages = list(range(len(pdf.pages)))
+    pdf: PDF
+    tree: Optional[PDFStructTree]
+    y_tolerance: int
+
+    def __init__(
+        self, path_or_fp: Union[str, Path, BufferedReader, BytesIO], y_tolerance=2
+    ):
+        self.pdf = PDF.open(path_or_fp)
+        self.y_tolerance = y_tolerance
         try:
             # Get the tree for the *entire* document since elements
             # like the TOC may span multiple pages, and we won't find
@@ -198,21 +152,74 @@ class Converteur:
             # page in which the top element appears (this is the way
             # the structure tree implementation in pdfplumber works,
             # which might be a bug)
-            tree = PDFStructTree(pdf)
+            self.tree = PDFStructTree(self.pdf)
         except StructTreeMissing:
-            tree = None
+            self.tree = None
+
+    def element_map(self, page_number: int) -> dict[int, str]:
+        """Construire une correspondance entre MCIDs et types d'elements structurels"""
+        elmap: dict[int, str] = {}
+        if self.tree is None:
+            return elmap
+        d: deque[PDFStructElement | str] = deque(self.tree)
+        tagstack: deque[str] = deque()
+        while d:
+            el = d.pop()
+            if isinstance(el, str):
+                assert tagstack[-1] == el
+                tagstack.pop()
+            else:
+                d.append(el.type)
+                tagstack.append(el.type)
+                if el.page_number == page_number:
+                    for mcid in el.mcids:
+                        elmap[mcid] = ";".join(tagstack)
+                d.extend(el.children)
+        return elmap
+
+    def extract_words(
+        self, pages: Optional[list[int]] = None
+    ) -> Iterator[dict[str, Any]]:
+        if pages is None:
+            pages = list(range(len(self.pdf.pages)))
         for idx in pages:
-            page = pdf.pages[idx]
+            page = self.pdf.pages[idx]
             LOGGER.info("traitement de la page %d", page.page_number)
-            words = page.extract_words(y_tolerance=2)
-            elmap = make_element_map(tree, page.page_number)
+            words = page.extract_words(y_tolerance=self.y_tolerance)
+            elmap = self.element_map(page.page_number)
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in page.chars)
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
 
-    def __call__(
-        self, infh: Any, pages: Optional[list[int]] = None
-    ) -> Iterable[dict[str, Any]]:
-        with pdfplumber.open(infh) as pdf:
-            yield from self.extract_words(pdf, pages)
+    def extract_tables(self, page_number: int) -> Iterator[PDFStructElement]:
+        """Trouver les tableaux principaux dans un page (ignorer les tableaux
+        imbriqués)"""
+        if self.tree is None:
+            return
+        d = deque(self.tree)
+        while d:
+            el = d.popleft()
+            if el.type == "Table":
+                if el.page_number == page_number:
+                    yield el
+            else:
+                # On ne traîte pas des tableaux imbriqués
+                d.extend(el.children)
+
+    def extract_figures(self, page_number: int) -> Iterator[PDFStructElement]:
+        """Trouver les figures dans un page (ignorer celles imbriqués dans des
+        tableaux ou autres figures)"""
+        if self.tree is None:
+            return
+        d = deque(self.tree)
+        while d:
+            el = d.popleft()
+            if el.type == "Table":
+                # Ignorer les figures à l'intérieur d'un tableau
+                continue
+            elif el.type == "Figure":
+                if el.page_number == page_number:
+                    yield el
+            else:
+                d.extend(el.children)
