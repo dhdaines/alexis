@@ -19,6 +19,20 @@ def test_format_html():
         assert html.count("<h3") == 3
         assert html.count("<h4") == 26
 
+        html = format_html(doc, element=doc.paliers["SousSection"][0])
+        assert html.count("<h3") == 1
+        assert html.count("<h4") == 6
+
+
+def test_format_html_figures():
+    with open(DATADIR / "pdf_structure.csv", "rt") as infh:
+        reader = csv.DictReader(infh)
+        analyseur = Analyseur()
+        doc = analyseur(reader)
+        html = format_html(doc, pdf=(DATADIR / "pdf_structure.pdf"))
+        print(html)
+
 
 if __name__ == "__main__":
     test_format_html()
+    test_format_html_figures()

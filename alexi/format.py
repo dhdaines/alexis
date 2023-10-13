@@ -69,7 +69,12 @@ BLOC = {
 }
 
 
-def format_html(doc: Document, pdf: Optional[Path] = None, indent: int = 2) -> str:
+def format_html(
+    doc: Document,
+    pdf: Optional[Path] = None,
+    indent: int = 2,
+    element: Optional[Element] = None,
+) -> str:
     """Représentation HTML5 du document."""
 
     def bloc_html(bloc: Bloc) -> str:
@@ -107,4 +112,6 @@ def format_html(doc: Document, pdf: Optional[Path] = None, indent: int = 2) -> s
         lines.append(spacing + f"</{tag}>")
         return lines
 
-    return "\n".join(element_html(doc.structure, indent))
+    if element is None:
+        element = doc.structure
+    return "\n".join(element_html(element, indent))
