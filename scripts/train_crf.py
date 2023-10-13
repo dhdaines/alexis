@@ -12,6 +12,9 @@ from alexi.crf import load, page2features, page2labels, split_pages
 
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--niter", default=69, type=int, help="Nombre d'iterations d'entrainement"
+    )
     parser.add_argument("--features", default="vsl", help="Extracteur de traits")
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument(
@@ -28,6 +31,7 @@ def train(
     features="vsl",
     labels="literal",
     n=2,
+    niter=69,
 ) -> crfsuite.CRF:
     train_pages = list(split_pages(train_set))
     X_train = [page2features(s, features, n) for s in train_pages]
@@ -37,7 +41,7 @@ def train(
         "c1": 0.01,
         "c2": 0.05,
         "algorithm": "lbfgs",
-        "max_iterations": 69,
+        "max_iterations": niter,
         "all_possible_transitions": True,
     }
     crf = crfsuite.CRF(**params, verbose=True)
@@ -63,7 +67,12 @@ def main():
         train_set = itertools.chain(train_set, dev_set)
         dev_set = None
     crf = train(
-        train_set, dev_set, features=args.features, labels=args.labels, n=args.n
+        train_set,
+        dev_set,
+        features=args.features,
+        labels=args.labels,
+        n=args.n,
+        niter=args.niter,
     )
     if args.outfile:
         joblib.dump((crf, args.n, args.features, args.labels), args.outfile)
