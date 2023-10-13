@@ -2,7 +2,7 @@ import csv
 import tempfile
 from pathlib import Path
 
-from alexi.crf import CRF
+from alexi.segment import Segmenteur
 
 DATADIR = Path(__file__).parent / "data"
 
@@ -17,7 +17,7 @@ def test_segment():
                 del word["tag"]
                 writer.writerow(word)
             testfh.seek(0, 0)
-            seg = CRF()
+            seg = Segmenteur()
             reader = csv.DictReader(testfh)
             words = list(seg(reader))
     assert len(words) > 0

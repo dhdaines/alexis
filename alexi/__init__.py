@@ -17,10 +17,10 @@ from bs4 import BeautifulSoup
 
 from .analyse import Analyseur
 from .convert import FIELDNAMES, Converteur
-from .crf import CRF, DEFAULT_MODEL
 from .format import format_html, format_xml
 from .index import index
 from .search import search
+from .segment import DEFAULT_MODEL, Segmenteur
 
 LOGGER = logging.getLogger("alexi")
 
@@ -75,9 +75,9 @@ def convert_main(args):
     write_csv(conv.extract_words(pages), sys.stdout)
 
 
-def crf_main(args):
-    """Segmenter les PDF avec CRF"""
-    crf = CRF(args.model)
+def segment_main(args):
+    """Segmenter les PDF"""
+    crf = Segmenteur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
 
@@ -146,14 +146,16 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     convert.set_defaults(func=convert_main)
 
-    crf = subp.add_parser("crf", help="Segmenter et étiquetter un PDF avec un CRF")
-    crf.add_argument("--model", help="Modele CRF", type=Path, default=DEFAULT_MODEL)
-    crf.add_argument(
+    segment = subp.add_parser(
+        "segment", help="Segmenter et étiquetter un PDF avec un CRF"
+    )
+    segment.add_argument("--model", help="Modele CRF", type=Path, default=DEFAULT_MODEL)
+    segment.add_argument(
         "csv",
         help="Fichier CSV à traiter",
         type=argparse.FileType("rt"),
     )
-    crf.set_defaults(func=crf_main)
+    segment.set_defaults(func=segment_main)
 
     xml = subp.add_parser(
         "xml",

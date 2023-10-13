@@ -1,134 +1,279 @@
-"""Segmentation du texte en format CSV"""
+"""Segmentation des textes avec CRF"""
 
+import csv
 import itertools
-import logging
-from collections.abc import Iterable, Sequence
-from typing import Any, Iterator
+import operator
+import re
+from enum import Enum
+from os import PathLike
+from pathlib import Path
+from typing import Any, Callable, Iterable, Iterator, Union
 
-LOGGER = logging.getLogger("segment")
+import joblib  # type: ignore
+
+from alexi.convert import FIELDNAMES
+
+FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
+DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
+FeatureFunc = Callable[[int, dict], list[str]]
 
 
-def detect_page_margins(
-    page_number: int, page_words: Sequence[dict[str, Any]]
-) -> Iterator[dict[str, Any]]:
-    """Détection heuristique des marges (haut et bas seuelement) d'une
-    page, qui sont étiquettées avec 'Tete' et 'Pied'."""
-    if not page_words:
-        return
-    for w in page_words:
-        w["top"] = round(float(w["top"]))
-        w["bottom"] = round(float(w["bottom"]))
-    margin_top = 0
-    page_height = round(float(page_words[0]["page_height"]))
-    margin_bottom = page_height
-    l1top = page_words[0]["top"]
-    l1bottom = page_words[0]["bottom"]
-    l1size = l1bottom - l1top
-    l1 = [word["text"] for word in page_words if word["top"] == l1top]
-    letop = page_words[-1]["top"]
-    lebottom = page_words[-1]["bottom"]
-    lesize = lebottom - letop
-    le = [word["text"] for word in page_words if word["top"] == letop]
-    if len(le) == 1 and le[0].isnumeric() and len(le[0]) < 4:
-        LOGGER.info(
-            "page %d: numéro de page en pied trouvé à %f pt", page_number, letop
-        )
-        margin_bottom = letop
-    elif lesize < 10 and (page_height - lebottom) < 72:
-        LOGGER.info("page %d: pied de page trouvé à %f pt", page_number, letop)
-        margin_bottom = letop
-        # Il existe parfois deux lignes de pied de page
-        for w in page_words[::-1]:
-            if w["top"] == letop:
-                continue
-            wsize = w["bottom"] - w["top"]
-            if wsize < 10 and letop - w["bottom"] < 10:
-                LOGGER.info(
-                    "page %d: deuxième ligne de pied de page trouvé à %f pt",
-                    page_number,
-                    w["top"],
-                )
-                margin_bottom = w["top"]
+class Bullet(Enum):
+    NUMERIC = re.compile(r"^(\d+)[\)\.°]$")
+    LOWER = re.compile(r"^([a-z])[\)\.]$")
+    UPPER = re.compile(r"^([A-Z])[\)\.]$")
+    ROMAN = re.compile(r"^([xiv]+)[\)\.]$", re.IGNORECASE)
+    BULLET = re.compile(r"^([•-])$")  # FIXME: need more bullets
+
+
+def sign(x: Union[int | float]):
+    """Get the sign of a number (should exist...)"""
+    if x == 0:
+        return 0
+    if x < 0:
+        return -1
+    return 1
+
+
+def make_visual_structural_literal() -> FeatureFunc:
+    prev_word = None
+    prev_line_height = None
+    prev_line_start = None
+
+    def visual_one(idx, word):
+        nonlocal prev_word, prev_line_height, prev_line_start
+        if idx == 0:  # page break
+            prev_word = None
+            prev_line_start = float(word["x0"])
+            prev_line_height = 1  # arbitrary
+        ph = float(word["page_height"])
+        pw = float(word["page_width"])
+        height = float(word["bottom"]) - float(word["top"])
+        bullet = None
+        for pattern in Bullet:
+            if pattern.value.match(word["text"]):
+                bullet = pattern.name
                 break
-    if len(l1) == 1 and l1[0].isnumeric() and len(l1[0]) < 4:
-        LOGGER.info(
-            "page %d: numéro de page en tête trouvé à %f", page_number, l1bottom
+        features = [
+            "bias",
+            "lower:" + word["text"].lower(),
+            "x0:%.1f" % (float(word["x0"]) / pw),
+            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
+            "top:%.1f" % (float(word["top"]) / ph),
+            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
+            "height:%.1f" % (height / 10),
+            "bold:%s" % str("bold" in word["fontname"].lower()),
+            "italic:%s" % str("italic" in word["fontname"].lower()),
+            "bullet:%s" % bullet,
+        ]
+        newline = False
+        linedelta = 0.0
+        dx = 1
+        dy = 0
+        dh = 0
+        prev_height = 1
+        if prev_word is not None:
+            height = float(word["bottom"]) - float(word["top"])
+            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
+            dx = float(word["x0"]) - float(prev_word["x0"])
+            dy = float(word["top"]) - float(prev_word["top"])
+            dh = height - prev_height
+            if dx < 0 and dy >= prev_height:
+                prev_line_height = prev_height
+                newline = True
+                linedelta = float(word["x0"]) - prev_line_start
+                prev_line_start = float(word["x0"])
+        yhdelta = dy / prev_line_height
+        features.extend(
+            [
+                "xdsign:" + str(sign(dx)),
+                "ydsign:" + str(sign(dy)),
+                "hdsign:" + str(sign(dh)),
+                "xdelta:%.1f" % (dx / pw),
+                "ydelta:%.1f" % (dy / ph),
+                "hdelta:%.1f" % (dh / prev_height),
+                "newline:%s" % str(newline),
+                "linedelta:%.1f" % (linedelta / pw),
+                "yhdelta:%d" % round(min(yhdelta, 5.0)),
+            ]
         )
-        margin_top = l1bottom
-    elif l1size < 10 and l1top < 72:
-        LOGGER.info("page %d: en-tête trouvé a %f pt", page_number, l1bottom)
-        margin_top = l1bottom
-        # Il existe parfois deux lignes de tête de page aussi!
-        for w in page_words:
-            if w["top"] == l1top:
-                continue
-            wsize = w["bottom"] - w["top"]
-            if wsize < 10 and w["top"] - l1bottom < 10:
-                LOGGER.info(
-                    "page %d: deuxième ligne d'en-tête trouvé à %f pt",
-                    page_number,
-                    w["bottom"],
-                )
-                margin_top = w["bottom"]
-                break
-    seen_head = seen_foot = False
-    for word in page_words:
-        if word["bottom"] <= margin_top:
-            word["tag"] = "I-Tete" if seen_head else "B-Tete"
-            seen_head = True
-        elif word["top"] >= margin_bottom:
-            word["tag"] = "I-Pied" if seen_foot else "B-Pied"
-            seen_foot = True
-        yield word
+        prev_mcid = prev_word["mcid"] if prev_word is not None else ""
+        elements = set(word.get("tagstack", "").split(";"))
+        if word["mcid"] != prev_mcid:
+            features.append("newmcid")
+        mctag = word.get("mctag")
+        if mctag:
+            features.append("mctag:" + mctag)
+        if "Table" in elements:
+            features.append("table")
+        if "Figure" in elements:
+            features.append("figure")
+        if "TOCI" in elements:
+            features.append("toc")
+        prev_word = word
+        return features
+
+    return visual_one
 
 
-def detect_margins(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
-    """Détection heuristique des marges (haut et bas seuelement) de chaque
-    page, qui sont étiquettées avec 'Tete' et 'Pied'."""
-    for page_number, page_words in itertools.groupby(words, key=lambda x: x["page"]):
-        for word in detect_page_margins(page_number, list(page_words)):
-            yield word
+def make_delta() -> FeatureFunc:
+    prev_word = None
 
-
-def split_paragraphs(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
-    """Détection heuristique très simple des alinéas.  Un nouvel alinéa
-    est marqué lorsque l'interligne dépasse 1,5 fois la hauteur de
-    la ligne précédente.
-    """
-    prev_top = 0
-    prev_height = 0
-    for word in words:
-        if "tag" in word and word["tag"]:
-            pass
-        elif word["top"] - prev_top < 0:
-            word["tag"] = "B-Alinea"
-        elif word["top"] - prev_top > 1.5 * prev_height:
-            word["tag"] = "B-Alinea"
+    def delta_one(idx, word):
+        nonlocal prev_word
+        if idx == 0:  # page break
+            prev_word = None
+        features = quantized(idx, word)
+        ph = float(word["page_height"])
+        pw = float(word["page_width"])
+        if prev_word is None:
+            dx = 1
+            dy = 0
+            dh = 0
+            prev_height = 1
         else:
-            word["tag"] = "I-Alinea"
-        prev_top = word["top"]
-        prev_height = word["bottom"] - word["top"]
-        yield word
+            height = float(word["bottom"]) - float(word["top"])
+            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
+            dx = float(word["x0"]) - float(prev_word["x0"])
+            dy = float(word["top"]) - float(prev_word["top"])
+            dh = height - prev_height
+        features.extend(
+            [
+                "xdsign:" + str(sign(dx)),
+                "ydsign:" + str(sign(dy)),
+                "hdsign:" + str(sign(dh)),
+                "xdelta:%.1f" % (dx / pw),
+                "ydelta:%.1f" % (dy / ph),
+                "hdelta:%.1f" % (dh / prev_height),
+            ]
+        )
+        prev_word = word
+        return features
+
+    return delta_one
 
 
-def label_tables(words: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
-    """Marquer les mots à l'intérieur de tableaux (selon l'arbre structurel du PDF)"""
-    in_table = False
-    for word in words:
-        if "Table" in word.get("tagstack", ""):
-            if not in_table:
-                word["tag"] = "B-Tableau"
-            else:
-                word["tag"] = "I-Tableau"
-            in_table = True
-        else:
-            in_table = False
-        yield word
+def quantized(_, word):
+    features = pruned(_, word)
+    ph = float(word["page_height"])
+    pw = float(word["page_width"])
+    height = float(word["bottom"]) - float(word["top"])
+    features.extend(
+        [
+            "x0:%.1f" % (float(word["x0"]) / pw),
+            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
+            "top:%.1f" % (float(word["top"]) / ph),
+            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
+            "height:%.1f" % (height / 10),
+        ]
+    )
+    return features
+
+
+def pruned(_, word):
+    bullet = ""
+    for pattern in Bullet:
+        if pattern.value.match(word["text"]):
+            bullet = pattern.name
+    features = [
+        "bias",
+        "lower:" + word["text"].lower(),
+        "mctag:" + word.get("mctag", ""),
+        "tableau:" + str(word.get("tableau") not in ("", None)),
+        "bullet:" + bullet,
+    ]
+    return features
+
+
+def literal(_, word):
+    features = ["bias"]
+    for key in FEATNAMES:
+        feat = word.get(key)
+        if feat is None:
+            feat = ""
+        features.append("=".join((key, str(feat))))
+    return features
+
+
+FEATURES: dict[str, FeatureFunc] = {
+    "literal": literal,
+    "pruned": pruned,
+    "quantized": quantized,
+    "delta": make_delta(),
+    "vsl": make_visual_structural_literal(),
+}
+
+
+def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int = 1):
+    if isinstance(feature_func, str):
+        feature_func = FEATURES.get(feature_func, literal)
+    features = [feature_func(i, w) for i, w in enumerate(page)]
+
+    def adjacent(features, label):
+        return (":".join((label, feature)) for feature in features if feature != "bias")
+
+    ngram_features = [iter(f) for f in features]
+    for m in range(1, n):
+        for idx in range(len(features) - m):
+            ngram_features[idx] = itertools.chain(
+                ngram_features[idx], adjacent(features[idx + 1], f"+{m}")
+            )
+        for idx in range(m, len(features)):
+            ngram_features[idx] = itertools.chain(
+                ngram_features[idx], adjacent(features[idx - 1], f"-{m}")
+            )
+    return [list(f) for f in ngram_features]
+
+
+def bonly(tag):
+    bio, sep, name = tag.partition("-")
+    if not name:
+        return tag
+    if bio == "I":
+        return "I"
+    return "-".join((bio, name))
+
+
+LabelFunc = Callable[[str], str]
+LABELS: dict[str, LabelFunc] = {
+    "literal": lambda x: x,
+    "bonly": bonly,
+}
+
+
+def page2labels(page, label_func: Union[str, LabelFunc] = "literal"):
+    if isinstance(label_func, str):
+        label_func = LABELS.get(label_func, lambda x: x)
+    return [label_func(x["tag"]) for x in page]
+
+
+def page2tokens(page):
+    return (x["text"] for x in page)
+
+
+def split_pages(words: Iterable[dict]) -> Iterable[list[dict]]:
+    return (list(p) for idx, p in itertools.groupby(words, operator.itemgetter("page")))
+
+
+def load(paths: Iterable[PathLike]) -> Iterator[dict]:
+    for p in paths:
+        with open(Path(p), "rt") as infh:
+            reader = csv.DictReader(infh)
+            yield from reader
 
 
 class Segmenteur:
+    def __init__(self, model=DEFAULT_MODEL):
+        self.crf, self.n, self.features, self.labels = joblib.load(model)
+
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
-        words = detect_margins(words)
-        words = label_tables(words)
-        words = split_paragraphs(words)
-        return words
+        c1, c2 = itertools.tee(words)
+        pred = itertools.chain.from_iterable(
+            self.crf.predict_single(
+                page2features(p, feature_func=self.features, n=self.n)
+            )
+            for p in split_pages(c1)
+        )
+        for label, word in zip(pred, c2):
+            word["tag"] = label
+            yield word
