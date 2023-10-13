@@ -3,14 +3,14 @@
 import itertools
 import logging
 from collections import deque
+from dataclasses import dataclass
 from io import BufferedReader, BytesIO
 from pathlib import Path
-from typing import Any, Iterator, Optional, Union
+from typing import Any, Iterable, Iterator, Optional, Union
 
 from pdfplumber import PDF
 from pdfplumber.page import Page
-from pdfplumber.structure import (PDFStructElement, PDFStructTree,
-                                  StructTreeMissing)
+from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 LOGGER = logging.getLogger("convert")
@@ -86,6 +86,16 @@ def add_margin(bbox: T_bbox, page: Page, margin: int):
         min(page.width, x1 + margin),
         min(page.height, bottom + margin),
     )
+
+
+@dataclass
+class StructElementBloc:
+    type: str
+    bbox: T_bbox
+
+    def __init__(self, page: Page, el: PDFStructElement):
+        self.type = el.type
+        self.bbox = get_element_bbox(page, el)
 
 
 def get_rgb(c: dict) -> str:
@@ -178,10 +188,10 @@ class Converteur:
         return elmap
 
     def extract_words(
-        self, pages: Optional[list[int]] = None
+        self, pages: Optional[Iterable[int]] = None
     ) -> Iterator[dict[str, Any]]:
         if pages is None:
-            pages = list(range(len(self.pdf.pages)))
+            pages = range(len(self.pdf.pages))
         for idx in pages:
             page = self.pdf.pages[idx]
             LOGGER.info("traitement de la page %d", page.page_number)
@@ -192,26 +202,38 @@ class Converteur:
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
 
-    def extract_tables(self, page_number: int) -> Iterator[PDFStructElement]:
-        """Trouver les tableaux principaux dans un page (ignorer les tableaux
+    def extract_tables(
+        self, pages: Optional[Iterable[int]] = None
+    ) -> Iterator[StructElementBloc]:
+        """Trouver les tableaux principaux (ignorer les tableaux
         imbriqués)"""
         if self.tree is None:
             return
+        if pages is None:
+            pageset = set(range(1, len(self.pdf.pages) + 1))
+        else:
+            pageset = set(pages)
         d = deque(self.tree)
         while d:
             el = d.popleft()
             if el.type == "Table":
-                if el.page_number == page_number:
-                    yield el
+                if el.page_number in pageset:
+                    yield StructElementBloc(self.pdf.pages[el.page_number - 1], el)
             else:
                 # On ne traîte pas des tableaux imbriqués
                 d.extend(el.children)
 
-    def extract_figures(self, page_number: int) -> Iterator[PDFStructElement]:
+    def extract_figures(
+        self, pages: Optional[Iterable[int]] = None
+    ) -> Iterator[StructElementBloc]:
         """Trouver les figures dans un page (ignorer celles imbriqués dans des
         tableaux ou autres figures)"""
         if self.tree is None:
             return
+        if pages is None:
+            pageset = set(range(1, len(self.pdf.pages) + 1))
+        else:
+            pageset = set(pages)
         d = deque(self.tree)
         while d:
             el = d.popleft()
@@ -219,7 +241,7 @@ class Converteur:
                 # Ignorer les figures à l'intérieur d'un tableau
                 continue
             elif el.type == "Figure":
-                if el.page_number == page_number:
-                    yield el
+                if el.page_number in pageset:
+                    yield StructElementBloc(self.pdf.pages[el.page_number - 1], el)
             else:
                 d.extend(el.children)
