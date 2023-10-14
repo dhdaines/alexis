@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 import sklearn_crfsuite as crfsuite  # type: ignore
-from alexi.crf import CRF, load, page2features, page2labels, split_pages
+from alexi.segment import Segmenteur, load, page2features, page2labels, split_pages
 from sklearn_crfsuite import metrics
 
 
@@ -38,7 +38,7 @@ def test(
 def main():
     parser = make_argparse()
     args = parser.parse_args()
-    crf = CRF(model=args.model)
+    crf = Segmenteur(model=args.model)
     test_set = split_pages(load(args.csvs))
     test(crf.crf, test_set, crf.features, crf.labels, crf.n)
 

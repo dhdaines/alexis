@@ -7,7 +7,7 @@ from typing import Iterable, Optional
 
 import joblib  # type: ignore
 import sklearn_crfsuite as crfsuite  # type: ignore
-from alexi.crf import load, page2features, page2labels, split_pages
+from alexi.segment import load, page2features, page2labels, split_pages
 
 
 def make_argparse():
@@ -61,6 +61,7 @@ def main():
     train_set = itertools.chain(
         load(Path("data/train").glob("*.csv")),
         load([Path("test/data/pdf_structure.csv")]),
+        load([Path("test/data/pdf_figures.csv")]),
     )
     dev_set = load(Path("data/dev").glob("*.csv"))
     if args.train_dev:

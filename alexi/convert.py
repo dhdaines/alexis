@@ -3,15 +3,16 @@
 import itertools
 import logging
 from collections import deque
-from dataclasses import dataclass
 from io import BufferedReader, BytesIO
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional, Union
+from typing import Iterable, Iterator, Optional, Union
 
 from pdfplumber import PDF
 from pdfplumber.page import Page
 from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
+
+from .types import Bloc, T_obj
 
 LOGGER = logging.getLogger("convert")
 FIELDNAMES = [
@@ -64,7 +65,7 @@ def get_element_bbox(page: Page, el: PDFStructElement) -> T_bbox:
         x0, y0, x1, y1 = bbox
         top = page.height - y1
         bottom = page.height - y0
-        return (x0, top, x1, bottom)
+        return (round(x0), round(top), round(x1), round(bottom))
     else:
         mcids = set(get_child_mcids(el))
         mcid_objs = [
@@ -88,16 +89,6 @@ def add_margin(bbox: T_bbox, page: Page, margin: int):
     )
 
 
-@dataclass
-class StructElementBloc:
-    type: str
-    bbox: T_bbox
-
-    def __init__(self, page: Page, el: PDFStructElement):
-        self.type = el.type
-        self.bbox = get_element_bbox(page, el)
-
-
 def get_rgb(c: dict) -> str:
     """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
@@ -116,7 +107,7 @@ def get_rgb(c: dict) -> str:
 def get_word_features(
     word: dict,
     page: Page,
-    chars: dict[tuple[int, int], dict[str, Any]],
+    chars: dict[tuple[int, int], T_obj],
     elmap: dict[int, str],
 ) -> dict:
     # Extract things from first character (we do not use
@@ -187,9 +178,7 @@ class Converteur:
                 d.extend(el.children)
         return elmap
 
-    def extract_words(
-        self, pages: Optional[Iterable[int]] = None
-    ) -> Iterator[dict[str, Any]]:
+    def extract_words(self, pages: Optional[Iterable[int]] = None) -> Iterator[T_obj]:
         if pages is None:
             pages = range(len(self.pdf.pages))
         for idx in pages:
@@ -202,9 +191,19 @@ class Converteur:
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
 
-    def extract_tables(
-        self, pages: Optional[Iterable[int]] = None
-    ) -> Iterator[StructElementBloc]:
+    def make_bloc(self, el: PDFStructElement, type: Optional[str] = None) -> Bloc:
+        assert el.page_number is not None
+        page = self.pdf.pages[el.page_number - 1]
+        if type is None:
+            type = el.type
+        return Bloc(
+            type=type,
+            contenus=[],
+            _page_number=el.page_number,
+            _bbox=get_element_bbox(page, el),
+        )
+
+    def extract_tables(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
         """Trouver les tableaux principaux (ignorer les tableaux
         imbriqués)"""
         if self.tree is None:
@@ -217,15 +216,13 @@ class Converteur:
         while d:
             el = d.popleft()
             if el.type == "Table":
-                if el.page_number in pageset:
-                    yield StructElementBloc(self.pdf.pages[el.page_number - 1], el)
+                if el.page_number is not None and el.page_number in pageset:
+                    yield self.make_bloc(el, "Tableau")
             else:
                 # On ne traîte pas des tableaux imbriqués
                 d.extend(el.children)
 
-    def extract_figures(
-        self, pages: Optional[Iterable[int]] = None
-    ) -> Iterator[StructElementBloc]:
+    def extract_figures(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
         """Trouver les figures dans un page (ignorer celles imbriqués dans des
         tableaux ou autres figures)"""
         if self.tree is None:
@@ -241,7 +238,7 @@ class Converteur:
                 # Ignorer les figures à l'intérieur d'un tableau
                 continue
             elif el.type == "Figure":
-                if el.page_number in pageset:
-                    yield StructElementBloc(self.pdf.pages[el.page_number - 1], el)
+                if el.page_number is not None and el.page_number in pageset:
+                    yield self.make_bloc(el)
             else:
                 d.extend(el.children)

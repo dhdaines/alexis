@@ -2,33 +2,13 @@
 Analyser un document étiquetté pour en extraire la structure.
 """
 
+import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Iterator
+from typing import Iterable, Iterator, Optional
 
-from pdfplumber.utils.geometry import T_bbox, merge_bboxes
-
-T_obj = dict[str, Any]
-
-
-@dataclass
-class Bloc:
-    """Élément de présentation (bloc de texte ou image)"""
-
-    type: str
-    contenus: list[T_obj]
-
-    @property
-    def texte(self) -> str:
-        """Représentation textuel du bloc."""
-        return " ".join(x["text"] for x in self.contenus)
-
-    @property
-    def bbox(self) -> T_bbox:
-        return merge_bboxes(
-            (int(word["x0"]), int(word["top"]), int(word["x1"]), int(word["bottom"]))
-            for word in self.contenus
-        )
+from .convert import bbox_contains
+from .types import Bloc, T_obj, T_bbox
 
 
 def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
@@ -131,9 +111,58 @@ def bbox_between(bbox: T_bbox, a: T_bbox, b: T_bbox) -> bool:
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
-    def __call__(self, words: Iterable[T_obj]) -> Document:
+    def __call__(
+        self,
+        words: Iterable[T_obj],
+        tables: Iterable[Bloc] = (),
+        figures: Iterable[Bloc] = (),
+    ) -> Document:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
         doc = Document()
-        for bloc in group_iob(words):
-            doc.add_bloc(bloc)
+        # Group tables and figures by page
+        tf_blocs: defaultdict[int, list[Bloc]] = defaultdict(list)
+        for bloc in itertools.chain(tables, figures):
+            tf_blocs[bloc.page_number].append(bloc)
+        # Group block-level text elements by page
+        for page, blocs in itertools.groupby(
+            group_iob(words), lambda x: int(x.page_number)
+        ):
+            seen_tf_blox: set[Bloc] = set()
+            blox = list(blocs)
+            # No text, add all tables/images
+            if not blox:
+                for tf_bloc in tf_blocs[page]:
+                    doc.add_bloc(tf_bloc)
+                continue
+            # Consume any tables/figures before text
+            for tf_bloc in tf_blocs[page]:
+                _, _, _, bottom = tf_bloc.bbox
+                _, top, _, _ = blox[0].bbox
+                if bottom <= top:
+                    doc.add_bloc(tf_bloc)
+                    seen_tf_blox.add(tf_bloc)
+            # Add text/table/figure blocs
+            prev_bloc: Optional[Bloc] = None
+            for bloc in blox:
+                found_bloc = False
+                for tf_bloc in tf_blocs[page]:
+                    if bbox_contains(tf_bloc.bbox, bloc.bbox):
+                        found_bloc = True
+                        tf_bloc.contenus.extend(bloc.contenus)
+                        if tf_bloc not in seen_tf_blox:
+                            doc.add_bloc(tf_bloc)
+                            seen_tf_blox.add(tf_bloc)
+                        break
+                    elif prev_bloc and bbox_between(
+                        tf_bloc.bbox, prev_bloc.bbox, bloc.bbox
+                    ):
+                        if tf_bloc not in seen_tf_blox:
+                            doc.add_bloc(tf_bloc)
+                            seen_tf_blox.add(tf_bloc)
+                if not found_bloc:
+                    doc.add_bloc(bloc)
+            # Add any tables or figures that might remain at the bottom of the page
+            for tf_bloc in tf_blocs[page]:
+                if tf_bloc not in seen_tf_blox:
+                    doc.add_bloc(tf_bloc)
         return doc

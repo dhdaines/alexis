@@ -1,6 +1,7 @@
 import csv
 from pathlib import Path
 
+from alexi.convert import Converteur
 from alexi.analyse import Analyseur, group_iob
 from alexi.format import format_xml
 
@@ -38,6 +39,17 @@ def test_analyse():
         assert xml.count("<Article") == 25
 
 
+def test_analyse_tableaux_figures():
+    conv = Converteur(DATADIR / "pdf_figures.pdf")
+    with open(DATADIR / "pdf_figures.csv", "rt") as infh:
+        reader = csv.DictReader(infh)
+        analyseur = Analyseur()
+        doc = analyseur(reader, conv.extract_tables(), conv.extract_figures())
+        assert "Figure" in (bloc.type for bloc in doc.contenu)
+        assert "Tableau" in (bloc.type for bloc in doc.contenu)
+
+
 if __name__ == "__main__":
     test_iob()
     test_analyse()
+    test_analyse_tableaux_figures()
