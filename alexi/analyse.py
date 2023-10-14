@@ -13,14 +13,14 @@ from .types import Bloc, T_obj, T_bbox
 
 def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
     """Regrouper mots en blocs de texte selon leurs étiquettes IOB."""
-    bloc = Bloc(type="", contenus=[])
+    bloc = Bloc(type="", contenu=[])
     for word in words:
         bio, sep, tag = word["tag"].partition("-")
         if bio in ("B", "O"):
             if bloc.type != "":
                 yield bloc
             # Could create an empty tag if this is O
-            bloc = Bloc(type=tag, contenus=[])
+            bloc = Bloc(type=tag, contenu=[])
         elif bio == "I":
             # Sometimes we are missing an initial B
             if bloc.type == "":
@@ -28,7 +28,7 @@ def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
         else:
             raise ValueError("Tag %s n'est pas I, O ou B" % word["tag"])
         if bio != "O":
-            bloc.contenus.append(word)
+            bloc.contenu.append(word)
     if bloc.type != "":
         yield bloc
 
@@ -148,7 +148,7 @@ class Analyseur:
                 for tf_bloc in tf_blocs[page]:
                     if bbox_contains(tf_bloc.bbox, bloc.bbox):
                         found_bloc = True
-                        tf_bloc.contenus.extend(bloc.contenus)
+                        tf_bloc.contenu.extend(bloc.contenu)
                         if tf_bloc not in seen_tf_blox:
                             doc.add_bloc(tf_bloc)
                             seen_tf_blox.add(tf_bloc)

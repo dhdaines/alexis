@@ -198,7 +198,7 @@ class Converteur:
             type = el.type
         return Bloc(
             type=type,
-            contenus=[],
+            contenu=[],
             _page_number=el.page_number,
             _bbox=get_element_bbox(page, el),
         )
