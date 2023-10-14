@@ -3,12 +3,15 @@ Analyser un document étiquetté pour en extraire la structure.
 """
 
 import itertools
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Optional
 
 from .convert import bbox_contains
 from .types import Bloc, T_obj, T_bbox
+
+LOGGER = logging.getLogger("analyse")
 
 
 def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
@@ -150,6 +153,12 @@ class Analyseur:
                         found_bloc = True
                         tf_bloc.contenu.extend(bloc.contenu)
                         if tf_bloc not in seen_tf_blox:
+                            LOGGER.info(
+                                "Page %d contain tf bloc %s %s",
+                                page,
+                                tf_bloc.type,
+                                tf_bloc.bbox,
+                            )
                             doc.add_bloc(tf_bloc)
                             seen_tf_blox.add(tf_bloc)
                         break
@@ -157,12 +166,23 @@ class Analyseur:
                         tf_bloc.bbox, prev_bloc.bbox, bloc.bbox
                     ):
                         if tf_bloc not in seen_tf_blox:
+                            LOGGER.info(
+                                "Page %d between tf bloc %s %s",
+                                page,
+                                tf_bloc.type,
+                                tf_bloc.bbox,
+                            )
                             doc.add_bloc(tf_bloc)
                             seen_tf_blox.add(tf_bloc)
                 if not found_bloc:
+                    LOGGER.info("Page %d bloc %s %s", page, bloc.type, bloc.bbox)
                     doc.add_bloc(bloc)
+                prev_bloc = bloc
             # Add any tables or figures that might remain at the bottom of the page
             for tf_bloc in tf_blocs[page]:
                 if tf_bloc not in seen_tf_blox:
+                    LOGGER.info(
+                        "Page %d extra tf bloc %s %s", page, tf_bloc.type, tf_bloc.bbox
+                    )
                     doc.add_bloc(tf_bloc)
         return doc

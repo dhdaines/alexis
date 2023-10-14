@@ -65,7 +65,7 @@ def get_element_bbox(page: Page, el: PDFStructElement) -> T_bbox:
         x0, y0, x1, y1 = bbox
         top = page.height - y1
         bottom = page.height - y0
-        return (round(x0), round(top), round(x1), round(bottom))
+        return (x0, top, x1, bottom)
     else:
         mcids = set(get_child_mcids(el))
         mcid_objs = [
@@ -191,16 +191,17 @@ class Converteur:
             for word in words:
                 yield get_word_features(word, page, chars, elmap)
 
-    def make_bloc(self, el: PDFStructElement, type: Optional[str] = None) -> Bloc:
-        assert el.page_number is not None
-        page = self.pdf.pages[el.page_number - 1]
+    def make_bloc(
+        self, el: PDFStructElement, page: Page, type: Optional[str] = None
+    ) -> Bloc:
         if type is None:
             type = el.type
+        x0, top, x1, bottom = get_element_bbox(page, el)
         return Bloc(
             type=type,
             contenu=[],
-            _page_number=el.page_number,
-            _bbox=get_element_bbox(page, el),
+            _page_number=page.page_number,
+            _bbox=(round(x0), round(top), round(x1), round(bottom)),
         )
 
     def extract_tables(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
@@ -209,18 +210,17 @@ class Converteur:
         if self.tree is None:
             return
         if pages is None:
-            pageset = set(range(1, len(self.pdf.pages) + 1))
-        else:
-            pageset = set(pages)
-        d = deque(self.tree)
-        while d:
-            el = d.popleft()
-            if el.type == "Table":
-                if el.page_number is not None and el.page_number in pageset:
-                    yield self.make_bloc(el, "Tableau")
-            else:
-                # On ne traîte pas des tableaux imbriqués
-                d.extend(el.children)
+            pages = range(len(self.pdf.pages))
+        for p in pages:
+            page = self.pdf.pages[p]
+            d = deque(PDFStructTree(self.pdf, page))
+            while d:
+                el = d.popleft()
+                if el.type == "Table":
+                    yield self.make_bloc(el, page, "Tableau")
+                else:
+                    # On ne traîte pas des tableaux imbriqués
+                    d.extend(el.children)
 
     def extract_figures(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
         """Trouver les figures dans un page (ignorer celles imbriqués dans des
@@ -228,17 +228,16 @@ class Converteur:
         if self.tree is None:
             return
         if pages is None:
-            pageset = set(range(1, len(self.pdf.pages) + 1))
-        else:
-            pageset = set(pages)
-        d = deque(self.tree)
-        while d:
-            el = d.popleft()
-            if el.type == "Table":
-                # Ignorer les figures à l'intérieur d'un tableau
-                continue
-            elif el.type == "Figure":
-                if el.page_number is not None and el.page_number in pageset:
-                    yield self.make_bloc(el)
-            else:
-                d.extend(el.children)
+            pages = range(len(self.pdf.pages))
+        for p in pages:
+            page = self.pdf.pages[p]
+            d = deque(PDFStructTree(self.pdf, page))
+            while d:
+                el = d.popleft()
+                if el.type == "Table":
+                    # Ignorer les figures à l'intérieur d'un tableau
+                    continue
+                elif el.type == "Figure":
+                    yield self.make_bloc(el, page)
+                else:
+                    d.extend(el.children)

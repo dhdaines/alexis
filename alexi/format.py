@@ -60,8 +60,8 @@ BLOC = {
     "Tete": "",
     "Pied": "",
     "TOC": "",
-    "Tableau": "",
-    "Figure": "",
+    "Tableau": "img",
+    "Figure": "img",
     "Liste": "li",
     "Titre": "h4",
     "Alinea": "p",
@@ -71,20 +71,19 @@ BLOC = {
 
 def format_html(
     doc: Document,
-    pdf: Optional[Path] = None,
     indent: int = 2,
     element: Optional[Element] = None,
 ) -> str:
     """Représentation HTML5 du document."""
 
     def bloc_html(bloc: Bloc) -> str:
-        if pdf and bloc.type in ("Tableau", "Figure"):
-            # Extract image from PDF based on bloc bbox
-            return ""
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
-        return f"<{tag}>{bloc.texte}</{tag}>"
+        elif tag == "img":
+            return f'<img alt="{bloc.texte}" src="{bloc.img}">'
+        else:
+            return f"<{tag}>{bloc.texte}</{tag}>"
 
     def element_html(el: Element, indent: int = 2, offset: int = 0) -> list[str]:
         spacing = " " * offset
