@@ -13,7 +13,7 @@ from alexi.segment import load, page2features, page2labels, split_pages
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--niter", default=69, type=int, help="Nombre d'iterations d'entrainement"
+        "--niter", default=100, type=int, help="Nombre d'iterations d'entrainement"
     )
     parser.add_argument("--features", default="vsl", help="Extracteur de traits")
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
@@ -21,6 +21,12 @@ def make_argparse():
         "--train-dev", action="store_true", help="Ajouter dev set au train set"
     )
     parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
+    parser.add_argument(
+        "--c1", default=0.5, type=float, help="Coefficient de regularisation L1"
+    )
+    parser.add_argument(
+        "--c2", default=0.1, type=float, help="Coefficient de regularisation L2"
+    )
     parser.add_argument("-o", "--outfile", help="Fichier destination pour modele")
     return parser
 
@@ -32,14 +38,16 @@ def train(
     labels="literal",
     n=2,
     niter=69,
+    c1=0.1,
+    c2=0.1,
 ) -> crfsuite.CRF:
     train_pages = list(split_pages(train_set))
     X_train = [page2features(s, features, n) for s in train_pages]
     y_train = [page2labels(s, labels) for s in train_pages]
 
     params = {
-        "c1": 0.1,
-        "c2": 0.1,
+        "c1": c1,
+        "c2": c2,
         "algorithm": "lbfgs",
         "max_iterations": niter,
         "all_possible_transitions": True,
@@ -74,6 +82,8 @@ def main():
         labels=args.labels,
         n=args.n,
         niter=args.niter,
+        c1=args.c1,
+        c2=args.c2,
     )
     if args.outfile:
         joblib.dump((crf, args.n, args.features, args.labels), args.outfile)
