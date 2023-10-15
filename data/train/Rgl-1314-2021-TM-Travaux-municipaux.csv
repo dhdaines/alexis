@@ -1049,7 +1049,7 @@ I-Liste,du,6,612,1008,BCDGEE+ArialNarrow,#000,382,391,596,606,5636,16,P,Document
 I-Liste,système,6,612,1008,BCDGEE+ArialNarrow,#000,393,424,596,606,5636,16,P,Document;H5
 I-Liste,international,6,612,1008,BCDGEE+ArialNarrow,#000,426,471,596,606,5636,16,P,Document;H5
 I-Liste,(SI);,6,612,1008,BCDGEE+ArialNarrow,#000,473,489,596,606,5636,16,P,Document;H5
-I-Liste,8.,6,612,1008,BCDGEE+ArialNarrow,#222,113,120,607,617,5648,17,P,Document;H5
+B-Liste,8.,6,612,1008,BCDGEE+ArialNarrow,#222,113,120,607,617,5648,17,P,Document;H5
 I-Liste,La,6,612,1008,BCDGEE+ArialNarrow,#000,132,141,607,617,5648,17,P,Document;H5
 I-Liste,table,6,612,1008,BCDGEE+ArialNarrow,#000,143,161,607,617,5648,17,P,Document;H5
 I-Liste,des,6,612,1008,BCDGEE+ArialNarrow,#000,163,177,607,617,5648,17,P,Document;H5
@@ -1207,7 +1207,7 @@ I-Liste,données,6,612,1008,BCDGEE+ArialNarrow,#000,407,439,781,791,5821,24,P,Do
 I-Liste,du,6,612,1008,BCDGEE+ArialNarrow,#000,441,450,781,791,5821,24,P,Document;H5
 I-Liste,tableau,6,612,1008,BCDGEE+ArialNarrow,#000,453,479,781,791,5821,24,P,Document;H5
 I-Liste,prévalent;,6,612,1008,BCDGEE+ArialNarrow,#000,482,518,781,791,5821,24,P,Document;H5
-I-Liste,4.,6,612,1008,BCDGEE+ArialNarrow,#222,113,120,792,802,5833,25,P,Document;H5
+B-Liste,4.,6,612,1008,BCDGEE+ArialNarrow,#222,113,120,792,802,5833,25,P,Document;H5
 I-Liste,En,6,612,1008,BCDGEE+ArialNarrow,#000,132,142,792,802,5833,25,P,Document;H5
 I-Liste,cas,6,612,1008,BCDGEE+ArialNarrow,#000,144,157,792,802,5833,25,P,Document;H5
 I-Liste,de,6,612,1008,BCDGEE+ArialNarrow,#000,159,168,792,802,5833,25,P,Document;H5
@@ -2698,7 +2698,7 @@ I-Liste,plus,10,612,1008,BCDGEE+ArialNarrow,#222,460,475,469,479,9542,8,P,Docume
 I-Liste,de,10,612,1008,BCDGEE+ArialNarrow,#222,478,487,469,479,9542,8,P,Document;H5
 I-Liste,20,10,612,1008,BCDGEE+ArialNarrow,#222,489,498,469,479,9542,8,P,Document;H5
 I-Liste,mètres;,10,612,1008,BCDGEE+ArialNarrow,#222,500,527,469,479,9542,8,P,Document;H5
-I-Liste,4.,10,612,1008,BCDGEE+ArialNarrow,#222,113,120,480,490,9553,9,P,Document;H5
+B-Liste,4.,10,612,1008,BCDGEE+ArialNarrow,#222,113,120,480,490,9553,9,P,Document;H5
 I-Liste,Un,10,612,1008,BCDJEE+ArialNarrow,#222,132,142,480,490,9553,9,P,Document;H5
 I-Liste,plan,10,612,1008,BCDJEE+ArialNarrow,#222,144,160,480,490,9553,9,P,Document;H5
 I-Liste,"d’ensemble,",10,612,1008,BCDJEE+ArialNarrow,#222,162,206,480,490,9553,9,P,Document;H5
@@ -3581,7 +3581,7 @@ I-Liste,finale,11,612,1008,BCDJEE+ArialNarrow,#222,455,474,619,629,10700,16,P,Do
 I-Liste,à,11,612,1008,BCDJEE+ArialNarrow,#222,476,481,619,629,10700,16,P,Document;L;LI;LBody;L;LI;LBody
 I-Liste,la,11,612,1008,BCDJEE+ArialNarrow,#222,483,490,619,629,10700,16,P,Document;L;LI;LBody;L;LI;LBody
 I-Liste,Ville;,11,612,1008,BCDJEE+ArialNarrow,#222,492,510,619,629,10700,16,P,Document;L;LI;LBody;L;LI;LBody
-I-Liste,e.,11,612,1008,BCDGEE+ArialNarrow,#222,142,149,631,641,10712,17,P,Document;L;LI;LBody;L;LI;LBody
+B-Liste,e.,11,612,1008,BCDGEE+ArialNarrow,#222,142,149,631,641,10712,17,P,Document;L;LI;LBody;L;LI;LBody
 I-Liste,Les,11,612,1008,BCDGEE+ArialNarrow,#222,160,173,631,641,10712,17,P,Document;L;LI;LBody;L;LI;LBody
 I-Liste,modalités,11,612,1008,BCDGEE+ArialNarrow,#222,175,210,631,641,10712,17,P,Document;L;LI;LBody;L;LI;LBody
 I-Liste,attestant,11,612,1008,BCDGEE+ArialNarrow,#222,213,244,631,641,10712,17,P,Document;L;LI;LBody;L;LI;LBody
@@ -4785,7 +4785,7 @@ I-Liste,et,13,612,1008,BCDGEE+ArialNarrow,#222,441,448,273,283,12370,5,P,Documen
 I-Liste,de,13,612,1008,BCDGEE+ArialNarrow,#222,450,459,273,283,12370,5,P,Document;H5
 I-Liste,leurs,13,612,1008,BCDGEE+ArialNarrow,#222,461,479,273,283,12370,5,P,Document;H5
 I-Liste,résultats.,13,612,1008,BCDGEE+ArialNarrow,#222,481,515,273,283,12370,5,P,Document;H5
-I-Liste,2.,13,612,1008,BCDGEE+ArialNarrow,#222,113,120,284,294,12382,6,P,Document;H5
+B-Liste,2.,13,612,1008,BCDGEE+ArialNarrow,#222,113,120,284,294,12382,6,P,Document;H5
 I-Liste,Transmettre,13,612,1008,BCDJEE+ArialNarrow,#222,132,176,284,294,12382,6,P,Document;H5
 I-Liste,à,13,612,1008,BCDJEE+ArialNarrow,#222,179,183,284,294,12382,6,P,Document;H5
 I-Liste,la,13,612,1008,BCDJEE+ArialNarrow,#222,186,193,284,294,12382,6,P,Document;H5
@@ -5012,7 +5012,7 @@ I-Liste,d’un,13,612,1008,BCDJEE+ArialNarrow,#222,429,445,540,550,12638,15,P,Do
 I-Liste,défaut,13,612,1008,BCDJEE+ArialNarrow,#222,447,470,540,550,12638,15,P,Document;H5
 I-Liste,du,13,612,1008,BCDJEE+ArialNarrow,#222,472,481,540,550,12638,15,P,Document;H5
 I-Liste,promoteur;,13,612,1008,BCDJEE+ArialNarrow,#222,483,523,540,550,12638,15,P,Document;H5
-I-Liste,3.,13,612,1008,BCDGEE+ArialNarrow,#222,113,120,552,562,12649,16,P,Document;H5
+B-Liste,3.,13,612,1008,BCDGEE+ArialNarrow,#222,113,120,552,562,12649,16,P,Document;H5
 I-Liste,Un,13,612,1008,BCDJEE+ArialNarrow,#222,132,142,552,562,12649,16,P,Document;H5
 I-Liste,chèque,13,612,1008,BCDJEE+ArialNarrow,#222,144,171,552,562,12649,16,P,Document;H5
 I-Liste,certifié,13,612,1008,BCDJEE+ArialNarrow,#222,173,198,552,562,12649,16,P,Document;H5
