@@ -3,7 +3,6 @@ Formatter la structure extraite d'un PDF
 """
 
 import logging
-from pathlib import Path
 from typing import Optional
 
 from alexi.analyse import Bloc, Document, Element
@@ -38,6 +37,33 @@ def format_xml(doc: Document, indent: int = 2) -> str:
         return lines
 
     return "\n".join(element_xml(doc.structure, indent))
+
+
+def format_text(doc: Document) -> str:
+    """Contenu textuel du document."""
+
+    def bloc_text(bloc: Bloc) -> str:
+        return bloc.texte
+
+    def element_text(el: Element) -> list[str]:
+        lines = [el.titre, "-" * len(el.titre)]
+        idx = el.debut
+        fin = len(doc.contenu) if el.fin == -1 else el.fin
+        subidx = 0
+        sub = el.sub[subidx] if subidx < len(el.sub) else None
+        while idx < fin:
+            if sub is not None and idx == sub.debut:
+                lines.extend(element_text(sub))
+                idx = len(doc.contenu) if sub.fin == -1 else sub.fin
+                subidx += 1
+                sub = el.sub[subidx] if subidx < len(el.sub) else None
+            else:
+                lines.append(bloc_text(doc.contenu[idx]))
+                idx += 1
+        lines.append("")
+        return lines
+
+    return "\n".join(element_text(doc.structure))
 
 
 TAG = {

@@ -14,7 +14,7 @@ from typing import Any
 from alexi.analyse import Analyseur
 from alexi.convert import Converteur
 from alexi.segment import Segmenteur
-from alexi.format import format_html
+from alexi.format import format_html, format_text
 
 LOGGER = logging.getLogger("convert")
 
@@ -87,9 +87,13 @@ def main():
 
         for palier, elements in doc.paliers.items():
             for idx, element in enumerate(elements):
-                with open(docdir / f"{palier}_{idx+1}.html", "wt") as outfh:
-                    LOGGER.info("Génération de %s/%s_%d.html", docdir, palier, idx + 1)
+                title = f"{palier}_{idx+1}"
+                with open(docdir / title + ".html", "wt") as outfh:
+                    LOGGER.info("Génération de %s/%s.html", docdir, title)
                     outfh.write(format_html(doc, element=element))
+                with open(docdir / title + ".txt", "wt") as outfh:
+                    LOGGER.info("Génération de %s/%s.txt", docdir, title)
+                    outfh.write(format_text(doc, element=element))
 
 
 if __name__ == "__main__":

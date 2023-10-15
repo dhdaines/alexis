@@ -1,8 +1,9 @@
 import csv
+import re
 from pathlib import Path
 
 from alexi.analyse import Analyseur
-from alexi.format import format_html
+from alexi.format import format_html, format_text
 
 DATADIR = Path(__file__).parent / "data"
 TRAINDIR = Path(__file__).parent.parent / "data" / "train"
@@ -29,10 +30,21 @@ def test_format_html_figures():
         reader = csv.DictReader(infh)
         analyseur = Analyseur()
         doc = analyseur(reader)
-        html = format_html(doc, pdf=(DATADIR / "pdf_structure.pdf"))
+        html = format_html(doc)
         print(html)
+
+
+def test_format_text():
+    with open(TRAINDIR / "zonage_sections.csv", "rt") as infh:
+        reader = csv.DictReader(infh)
+        analyseur = Analyseur()
+        doc = analyseur(reader)
+        text = format_text(doc)
+        print(text)
+        assert len(re.findall(r"^--", text, re.MULTILINE)) == 33
 
 
 if __name__ == "__main__":
     test_format_html()
     test_format_html_figures()
+    test_format_text()
