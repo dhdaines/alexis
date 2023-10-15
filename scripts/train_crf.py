@@ -38,8 +38,8 @@ def train(
     y_train = [page2labels(s, labels) for s in train_pages]
 
     params = {
-        "c1": 0.01,
-        "c2": 0.05,
+        "c1": 0.1,
+        "c2": 0.1,
         "algorithm": "lbfgs",
         "max_iterations": niter,
         "all_possible_transitions": True,
@@ -52,6 +52,11 @@ def train(
         crf.fit(X_train, y_train, X_dev=X_dev, y_dev=y_dev)
     else:
         crf.fit(X_train, y_train)
+    for (src, dest), weight in crf.transition_features_.items():
+        src_iob, _, src_tag = src.partition("-")
+        dest_iob, _, dest_tag = dest.partition("-")
+        if src_iob in ("I", "O") and dest_iob == "I" and src_tag != dest_tag:
+            crf.transition_features_[src, dest] = -5
     return crf
 
 
