@@ -85,9 +85,11 @@ def main():
             tables = figures = None
             doc = analyseur(iob)
 
-        with open(docdir / "index.html", "wt") as outfh:
-            LOGGER.info("Génération de %s/index.html", docdir)
-            outfh.write(format_html(doc))
+        for palier, elements in doc.paliers.items():
+            for idx, element in enumerate(elements):
+                with open(docdir / f"{palier}_{idx+1}.html", "wt") as outfh:
+                    LOGGER.info("Génération de %s/%s_%d.html", docdir, palier, idx + 1)
+                    outfh.write(format_html(doc, element=element))
 
 
 if __name__ == "__main__":
