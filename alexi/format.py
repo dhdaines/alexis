@@ -2,12 +2,32 @@
 Formatter la structure extraite d'un PDF
 """
 
+import itertools
 import logging
-from typing import Optional
+from typing import Iterator, Optional, Sequence
 
-from alexi.analyse import Bloc, Document, Element
+from alexi.analyse import Bloc, Document, Element, T_obj
 
 LOGGER = logging.getLogger("format")
+
+
+def line_breaks(paragraph: Sequence[T_obj]) -> Iterator[list[T_obj]]:
+    xdeltas = [int(paragraph[0]["x0"])]
+    xdeltas.extend(
+        int(b["x0"]) - int(a["x0"]) for a, b in itertools.pairwise(paragraph)
+    )
+    ydeltas = [int(paragraph[0]["top"])]
+    ydeltas.extend(
+        int(b["top"]) - int(a["top"]) for a, b in itertools.pairwise(paragraph)
+    )
+    line: list[T_obj] = []
+    for word, xdelta, ydelta in zip(paragraph, xdeltas, ydeltas):
+        if xdelta <= 0 and ydelta > 0:  # CR, LF
+            yield line
+            line = []
+        line.append(word)
+    if line:
+        yield line
 
 
 def format_xml(doc: Document, indent: int = 2) -> str:
@@ -122,7 +142,9 @@ def format_text(doc: Document) -> str:
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
-        return bloc.texte
+        return "\n".join(
+            " ".join(w["text"] for w in line) for line in line_breaks(bloc.contenu)
+        )
 
     def element_text(el: Element) -> list[str]:
         lines = [el.titre, "-" * len(el.titre), ""]
