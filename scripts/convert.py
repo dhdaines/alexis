@@ -88,10 +88,10 @@ def main():
         for palier, elements in doc.paliers.items():
             for idx, element in enumerate(elements):
                 title = f"{palier}_{idx+1}"
-                with open(docdir / title + ".html", "wt") as outfh:
+                with open(docdir / f"{title}.html", "wt") as outfh:
                     LOGGER.info("Génération de %s/%s.html", docdir, title)
                     outfh.write(format_html(doc, element=element))
-                with open(docdir / title + ".txt", "wt") as outfh:
+                with open(docdir / f"{title}.txt", "wt") as outfh:
                     LOGGER.info("Génération de %s/%s.txt", docdir, title)
                     outfh.write(format_text(doc, element=element))
 

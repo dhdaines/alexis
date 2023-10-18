@@ -12,6 +12,8 @@ LOGGER = logging.getLogger("format")
 
 
 def line_breaks(paragraph: Sequence[T_obj]) -> Iterator[list[T_obj]]:
+    if len(paragraph) == 0:
+        return
     xdeltas = [int(paragraph[0]["x0"])]
     xdeltas.extend(
         int(b["x0"]) - int(a["x0"]) for a, b in itertools.pairwise(paragraph)
@@ -135,7 +137,10 @@ def format_html(
     return "\n".join(element_html(element, indent))
 
 
-def format_text(doc: Document) -> str:
+def format_text(
+    doc: Document,
+    element: Optional[Element] = None,
+) -> str:
     """Contenu textuel du document."""
 
     def bloc_text(bloc: Bloc) -> str:
@@ -165,4 +170,6 @@ def format_text(doc: Document) -> str:
         lines.append("")
         return lines
 
-    return "\n".join(element_text(doc.structure))
+    if element is None:
+        element = doc.structure
+    return "\n".join(element_text(element))
