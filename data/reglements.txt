@@ -1,9 +1,8 @@
-upload/documents/10.1R-Projet-rgl-1000-2008-PPC-2-AM.pdf
-upload/documents/2023-07-17-RGL-1314-2021-Z-10-AM_1.pdf
-upload/documents/2023-07-17-RGL-1314-2021-PC-3-AM_1.pdf
-upload/documents/2023-07-17-Rgl-1337-Type-Parapluie-2023-AM-.pdf
-upload/documents/2023-07-17-Rgl-1338-rue-du-Valais-AM-.pdf
-upload/documents/2023-07-12-RGL-SQ-2023-01-AM.pdf
+upload/documents/2023-09-18-Rgl-1339-40-80-phase-2-3-Adoption-.pdf
+upload/documents/2023-09-18-Reso-Second-PPCMOI-Strom-Spa.pdf
+upload/documents/2023-08-21-RGL-1314-2021-PC-3-Adoption.pdf
+upload/documents/2023-09-18-RGL-1314-2021-PC-4-Adoption.pdf
+upload/documents/2023-09-18-RGL-1314-2021-Z-10-Adoption.pdf
 upload/documents/RGL-790-1993-Formation-du-CCU-COMPILATION-ADMINISTRATIVE.pdf
 upload/documents/2019-06-18-RGL-1132-1-amdt-occupation-domaine-public-Adoption.pdf
 upload/documents/RGL-1135-2010-Comite-culturel-COMPILATION-ADMINISTRATIVE.pdf
@@ -140,7 +139,7 @@ upload/documents/RGL-1331-Travaux-refection-rue-Lanthier-Adopte.pdf
 upload/documents/RGL-1332-Mises-aux-normes-PPompage-117E-Adopte.pdf
 upload/documents/RGL-1335-Generatrices-Riverdale-Ronchamp-Adopte.pdf
 upload/documents/xx2023-03-20-Rgl-1336-rue-Skieur-Adopte.pdf
-upload/documents/2023-07-31-Rgl-1337-Type-Parapluie-2023-adoption-.pdf
+upload/documents/xx2023-07-31-Rgl-1337-Type-Parapluie-2023-adopte-web-.pdf
 upload/documents/RGL-1144-2010-Parc-canin.pdf
 upload/documents/RGL-1174-2012-Interdiction-fumer-parcs.pdf
 upload/documents/2015-06-20-Reglement-1223-circulation-des-vehicules-lourds-et-ANNEXES.pdf
@@ -149,7 +148,7 @@ upload/documents/xx-2019-10-21-RGL-1280-Nuisance-Adoption_1.pdf
 upload/documents/xx-2019-10-21-RGL-1281-Systeme-d-alarme-Adoption.pdf
 upload/documents/2020-12-14-RGL-1281-1-Systeme-d-alarme-Adoption.pdf
 upload/documents/2021-03-15-Reglement-1301-animaux-adoption.pdf
-upload/documents/xx2023-06-20-rgl-SQ-2023-Adopte_1.pdf
+upload/documents/SQ-2023-codification.pdf
 upload/documents/2022-12-19-Reglement-1327-Tarification-2023-Adoption_1.pdf
 upload/documents/2023-01-16-Rgl-1334-Taxation-2023-Adoption-Version-JT.pdf
 upload/documents/2022-01-26-Rgl-1320-Taxation-2022-adopte.pdf
@@ -163,7 +162,7 @@ upload/documents/1314-2021-C-envigueur-20230317.pdf
 upload/documents/xx-2023-02-20-Rgl-1314-2021-C-1-adopte.pdf
 upload/documents/Rgl-1314-2021-DM-Derogations-mineures.pdf
 upload/documents/Rgl-1314-2021-L-Lotissement.pdf
-upload/documents/Rgl-1314-2021-PC-version-en-vigueur-20230509.pdf
+upload/documents/Rgl-1314-2021-PC-version-en-vigueur-20231013.pdf
 upload/documents/2022-03-21-1314-2021-PC-1-Adopte_1.pdf
 upload/documents/xx2023-04-17-Rgl-1314-2021-PC-2-Adopte.pdf
 upload/documents/Rgl-1314-2021-PIIA-en-vigueur-17022023.pdf
@@ -171,7 +170,7 @@ upload/documents/xx2023-02-17-Regl-1314-2021-PIIA-1-adopte.pdf
 upload/documents/Rgl-1314-2021-PU-refonte-Plan-d-urbanisme.pdf
 upload/documents/Rgl-1314-2021-TM-Travaux-municipaux.pdf
 upload/documents/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
-upload/documents/Rgl-1314-2021-Z-en-vigueur-20230614.pdf
+upload/documents/Rgl-1314-2021-Z-en-vigueur-20231013.pdf
 upload/documents/19213-Plan-de-zonage-VZ-6-Tout-20221014.pdf
 upload/documents/19213-Plan-de-zonage-V5R2-Zoom.pdf
 upload/documents/xx-2022-01-24-Reglement-1314-2021-Z-1-adopte-et-signe_1.pdf
