@@ -14,7 +14,7 @@ from .types import Bloc, T_obj, T_bbox
 LOGGER = logging.getLogger("analyse")
 
 
-def group_iob(words: Iterable[T_obj], key: str = "tag") -> Iterator[Bloc]:
+def group_iob(words: Iterable[T_obj], key: str = "segtag") -> Iterator[Bloc]:
     """Regrouper mots en blocs de texte selon leurs étiquettes IOB."""
     bloc = Bloc(type="", contenu=[])
     for word in words:

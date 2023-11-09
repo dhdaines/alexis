@@ -13,7 +13,7 @@ import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
 
-FEATNAMES = [name for name in FIELDNAMES if name not in ("tag", "seqtag")]
+FEATNAMES = [name for name in FIELDNAMES if name not in ("segtag", "seqtag")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 FeatureFunc = Callable[[int, dict], list[str]]
 
@@ -226,7 +226,7 @@ def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int 
 
 
 def bonly(_, word):
-    tag = word.get("tag", "O")
+    tag = word.get("segtag", "O")
     bio, sep, name = tag.partition("-")
     if not name:
         return tag
@@ -237,7 +237,7 @@ def bonly(_, word):
 
 LabelFunc = Callable[[str], str]
 LABELS: dict[str, LabelFunc] = {
-    "literal": lambda _, x: x.get("tag", "O"),
+    "literal": lambda _, x: x.get("segtag", "O"),
     "bonly": bonly,
 }
 
@@ -276,5 +276,5 @@ class Segmenteur:
             for p in split_pages(c1)
         )
         for label, word in zip(pred, c2):
-            word["tag"] = label
+            word["segtag"] = label
             yield word
