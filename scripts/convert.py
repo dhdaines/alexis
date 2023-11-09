@@ -15,6 +15,7 @@ from alexi.analyse import Analyseur
 from alexi.convert import Converteur
 from alexi.segment import Segmenteur
 from alexi.format import format_html, format_text
+from alexi.label import Extracteur
 
 LOGGER = logging.getLogger("convert")
 
@@ -45,6 +46,7 @@ def main():
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
 
     crf = None
+    extracteur = Extracteur()
     analyseur = Analyseur()
     args.outdir.mkdir(parents=True, exist_ok=True)
     for path in args.docs:
@@ -58,7 +60,7 @@ def main():
             feats = conv.extract_words()
             if crf is None:
                 crf = Segmenteur()
-            iob = crf(feats)
+            iob = list(extracteur(crf(feats)))
 
         pdf_path = path.with_suffix(".pdf")
         if conv is None and pdf_path.exists():
@@ -87,7 +89,11 @@ def main():
 
         for palier, elements in doc.paliers.items():
             for idx, element in enumerate(elements):
-                title = f"{palier}_{idx+1}"
+                if palier == "Document":
+                    element = None
+                    title = "index"
+                else:
+                    title = f"{palier}_{idx+1}"
                 with open(docdir / f"{title}.html", "wt") as outfh:
                     LOGGER.info("Génération de %s/%s.html", docdir, title)
                     outfh.write(format_html(doc, element=element))

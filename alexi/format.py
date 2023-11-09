@@ -132,9 +132,16 @@ def format_html(
         lines.append(spacing + f"</{tag}>")
         return lines
 
-    if element is None:
-        element = doc.structure
-    return "\n".join(element_html(element, indent))
+    if element is not None:
+        return "\n".join(element_html(element, indent))
+    doc_body = "\n".join(element_html(doc.structure, indent))
+    doc_header = f"""<!DOCTYPE html>
+<html>
+  <head>
+    <title>{doc.meta.get("Titre", "Document")}</title>
+  </head>"""
+    doc_footer = "</html>"
+    return "\n".join((doc_header, doc_body, doc_footer))
 
 
 def format_text(

@@ -6,7 +6,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Optional
+from typing import Iterable, Iterator, Optional, Sequence
 
 from .convert import bbox_contains
 from .types import Bloc, T_obj, T_bbox
@@ -58,11 +58,14 @@ class Element:
 class Document:
     """Document avec blocs de texte et structure."""
 
+    meta: dict[str, str]
+
     def __init__(self) -> None:
         self.contenu: list[Bloc] = []
         self.paliers: defaultdict[str, list[Element]] = defaultdict(list)
         doc = Element(type="Document", titre="", debut=0, fin=-1, sub=[])
         self.paliers["Document"].append(doc)
+        self.meta = {}
 
     def add_bloc(self, bloc: Bloc):
         """Ajouter un bloc de texte."""
@@ -116,7 +119,7 @@ class Analyseur:
 
     def __call__(
         self,
-        words: Iterable[T_obj],
+        words: Sequence[T_obj],
         tables: Iterable[Bloc] = (),
         figures: Iterable[Bloc] = (),
     ) -> Document:
@@ -126,6 +129,11 @@ class Analyseur:
         tf_blocs: defaultdict[int, list[Bloc]] = defaultdict(list)
         for bloc in itertools.chain(tables, figures):
             tf_blocs[bloc.page_number].append(bloc)
+        # Get metadata
+        for bloc in group_iob(words, "seqtag"):
+            if bloc.type not in doc.meta:
+                LOGGER.info(f"{bloc.type}: {bloc.texte}")
+                doc.meta[bloc.type] = bloc.texte
         # Group block-level text elements by page
         for page, blocs in itertools.groupby(
             group_iob(words), lambda x: int(x.page_number)
