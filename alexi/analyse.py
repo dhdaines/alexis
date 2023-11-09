@@ -14,11 +14,11 @@ from .types import Bloc, T_obj, T_bbox
 LOGGER = logging.getLogger("analyse")
 
 
-def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
+def group_iob(words: Iterable[T_obj], key: str = "tag") -> Iterator[Bloc]:
     """Regrouper mots en blocs de texte selon leurs étiquettes IOB."""
     bloc = Bloc(type="", contenu=[])
     for word in words:
-        bio, sep, tag = word["tag"].partition("-")
+        bio, sep, tag = word[key].partition("-")
         if bio in ("B", "O"):
             if bloc.type != "":
                 yield bloc
@@ -29,7 +29,7 @@ def group_iob(words: Iterable[T_obj]) -> Iterator[Bloc]:
             if bloc.type == "":
                 bloc.type = tag
         else:
-            raise ValueError("Tag %s n'est pas I, O ou B" % word["tag"])
+            raise ValueError("Tag %s n'est pas I, O ou B" % word[key])
         if bio != "O":
             bloc.contenu.append(word)
     if bloc.type != "":

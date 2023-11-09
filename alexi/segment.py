@@ -13,7 +13,7 @@ import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
 
-FEATNAMES = [name for name in FIELDNAMES if name != "tag"]
+FEATNAMES = [name for name in FIELDNAMES if name not in ("tag", "seqtag")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 FeatureFunc = Callable[[int, dict], list[str]]
 
@@ -225,7 +225,8 @@ def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int 
     return [list(f) for f in ngram_features]
 
 
-def bonly(tag):
+def bonly(_, word):
+    tag = word.get("tag", "O")
     bio, sep, name = tag.partition("-")
     if not name:
         return tag
@@ -236,15 +237,15 @@ def bonly(tag):
 
 LabelFunc = Callable[[str], str]
 LABELS: dict[str, LabelFunc] = {
-    "literal": lambda x: x,
+    "literal": lambda _, x: x.get("tag", "O"),
     "bonly": bonly,
 }
 
 
 def page2labels(page, label_func: Union[str, LabelFunc] = "literal"):
     if isinstance(label_func, str):
-        label_func = LABELS.get(label_func, lambda x: x)
-    return [label_func(x["tag"]) for x in page]
+        label_func = LABELS.get(label_func, LABELS["literal"])
+    return [label_func(i, x) for i, x in enumerate(page)]
 
 
 def page2tokens(page):
