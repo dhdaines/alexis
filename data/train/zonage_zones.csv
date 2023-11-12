@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 O,B-Chapitre,CHAPITRE,189,612,1008,ABCDEE+ArialNarrow-Bold,#222,178,253,513,531,190040,1,P,H1
 O,I-Chapitre,7,189,612,1008,ABCDEE+ArialNarrow-Bold,#222,257,265,513,531,190040,1,P,H1
 O,I-Chapitre,TYPES,189,612,1008,ABCDEE+ArialNarrow-Bold,#222,269,318,513,531,190040,2,P,H1

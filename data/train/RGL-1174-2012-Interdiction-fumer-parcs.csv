@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 O,B-Titre,VILLE,1,618,1012,Times-Bold,#000,106,135,90,100,90,,,
 O,I-Titre,DE,1,618,1012,Times-Bold,#000,139,152,90,100,90,,,
 O,I-Titre,SAINTE-ADÈLE,1,618,1012,Times-Bold,#000,155,230,90,100,90,,,

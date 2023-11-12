@@ -16,8 +16,8 @@ from .types import Bloc, T_obj
 
 LOGGER = logging.getLogger("convert")
 FIELDNAMES = [
-    "seqtag",
-    "segtag",
+    "sequence",
+    "segment",
     "text",
     "page",
     "page_width",
@@ -125,7 +125,7 @@ def get_word_features(
         feats["mctag"] = c.get("tag")
         feats["fontname"] = c.get("fontname")
     # Ensure matching PDF/CSV behaviour with missing fields
-    for field in "mcid", "seqtag", "seqtag", "fontname", "tagstack":
+    for field in "mcid", "sequence", "segment", "fontname", "tagstack":
         if field not in feats or feats[field] is None:
             feats[field] = ""
     feats["page"] = page.page_number

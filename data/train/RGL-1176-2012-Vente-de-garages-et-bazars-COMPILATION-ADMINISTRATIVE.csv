@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 O,B-Titre,COMPILATION,1,612,1008,Helvetica-Bold,#000,202,314,186,202,186,7,P,Part;P
 O,I-Titre,ADMINISTRATIVE,1,612,1008,Helvetica-Bold,#000,318,453,186,202,186,7,P,Part;P
 O,B-Alinea,Mise,1,612,1008,Helvetica,#000,87,110,242,253,242,11,P,Part;P

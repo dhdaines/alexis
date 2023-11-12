@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 O,B-Titre,CODIFICATION,1,612,1008,"ABCDEE+Arial,Bold",#000,254,334,185,196,185,7,P,Part;P
 O,I-Titre,ADMINISTRATIVE,1,612,1008,"ABCDEE+Arial,Bold",#000,337,429,185,196,185,7,P,Part;P
 O,B-Alinea,Mise,1,612,1008,ABCDEE+Arial,#000,108,131,236,247,236,11,P,Part;P

@@ -14,7 +14,7 @@ from .types import Bloc, T_obj, T_bbox
 LOGGER = logging.getLogger("analyse")
 
 
-def group_iob(words: Iterable[T_obj], key: str = "segtag") -> Iterator[Bloc]:
+def group_iob(words: Iterable[T_obj], key: str = "segment") -> Iterator[Bloc]:
     """Regrouper mots en blocs de texte selon leurs étiquettes IOB."""
     bloc = Bloc(type="", contenu=[])
     for word in words:
@@ -130,7 +130,7 @@ class Analyseur:
         for bloc in itertools.chain(tables, figures):
             tf_blocs[bloc.page_number].append(bloc)
         # Get metadata
-        for bloc in group_iob(words, "seqtag"):
+        for bloc in group_iob(words, "sequence"):
             if bloc.type not in doc.meta:
                 LOGGER.info(f"{bloc.type}: {bloc.texte}")
                 doc.meta[bloc.type] = bloc.texte

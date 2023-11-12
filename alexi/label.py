@@ -12,7 +12,7 @@ from alexi.analyse import group_iob
 from alexi.convert import FIELDNAMES, Converteur
 from alexi.segment import Segmenteur, page2features, page2labels, split_pages
 
-FEATNAMES = [name for name in FIELDNAMES if name != "seqtag"]
+FEATNAMES = [name for name in FIELDNAMES if name != "sequence"]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crfseq.joblib.gz"
 NUMDASH = re.compile(r"[\d-]+")
 
@@ -25,13 +25,13 @@ def features(_, word):
     features.append("alpha=%s" % bool(word["text"].isalpha()))
     features.append("numdash=%s" % bool(NUMDASH.match(word["text"])))
     features.append("bold=%s" % bool("bold" in word["fontname"].lower()))
-    features.append("tag=%s" % word["segtag"].partition("-")[2])
+    features.append("tag=%s" % word["segment"].partition("-")[2])
     features.append("size=%d" % (int(word["bottom"]) - int(word["top"])))
     return features
 
 
 def labels(_, word):
-    return word.get("seqtag", "O")
+    return word.get("sequence", "O")
 
 
 def load(paths):
@@ -79,7 +79,7 @@ class Extracteur:
         c1, c2 = itertools.tee(words)
         pred = self.predict(c1)
         for label, word in zip(pred, c2):
-            word["seqtag"] = label
+            word["sequence"] = label
             yield word
 
 
@@ -95,7 +95,7 @@ def main():
     pages = conv.extract_words()
     segmented = seg(pages)
     tagged = ex(segmented)
-    for bloc in group_iob(tagged, "seqtag"):
+    for bloc in group_iob(tagged, "sequence"):
         print(f"{bloc.type}: {bloc.texte}")
 
 

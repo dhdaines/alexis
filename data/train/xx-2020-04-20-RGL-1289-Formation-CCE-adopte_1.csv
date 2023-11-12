@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 B-Titre,B-Titre,RÈGLEMENT,1,612,1008,Arial-BoldMT,#000,310,397,62,76,62,,,
 I-Titre,I-Titre,1289,1,612,1008,Arial-BoldMT,#000,400,431,62,76,62,,,
 I-Titre,B-Alinea,concernant,1,612,1008,ArialMT,#000,252,307,90,101,90,,,

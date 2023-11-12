@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 B-Titre,B-Titre,Règlement,1,612,1008,BCDFEE+Lato,#555,85,203,533,559,533,4,P,Document;P;Span
 I-Titre,I-Titre,de,1,612,1008,BCDFEE+Lato,#555,208,236,533,559,533,4,P,Document;P;Span
 I-Titre,I-Titre,lotissement,1,612,1008,BCDFEE+Lato,#555,242,368,533,559,533,4,P,Document;P;Span

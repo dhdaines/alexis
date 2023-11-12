@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 O,B-Titre,VILLE,1,612,1008,Verdana-Bold,#000,108,141,97,107,97,,,
 O,I-Titre,DE,1,612,1008,Verdana-Bold,#000,144,159,97,107,97,,,
 O,I-Titre,SAINTE-ADÈLE,1,612,1008,Verdana-Bold,#000,163,246,97,107,97,,,

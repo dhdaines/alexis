@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 B-Titre,I-Tableau,RÈGLEMENT,1,612,1008,Arial-BoldMT,#000,261,329,107,118,107,3,Span,Document;Table;TBody;TR;TH;P
 I-Titre,I-Tableau,NUMÉRO,1,612,1008,Arial-BoldMT,#000,332,380,107,118,107,3,Span,Document;Table;TBody;TR;TH;P
 I-Titre,I-Tableau,1310,1,612,1008,Arial-BoldMT,#000,383,407,107,118,107,3,Span,Document;Table;TBody;TR;TH;P

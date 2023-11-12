@@ -1,4 +1,4 @@
-seqtag,segtag,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
+sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
 B-Titre,B-Tete,Règlement,1,612,792,BCDEEE+ArialNarrow,#777,97,128,36,45,36,,Artifact,
 I-Titre,I-Tete,relatif,1,612,792,BCDEEE+ArialNarrow,#777,130,146,36,45,36,,Artifact,
 I-Titre,I-Tete,aux,1,612,792,BCDEEE+ArialNarrow,#777,148,159,36,45,36,,Artifact,
