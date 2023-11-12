@@ -199,13 +199,17 @@ def format_dict(doc: Document) -> str:  # noqa: C901
         },
     }
 
-    def bloc_texte(bloc: Bloc) -> str:
+    def bloc_dict(bloc: Bloc) -> str:
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
-        return "\n".join(
-            " ".join(w["text"] for w in line) for line in line_breaks(bloc.contenu)
-        )
+        elif tag == "img":
+            if bloc.type == "Tableau":
+                return {"texte": bloc.texte, "tableau": bloc.img}
+            else:
+                return {"texte": bloc.texte, "figure": bloc.img}
+        else:
+            return {"texte": bloc.texte}
 
     # group together "contenu" as "texte" (they are not the same thing)
     def make_texte(titre: str, contenus: Sequence[Bloc]) -> dict:
@@ -213,7 +217,7 @@ def format_dict(doc: Document) -> str:  # noqa: C901
         texte = {
             "titre": titre,
             "pages": [int(contenus[0].page_number), int(contenus[-1].page_number)],
-            "contenu": [{"texte": bloc_texte(bloc)} for bloc in contenus],
+            "contenu": [bloc_dict(bloc) for bloc in contenus],
         }
         if m := re.match(r"(?:article )?(\d+)", titre, re.I):
             texte["article"] = int(m.group(1))
