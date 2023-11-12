@@ -20,7 +20,8 @@ from .convert import FIELDNAMES, Converteur
 from .format import format_html, format_xml
 from .index import index
 from .search import search
-from .segment import DEFAULT_MODEL, Segmenteur
+from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL, Segmenteur
+from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL, Extracteur
 
 LOGGER = logging.getLogger("alexi")
 
@@ -76,8 +77,15 @@ def convert_main(args):
 
 
 def segment_main(args):
-    """Segmenter les PDF"""
+    """Segmenter un CSV"""
     crf = Segmenteur(args.model)
+    reader = csv.DictReader(args.csv)
+    write_csv(crf(reader), sys.stdout)
+
+
+def label_main(args):
+    """Étiquetter un CSV"""
+    crf = Extracteur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
 
@@ -147,15 +155,30 @@ def make_argparse() -> argparse.ArgumentParser:
     convert.set_defaults(func=convert_main)
 
     segment = subp.add_parser(
-        "segment", help="Segmenter et étiquetter un PDF avec un CRF"
+        "segment", help="Segmenter et étiquetter les segments d'un CSV"
     )
-    segment.add_argument("--model", help="Modele CRF", type=Path, default=DEFAULT_MODEL)
+    segment.add_argument(
+        "--model", help="Modele CRF", type=Path, default=DEFAULT_SEGMENT_MODEL
+    )
     segment.add_argument(
         "csv",
         help="Fichier CSV à traiter",
         type=argparse.FileType("rt"),
     )
     segment.set_defaults(func=segment_main)
+
+    label = subp.add_parser(
+        "label", help="Étiquetter (extraire des informations) un CSV segmenté"
+    )
+    label.add_argument(
+        "--model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
+    )
+    label.add_argument(
+        "csv",
+        help="Fichier CSV à traiter",
+        type=argparse.FileType("rt"),
+    )
+    label.set_defaults(func=label_main)
 
     xml = subp.add_parser(
         "xml",
