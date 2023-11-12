@@ -2,6 +2,7 @@
 
 import itertools
 import logging
+import operator
 from collections import deque
 from io import BufferedReader, BytesIO
 from pathlib import Path
@@ -35,16 +36,6 @@ FIELDNAMES = [
 ]
 
 
-def get_child_mcids(el: PDFStructElement) -> Iterator[int]:
-    """Trouver tous les MCIDs à l'intérieur d'un élément structurel"""
-    yield from el.mcids
-    d = deque(el.children)
-    while d:
-        el = d.popleft()
-        yield from el.mcids
-        d.extend(el.children)
-
-
 def bbox_overlaps(obox: T_bbox, bbox: T_bbox) -> bool:
     """Déterminer si deux BBox ont une intersection."""
     ox0, otop, ox1, obottom = obox
@@ -59,7 +50,7 @@ def bbox_contains(bbox: T_bbox, ibox: T_bbox) -> bool:
     return ix0 >= x0 and ix1 <= x1 and itop >= top and ibottom <= bottom
 
 
-def get_element_bbox(page: Page, el: PDFStructElement) -> T_bbox:
+def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> T_bbox:
     """Obtenir le BBox autour d'un élément structurel."""
     bbox = el.attributes.get("BBox", None)
     if bbox is not None:
@@ -68,11 +59,11 @@ def get_element_bbox(page: Page, el: PDFStructElement) -> T_bbox:
         bottom = page.height - y0
         return (x0, top, x1, bottom)
     else:
-        mcids = set(get_child_mcids(el))
+        mcidset = set(mcids)
         mcid_objs = [
             c
             for c in itertools.chain.from_iterable(page.objects.values())
-            if c.get("mcid") in mcids
+            if c.get("mcid") in mcidset
         ]
         if not mcid_objs:
             return (-1, -1, -1, -1)  # An impossible BBox
@@ -193,52 +184,60 @@ class Converteur:
                 yield get_word_features(word, page, chars, elmap)
 
     def make_bloc(
-        self, el: PDFStructElement, page: Page, type: Optional[str] = None
+        self, el: PDFStructElement, page_number: int, mcids: Iterable[int]
     ) -> Bloc:
-        if type is None:
-            type = el.type
-        x0, top, x1, bottom = get_element_bbox(page, el)
+        page = self.pdf.pages[page_number - 1]
+        x0, top, x1, bottom = get_element_bbox(page, el, mcids)
         return Bloc(
-            type=type,
+            type="Tableau" if el.type == "Table" else el.type,
             contenu=[],
-            _page_number=page.page_number,
+            _page_number=page_number,
             _bbox=(round(x0), round(top), round(x1), round(bottom)),
         )
 
-    def extract_tables(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
-        """Trouver les tableaux principaux (ignorer les tableaux
-        imbriqués)"""
+    def extract_images(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
+        """Trouver des éléments qui seront représentés par des images
+        (tableaux et figures pour le moment)"""
         if self.tree is None:
             return
         if pages is None:
-            pages = range(len(self.pdf.pages))
-        for p in pages:
-            page = self.pdf.pages[p]
-            d = deque(PDFStructTree(self.pdf, page))
-            while d:
-                el = d.popleft()
-                if el.type == "Table":
-                    yield self.make_bloc(el, page, "Tableau")
-                else:
-                    # On ne traîte pas des tableaux imbriqués
-                    d.extend(el.children)
+            pages = range(1, len(self.pdf.pages) + 1)
+        pageset = set(pages)
 
-    def extract_figures(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
-        """Trouver les figures dans un page (ignorer celles imbriqués dans des
-        tableaux ou autres figures)"""
-        if self.tree is None:
-            return
-        if pages is None:
-            pages = range(len(self.pdf.pages))
-        for p in pages:
-            page = self.pdf.pages[p]
-            d = deque(PDFStructTree(self.pdf, page))
+        # tables *might* span multiple pages (in practice, no...) so
+        # we have to split them at page breaks, but also, their
+        # top-level elements don't have page numbers for this reason.
+        # So, we find them in a first traversal, then gather their
+        # children in a second one.
+        def gather_elements() -> Iterator[PDFStructElement]:
+            """Traverser l'arbre structurel en profondeur pour chercher les
+            figures et tableaux."""
+            d = deque(self.tree)
             while d:
                 el = d.popleft()
                 if el.type == "Table":
-                    # Ignorer les figures à l'intérieur d'un tableau
-                    continue
+                    yield el
                 elif el.type == "Figure":
-                    yield self.make_bloc(el, page)
+                    yield el
                 else:
-                    d.extend(el.children)
+                    d.extendleft(reversed(el.children))
+
+        def get_child_mcids(el: PDFStructElement) -> Iterator[tuple[int, int]]:
+            """Trouver tous les MCIDs (avec numeros de page, sinon ils sont
+            inutiles!) à l'intérieur d'un élément structurel"""
+            for mcid in el.mcids:
+                yield el.page_number, mcid
+            d = deque(el.children)
+            while d:
+                el = d.popleft()
+                for mcid in el.mcids:
+                    yield el.page_number, mcid
+                d.extend(el.children)
+
+        for el in gather_elements():
+            # Note: we must sort them as we can't guarantee they come in any particular order
+            mcids = list(get_child_mcids(el))
+            mcids.sort()
+            for page_number, group in itertools.groupby(mcids, operator.itemgetter(0)):
+                if page_number in pageset:
+                    yield self.make_bloc(el, page_number, (mcid for _, mcid in group))

@@ -72,9 +72,9 @@ def main():
 
         LOGGER.info("Analyse de la structure de %s", path)
         if conv:
-            tables = list(conv.extract_tables())
-            figures = list(conv.extract_figures())
-            for bloc in itertools.chain(tables, figures):
+            images = {}
+            for bloc in conv.extract_images():
+                images.setdefault(bloc.page_number, []).append(bloc)
                 img = (
                     conv.pdf.pages[bloc.page_number - 1]
                     .crop(bloc.bbox)
@@ -82,9 +82,8 @@ def main():
                 )
                 LOGGER.info("Extraction de %s", docdir / bloc.img)
                 img.save(docdir / bloc.img)
-            doc = analyseur(iob, tables, figures)
+            doc = analyseur(iob, images)
         else:
-            tables = figures = None
             doc = analyseur(iob)
 
         for palier, elements in doc.paliers.items():

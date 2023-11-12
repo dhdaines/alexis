@@ -6,6 +6,7 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
+import itertools
 import json
 import logging
 import re
@@ -76,6 +77,20 @@ def convert_main(args):
     else:
         pages = None
     conv = Converteur(args.pdf)
+    if args.images is not None:
+        args.images.mkdir(parents=True, exist_ok=True)
+        images = {}
+        for bloc in conv.extract_images(pages):
+            images.setdefault(bloc.page_number, []).append(bloc.img)
+            img = (
+                conv.pdf.pages[bloc.page_number - 1]
+                .crop(bloc.bbox)
+                .to_image(resolution=150, antialias=True)
+            )
+            LOGGER.info("Extraction de %s", args.images / bloc.img)
+            img.save(args.images / bloc.img)
+        with open(args.images / "images.json", "wt") as outfh:
+            json.dump(images, outfh)
     write_csv(conv.extract_words(pages), sys.stdout)
 
 
@@ -110,6 +125,9 @@ def html_main(args):
 def json_main(args):
     """Convertir un CSV segmenté et étiquetté en JSON"""
     reader = csv.DictReader(args.csv)
+    if args.images:
+        with open(args.images, "rt") as infh:
+            images = json.load(infh)
     doc = Analyseur()(reader)
     print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
@@ -162,6 +180,9 @@ def make_argparse() -> argparse.ArgumentParser:
     convert.add_argument(
         "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
     )
+    convert.add_argument(
+        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
+    )
     convert.set_defaults(func=convert_main)
 
     segment = subp.add_parser(
@@ -210,6 +231,9 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     jsonf.add_argument(
         "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
+    )
+    jsonf.add_argument(
+        "--images", help="Répertoire contenant les images des tableaux", type=Path
     )
     jsonf.set_defaults(func=json_main)
 
