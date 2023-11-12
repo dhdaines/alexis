@@ -119,7 +119,7 @@ class Analyseur:
 
     def __call__(
         self,
-        words: Sequence[T_obj],
+        words: Iterable[T_obj],
         tables: Iterable[Bloc] = (),
         figures: Iterable[Bloc] = (),
     ) -> Document:
@@ -129,14 +129,16 @@ class Analyseur:
         tf_blocs: defaultdict[int, list[Bloc]] = defaultdict(list)
         for bloc in itertools.chain(tables, figures):
             tf_blocs[bloc.page_number].append(bloc)
+        # Store all inputs as we will do two passes
+        word_sequence = list(words)
         # Get metadata
-        for bloc in group_iob(words, "sequence"):
+        for bloc in group_iob(word_sequence, "sequence"):
             if bloc.type not in doc.meta:
                 LOGGER.info(f"{bloc.type}: {bloc.texte}")
                 doc.meta[bloc.type] = bloc.texte
         # Group block-level text elements by page
         for page, blocs in itertools.groupby(
-            group_iob(words), lambda x: int(x.page_number)
+            group_iob(word_sequence), lambda x: int(x.page_number)
         ):
             seen_tf_blox: set[Bloc] = set()
             blox = list(blocs)
