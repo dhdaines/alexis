@@ -2,8 +2,10 @@
 Formatter la structure extraite d'un PDF
 """
 
+from collections import deque
 import itertools
 import logging
+import re
 from typing import Iterator, Optional, Sequence
 
 from alexi.analyse import Bloc, Document, Element, T_obj
@@ -180,3 +182,147 @@ def format_text(
     if element is None:
         element = doc.structure
     return "\n".join(element_text(element))
+
+
+def format_dict(doc: Document) -> str:  # noqa: C901
+    """Formatter un document en dictionnaire afin d'émettre un JSON pour
+    utilisation dans SÈRAFIM"""
+    # structure de base
+    doc_dict = {
+        "fichier": None,
+        "titre": doc.meta.get("Titre"),
+        "numero": doc.meta.get("Numero"),
+        "chapitres": [],
+        "textes": [],
+        "dates": {
+            "adoption": None,
+        },
+    }
+
+    def bloc_texte(bloc: Bloc) -> str:
+        tag = BLOC[bloc.type]
+        if tag == "":
+            return ""
+        return "\n".join(
+            " ".join(w["text"] for w in line) for line in line_breaks(bloc.contenu)
+        )
+
+    # group together "contenu" as "texte" (they are not the same thing)
+    def make_texte(titre: str, contenus: Sequence[Bloc]) -> dict:
+        # FIXME: Handle images, etc
+        texte = {
+            "titre": titre,
+            "pages": [int(contenus[0].page_number), int(contenus[-1].page_number)],
+            "contenu": [{"texte": bloc_texte(bloc)} for bloc in contenus],
+        }
+        if m := re.match(r"(?:article )?(\d+)", titre, re.I):
+            texte["article"] = int(m.group(1))
+        return texte
+
+    # add front matter as a single texte
+    if not doc.structure.sub:
+        LOGGER.warning("Absence de structure dans le document!")
+        preambule = doc.contenu
+    else:
+        preambule = doc.contenu[0 : doc.structure.sub[0].debut]
+    doc_dict["textes"].append(make_texte(doc.meta.get("Titre", "Préambule"), preambule))
+
+    # depth-first traverse adding leaf nodes as textes. total hack,
+    # not refactored, doomed to go away at some point
+    d = deque(doc.structure.sub)
+    chapitre = None
+    chapitre_idx = 0
+    section = None
+    section_idx = 0
+    sous_section = None
+    sous_section_idx = 0
+    while d:
+        el = d.popleft()
+        if el.sub:
+            if el.type == "Chapitre":
+                chapitre_idx += 1
+                if m := re.match(r"(?:chapitre )?(\d+|[XIV]+)", el.titre, re.I):
+                    chapitre_numero = m.group(1)
+                else:
+                    chapitre_numero = "%d" % chapitre_idx
+                first_page = int(doc.contenu[el.debut].page_number)
+                end = len(doc.contenu) if el.fin == -1 else el.fin
+                last_page = int(doc.contenu[end - 1].page_number)
+                if chapitre:
+                    chapitre["textes"][1] = len(doc_dict["textes"])
+                if section:
+                    section["textes"][1] = len(doc_dict["textes"])
+                if sous_section:
+                    sous_section["textes"][1] = len(doc_dict["textes"])
+                chapitre = {
+                    "numero": chapitre_numero,
+                    "titre": el.titre,
+                    "pages": [first_page, last_page],
+                    "textes": [len(doc_dict["textes"]), -1],
+                }
+                doc_dict["chapitres"].append(chapitre)
+                section_idx = 0
+                sous_section_idx = 0
+            elif el.type == "Section":
+                section_idx += 1
+                if m := re.match(r"(?:section )?(\d+|[XIV]+)", el.titre, re.I):
+                    section_numero = m.group(1)
+                else:
+                    section_numero = "%d" % section_idx
+                first_page = int(doc.contenu[el.debut].page_number)
+                end = len(doc.contenu) if el.fin == -1 else el.fin
+                last_page = int(doc.contenu[end - 1].page_number)
+                if section:
+                    section["textes"][1] = len(doc_dict["textes"])
+                if sous_section:
+                    sous_section["textes"][1] = len(doc_dict["textes"])
+                section = {
+                    "numero": section_numero,
+                    "titre": el.titre,
+                    "pages": [first_page, last_page],
+                    "textes": [len(doc_dict["textes"]), -1],
+                }
+                if "sections" not in chapitre:
+                    chapitre["sections"] = []
+                chapitre["sections"].append(section)
+            elif el.type == "SousSection":
+                sous_section_idx += 1
+                if m := re.match(r"(?:sous-section )?([\d\.]+)", el.titre, re.I):
+                    sous_section_numero = m.group(1)
+                else:
+                    sous_section_numero = "%d" % sous_section_idx
+                first_page = int(doc.contenu[el.debut].page_number)
+                end = len(doc.contenu) if el.fin == -1 else el.fin
+                last_page = int(doc.contenu[end - 1].page_number)
+                if sous_section:
+                    sous_section["textes"][1] = len(doc_dict["textes"])
+                sous_section = {
+                    "numero": sous_section_numero,
+                    "titre": el.titre,
+                    "pages": [first_page, last_page],
+                    "textes": [len(doc_dict["textes"]), -1],
+                }
+                if "sous_sections" not in section:
+                    section["sous_sections"] = []
+                section["sous_sections"].append(sous_section)
+            d.extendleft(reversed(el.sub))
+        else:
+            start = el.debut
+            end = len(doc.contenu) if el.fin == -1 else el.fin
+            texte = make_texte(el.titre, doc.contenu[start:end])
+            if chapitre:
+                texte["chapitre"] = chapitre_idx - 1
+            if section:
+                texte["section"] = section_idx - 1
+            if sous_section:
+                texte["sous_section"] = sous_section_idx - 1
+            doc_dict["textes"].append(texte)
+    # FIXME: not actually correct, but we don't really care
+    if chapitre and chapitre["textes"][1] == -1:
+        chapitre["textes"][1] = len(doc_dict["textes"])
+    if section and section["textes"][1] == -1:
+        section["textes"][1] = len(doc_dict["textes"])
+    if sous_section and sous_section["textes"][1] == -1:
+        sous_section["textes"][1] = len(doc_dict["textes"])
+
+    return doc_dict

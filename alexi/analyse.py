@@ -6,7 +6,7 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Optional, Sequence
+from typing import Iterable, Iterator, Optional
 
 from .convert import bbox_contains
 from .types import Bloc, T_obj, T_bbox

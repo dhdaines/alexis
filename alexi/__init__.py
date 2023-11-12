@@ -6,6 +6,7 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
+import json
 import logging
 import re
 import subprocess
@@ -17,11 +18,13 @@ from bs4 import BeautifulSoup
 
 from .analyse import Analyseur
 from .convert import FIELDNAMES, Converteur
-from .format import format_html, format_xml
+from .format import format_dict, format_html, format_xml
 from .index import index
+from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
+from .label import Extracteur
 from .search import search
-from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL, Segmenteur
-from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL, Extracteur
+from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
+from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
 
@@ -102,6 +105,13 @@ def html_main(args):
     reader = csv.DictReader(args.csv)
     doc = Analyseur()(reader)
     print(format_html(doc))
+
+
+def json_main(args):
+    """Convertir un CSV segmenté et étiquetté en JSON"""
+    reader = csv.DictReader(args.csv)
+    doc = Analyseur()(reader)
+    print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
 
 def index_main(args):
@@ -193,6 +203,15 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
     html.set_defaults(func=html_main)
+
+    jsonf = subp.add_parser(
+        "json",
+        help="Extraire la structure en format JSON en partant du CSV étiquetté",
+    )
+    jsonf.add_argument(
+        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
+    )
+    jsonf.set_defaults(func=json_main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
