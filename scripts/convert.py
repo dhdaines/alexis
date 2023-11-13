@@ -247,12 +247,12 @@ def main():
             imgdir = args.outdir / "public" / "img" / path.stem
             LOGGER.info("Génération de fichiers SÈRAFIM sous %s", docdir)
             LOGGER.info("Extraction d'images sous %s", imgdir)
-            docdir.mkdir(exist_ok=True)
-            imgdir.mkdir(exist_ok=True)
+            docdir.mkdir(parents=True, exist_ok=True)
+            imgdir.mkdir(parents=True, exist_ok=True)
         else:
             docdir = imgdir = args.outdir / path.stem
             LOGGER.info("Génération de pages HTML sous %s", docdir)
-            docdir.mkdir(exist_ok=True)
+            docdir.mkdir(parents=True, exist_ok=True)
 
         if conv:
             LOGGER.info("Extraction d'images de %s", path)

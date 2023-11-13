@@ -237,6 +237,9 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
 
     # group together "contenu" as "texte" (they are not the same thing)
     def make_texte(titre: str, contenus: Sequence[Bloc]) -> dict:
+        if len(contenus) == 0:
+            LOGGER.warning("Absence de contenus, titre='%s'", titre)
+            return {}
         contenu = []
         for bloc in contenus:
             bd = bloc_dict(bloc)
@@ -257,7 +260,9 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
         preambule = doc.contenu
     else:
         preambule = doc.contenu[0 : doc.structure.sub[0].debut]
-    doc_dict["textes"].append(make_texte(doc.meta.get("Titre", "Préambule"), preambule))
+    pretexte = make_texte(doc.meta.get("Titre", "Préambule"), preambule)
+    if pretexte:
+        doc_dict["textes"].append(pretexte)
 
     # depth-first traverse adding leaf nodes as textes. total hack,
     # not refactored, doomed to go away at some point
@@ -316,9 +321,8 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
                     "pages": [first_page, last_page],
                     "textes": [len(doc_dict["textes"]), -1],
                 }
-                if "sections" not in chapitre:
-                    chapitre["sections"] = []
-                chapitre["sections"].append(section)
+                if chapitre:
+                    chapitre.setdefault("sections", []).append(section)
             elif el.type == "SousSection":
                 sous_section_idx += 1
                 if m := re.match(r"(?:sous-section )?([\d\.]+)", el.titre, re.I):
@@ -337,21 +341,21 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
                     "pages": [first_page, last_page],
                     "textes": [len(doc_dict["textes"]), -1],
                 }
-                if "sous_sections" not in section:
-                    section["sous_sections"] = []
-                section["sous_sections"].append(sous_section)
+                if section:
+                    section.setdefault("sous_sections", []).append(sous_section)
             d.extendleft(reversed(el.sub))
         else:
             start = el.debut
             end = len(doc.contenu) if el.fin == -1 else el.fin
             texte = make_texte(el.titre, doc.contenu[start:end])
-            if chapitre:
-                texte["chapitre"] = chapitre_idx - 1
-            if section:
-                texte["section"] = section_idx - 1
-            if sous_section:
-                texte["sous_section"] = sous_section_idx - 1
-            doc_dict["textes"].append(texte)
+            if texte:
+                if chapitre:
+                    texte["chapitre"] = chapitre_idx - 1
+                if section:
+                    texte["section"] = section_idx - 1
+                if sous_section:
+                    texte["sous_section"] = sous_section_idx - 1
+                doc_dict["textes"].append(texte)
     # FIXME: not actually correct, but we don't really care
     if chapitre and chapitre["textes"][1] == -1:
         chapitre["textes"][1] = len(doc_dict["textes"])
