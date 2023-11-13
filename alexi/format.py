@@ -104,7 +104,7 @@ def format_html(
         if tag == "":
             return ""
         elif tag == "img":
-            return f'<img alt="{bloc.texte}" src="{bloc.img}">'
+            return f'<img alt="{bloc.texte}" src="{bloc.img}"><br>'
         else:
             return f"<{tag}>{bloc.texte}</{tag}>"
 

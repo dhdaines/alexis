@@ -18,7 +18,7 @@ class Bloc:
         if self._bbox:
             return hash((self.type, self._bbox, self._page_number))
         else:
-            return hash((self.type, self.contenu))
+            return hash((self.type, self.texte))
 
     @property
     def texte(self) -> str:

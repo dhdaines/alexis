@@ -4,12 +4,12 @@ Analyser un document étiquetté pour en extraire la structure.
 
 import itertools
 import logging
+import operator
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Optional
 
-from .convert import bbox_contains
-from .types import Bloc, T_obj, T_bbox
+from .types import Bloc, T_obj
 
 LOGGER = logging.getLogger("analyse")
 
@@ -108,90 +108,25 @@ class Document:
         return self.paliers["Document"][0]
 
 
-def bbox_between(bbox: T_bbox, a: T_bbox, b: T_bbox) -> bool:
-    """Déterminer si une BBox se trouve entre deux autres."""
-    _, top, _, bottom = bbox
-    return top >= a[1] and bottom <= b[3]
-
-
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
     def __call__(
-        self,
-        words: Iterable[T_obj],
-        images: dict[int, list[Bloc]] = {},
+        self, words: Iterable[T_obj], blocs: Optional[Iterable[Bloc]] = None
     ) -> Document:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
         doc = Document()
-        # Store all inputs as we will do two passes
+        # Store all inputs as we will do two passes (for sequence and segment tags)
         word_sequence = list(words)
-        # Get metadata
+        # Get metadata from sequence tags
         for bloc in group_iob(word_sequence, "sequence"):
             if bloc.type not in doc.meta:
                 LOGGER.info(f"{bloc.type}: {bloc.texte}")
                 doc.meta[bloc.type] = bloc.texte
-        # Group block-level text elements by page
-        for page, blocs in itertools.groupby(
-            group_iob(word_sequence), lambda x: int(x.page_number)
-        ):
-            seen_tf_blox: set[Bloc] = set()
-            blox = list(blocs)
-            # No text, add all tables/images
-            if not blox:
-                if page in images:
-                    for tf_bloc in images[page]:
-                        doc.add_bloc(tf_bloc)
-                    continue
-            # Consume any tables/figures before text
-            if page in images:
-                for tf_bloc in images[page]:
-                    _, _, _, bottom = tf_bloc.bbox
-                    _, top, _, _ = blox[0].bbox
-                    if bottom <= top:
-                        doc.add_bloc(tf_bloc)
-                        seen_tf_blox.add(tf_bloc)
-            # Add text/table/figure blocs
-            prev_bloc: Optional[Bloc] = None
-            for bloc in blox:
-                found_bloc = False
-                if page in images:
-                    for tf_bloc in images[page]:
-                        if bbox_contains(tf_bloc.bbox, bloc.bbox):
-                            found_bloc = True
-                            tf_bloc.contenu.extend(bloc.contenu)
-                            if tf_bloc not in seen_tf_blox:
-                                LOGGER.info(
-                                    "Page %d contain tf bloc %s %s",
-                                    page,
-                                    tf_bloc.type,
-                                    tf_bloc.bbox,
-                                )
-                                doc.add_bloc(tf_bloc)
-                                seen_tf_blox.add(tf_bloc)
-                            break
-                        elif prev_bloc and bbox_between(
-                            tf_bloc.bbox, prev_bloc.bbox, bloc.bbox
-                        ):
-                            if tf_bloc not in seen_tf_blox:
-                                LOGGER.info(
-                                    "Page %d between tf bloc %s %s",
-                                    page,
-                                    tf_bloc.type,
-                                    tf_bloc.bbox,
-                                )
-                                doc.add_bloc(tf_bloc)
-                                seen_tf_blox.add(tf_bloc)
-                if not found_bloc:
-                    LOGGER.info("Page %d bloc %s %s", page, bloc.type, bloc.bbox)
-                    doc.add_bloc(bloc)
-                prev_bloc = bloc
-            # Add any tables or figures that might remain at the bottom of the page
-            if page in images:
-                for tf_bloc in images[page]:
-                    if tf_bloc not in seen_tf_blox:
-                        LOGGER.info(
-                            "Page %d extra tf bloc %s %s", page, tf_bloc.type, tf_bloc.bbox
-                        )
-                        doc.add_bloc(tf_bloc)
+        # Group block-level text elements by page from segment tags
+        if blocs is None:
+            blocs = group_iob(word_sequence)
+        for page, blocs in itertools.groupby(blocs, operator.attrgetter("page_number")):
+            for bloc in blocs:
+                doc.add_bloc(bloc)
         return doc

@@ -8,11 +8,13 @@ import argparse
 import csv
 import itertools
 import logging
+import operator
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Iterator
 
-from alexi.analyse import Analyseur
-from alexi.convert import Converteur
+from alexi.types import Bloc, T_bbox
+from alexi.analyse import Analyseur, group_iob
+from alexi.convert import Converteur, bbox_contains
 from alexi.segment import Segmenteur
 from alexi.format import format_html, format_text
 from alexi.label import Extracteur
@@ -40,6 +42,123 @@ def read_csv(path: Path) -> list[dict[str, Any]]:
         return list(csv.DictReader(infh))
 
 
+def expand_text_blocs(images: dict[int, list[Bloc]], structure_blocs: Iterable[Bloc]):
+    bloclist = list(structure_blocs)
+    replace_blocs = {}
+    for page_number, blocs in images.items():
+        for text_bloc in blocs:
+            for struct_bloc in bloclist:
+                if text_bloc.page_number != struct_bloc.page_number:
+                    continue
+                if bbox_contains(struct_bloc.bbox, text_bloc.bbox):
+                    struct_bloc.contenu.extend(text_bloc.contenu)
+                    LOGGER.info(
+                        "page %d replace %s => %s",
+                        page_number,
+                        text_bloc.bbox,
+                        struct_bloc.bbox,
+                    )
+                    replace_blocs[text_bloc] = struct_bloc
+        images[page_number] = [replace_blocs.get(b, b) for b in blocs]
+    return replace_blocs
+
+
+def bbox_above(bbox: T_bbox, other: T_bbox) -> bool:
+    """Déterminer si une BBox se trouve en haut d'une autre."""
+    _, _, _, bottom = bbox
+    _, top, _, _ = other
+    return bottom <= top
+
+
+def bbox_below(bbox: T_bbox, other: T_bbox) -> bool:
+    """Déterminer si une BBox se trouve en bas d'une autre."""
+    _, top, _, _ = bbox
+    _, _, _, bottom = other
+    return top >= bottom
+
+
+def bbox_between(bbox: T_bbox, a: T_bbox, b: T_bbox) -> bool:
+    """Déterminer si une BBox se trouve entre deux autres."""
+    _, top, _, bottom = bbox
+    return top >= a[1] and bottom <= b[3]
+
+
+def insert_outside_blocs(
+    blocs: list[Bloc], insert_blocs: dict[int, list[Bloc]]
+) -> Iterator[Bloc]:
+    for page, group in itertools.groupby(blocs, operator.attrgetter("page_number")):
+        if page not in insert_blocs:
+            yield from group
+            continue
+        page_blocs = list(group)
+        page_insert_blocs = insert_blocs[page]
+        if len(page_blocs) == 0:
+            yield from insert_blocs[page]
+        else:
+            top_bloc = page_blocs[0]
+            bottom_bloc = page_blocs[-1]
+            for bloc in page_insert_blocs:
+                if bbox_above(bloc.bbox, top_bloc.bbox):
+                    LOGGER.info(
+                        "inserted non-text bloc %s at top of page %d",
+                        bloc.bbox,
+                        bloc.page_number,
+                    )
+                    yield bloc
+            for bloc_a, bloc_b in itertools.pairwise(page_blocs):
+                yield bloc_a
+                for bloc in page_insert_blocs:
+                    if bbox_between(bloc.bbox, bloc_a.bbox, bloc_b.bbox):
+                        LOGGER.info(
+                            "inserted non-text bloc %s inside page %d",
+                            bloc.bbox,
+                            bloc.page_number,
+                        )
+                        yield bloc
+            yield bloc_b
+            for bloc in page_insert_blocs:
+                if bbox_below(bloc.bbox, bottom_bloc.bbox):
+                    LOGGER.info(
+                        "inserted non-text bloc %s at bottom page %d",
+                        bloc.bbox,
+                        bloc.page_number,
+                    )
+                    yield bloc
+
+
+def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterator[Bloc]:
+    images = {}
+    # Find images in tagged text
+    for bloc in blocs:
+        if bloc.type in ("Tableau", "Figure"):
+            images.setdefault(bloc.page_number, []).append(bloc)
+    # Replace tag blocs with structure blocs if possible
+    struct_blocs = list(conv.extract_images())
+    replace_blocs = expand_text_blocs(images, struct_blocs)
+    # Replace "expanded" blocs
+    for idx, bloc in enumerate(blocs):
+        if bloc in replace_blocs:
+            blocs[idx] = replace_blocs[bloc]
+    # Find ones not linked to any text into document structure
+    insert_blocs = {}
+    for bloc in struct_blocs:
+        if not bloc.contenu:
+            insert_blocs.setdefault(bloc.page_number, []).append(bloc)
+            images.setdefault(bloc.page_number, []).append(bloc)
+    # Render image files
+    for page_number, image_blocs in images.items():
+        for bloc in image_blocs:
+            img = (
+                conv.pdf.pages[page_number - 1]
+                .crop(bloc.bbox)
+                .to_image(resolution=150, antialias=True)
+            )
+            LOGGER.info("Extraction de %s", docdir / bloc.img)
+            img.save(docdir / bloc.img)
+    # Insert non-text blocks into the document for reparsing
+    return insert_outside_blocs(blocs, insert_blocs)
+
+
 def main():
     parser = make_argparse()
     args = parser.parse_args()
@@ -53,7 +172,7 @@ def main():
         conv = None
         if path.suffix == ".csv":
             LOGGER.info("Lecture de %s", path)
-            iob = read_csv(path)
+            iob = list(read_csv(path))
         elif path.suffix == ".pdf":
             LOGGER.info("Conversion, segmentation et classification de %s", path)
             conv = Converteur(path)
@@ -70,20 +189,13 @@ def main():
         LOGGER.info("Génération de pages HTML sous %s", docdir)
         docdir.mkdir(exist_ok=True)
 
-        LOGGER.info("Analyse de la structure de %s", path)
         if conv:
-            images = {}
-            for bloc in conv.extract_images():
-                images.setdefault(bloc.page_number, []).append(bloc)
-                img = (
-                    conv.pdf.pages[bloc.page_number - 1]
-                    .crop(bloc.bbox)
-                    .to_image(resolution=150, antialias=True)
-                )
-                LOGGER.info("Extraction de %s", docdir / bloc.img)
-                img.save(docdir / bloc.img)
-            doc = analyseur(iob, images)
+            LOGGER.info("Extraction d'images de %s", path)
+            blocs = list(group_iob(iob))
+            blocs = extract_images(blocs, conv, docdir)
+            doc = analyseur(iob, blocs)
         else:
+            LOGGER.info("Analyse de la structure de %s", path)
             doc = analyseur(iob)
 
         for palier, elements in doc.paliers.items():
