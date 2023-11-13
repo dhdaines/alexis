@@ -236,18 +236,19 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
             return {"texte": bloc.texte}
 
     # group together "contenu" as "texte" (they are not the same thing)
-    def make_texte(titre: str, contenus: Sequence[Bloc]) -> dict:
-        if len(contenus) == 0:
-            LOGGER.warning("Absence de contenus, titre='%s'", titre)
-            return {}
+    def make_texte(titre: str, contenus: Sequence[Bloc], page: int) -> dict:
         contenu = []
         for bloc in contenus:
             bd = bloc_dict(bloc)
             if bd:
                 contenu.append(bd)
+        if len(contenus) == 0:
+            pages = [page, page]
+        else:
+            pages = ([int(contenus[0].page_number), int(contenus[-1].page_number)],)
         texte = {
             "titre": titre,
-            "pages": [int(contenus[0].page_number), int(contenus[-1].page_number)],
+            "pages": pages,
             "contenu": contenu,
         }
         if m := re.match(r"(?:article )?(\d+)", titre, re.I):
@@ -260,7 +261,7 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
         preambule = doc.contenu
     else:
         preambule = doc.contenu[0 : doc.structure.sub[0].debut]
-    pretexte = make_texte(doc.meta.get("Titre", "Préambule"), preambule)
+    pretexte = make_texte(doc.meta.get("Titre", "Préambule"), preambule, 1)
     if pretexte:
         doc_dict["textes"].append(pretexte)
 
@@ -345,10 +346,29 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
                     section.setdefault("sous_sections", []).append(sous_section)
             d.extendleft(reversed(el.sub))
         else:
+            if el.type == "Annexe":
+                if m := re.match(r"(?:annexe )?(\d+|[A-Z]\b)", el.titre, re.I):
+                    annexe = m.group(1)
+                    el.titre = el.titre[m.end(1) :]
+                else:
+                    annexe = "A"
             start = el.debut
             end = len(doc.contenu) if el.fin == -1 else el.fin
-            texte = make_texte(el.titre, doc.contenu[start:end])
-            if texte:
+            texte = make_texte(el.titre, doc.contenu[start:end], el.page)
+            if not texte:
+                continue
+            if el.type == "Annexe":
+                texte["annexe"] = annexe
+                if chapitre:
+                    chapitre["textes"][1] = len(doc_dict["textes"])
+                    chapitre = None
+                if section:
+                    section["textes"][1] = len(doc_dict["textes"])
+                    section = None
+                if sous_section:
+                    sous_section["textes"][1] = len(doc_dict["textes"])
+                    sous_section = None
+            else:
                 if chapitre:
                     texte["chapitre"] = chapitre_idx - 1
                 if section:

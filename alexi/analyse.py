@@ -53,6 +53,7 @@ class Element:
     debut: int
     fin: int
     sub: list["Element"]
+    page: int
 
 
 class Document:
@@ -63,7 +64,7 @@ class Document:
     def __init__(self) -> None:
         self.contenu: list[Bloc] = []
         self.paliers: defaultdict[str, list[Element]] = defaultdict(list)
-        doc = Element(type="Document", titre="", debut=0, fin=-1, sub=[])
+        doc = Element(type="Document", titre="", debut=0, fin=-1, sub=[], page=1)
         self.paliers["Document"].append(doc)
         self.meta = {}
 
@@ -76,6 +77,7 @@ class Document:
                 debut=len(self.contenu),
                 fin=-1,
                 sub=[],
+                page=bloc.page_number,
             )
             self.add_element(element)
         else:
