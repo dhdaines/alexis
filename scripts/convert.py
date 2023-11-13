@@ -7,6 +7,7 @@ Convertir les règlements en HTML structuré.
 import argparse
 import csv
 import itertools
+import json
 import logging
 import operator
 from pathlib import Path
@@ -16,7 +17,7 @@ from alexi.types import Bloc, T_bbox
 from alexi.analyse import Analyseur, group_iob
 from alexi.convert import Converteur, bbox_contains, bbox_overlaps
 from alexi.segment import Segmenteur
-from alexi.format import format_html, format_text
+from alexi.format import format_html, format_text, format_dict
 from alexi.label import Extracteur
 
 LOGGER = logging.getLogger("convert")
@@ -26,10 +27,16 @@ def make_argparse():
     """Make the argparse"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-o", "--outdir", help="Repertoire de sortie", type=Path, default="html"
+        "-o", "--outdir", help="Repertoire de sortie", type=Path, default="export"
     )
     parser.add_argument(
         "-v", "--verbose", help="Notification plus verbose", action="store_true"
+    )
+    parser.add_argument(
+        "-s",
+        "--serafim",
+        help="Générer le format JSON attendu par SÈRAFIM",
+        action="store_true",
     )
     parser.add_argument(
         "docs", help="Documents en PDF ou CSV pré-annoté", type=Path, nargs="+"
@@ -235,32 +242,49 @@ def main():
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
 
-        docdir = args.outdir / path.stem
-        LOGGER.info("Génération de pages HTML sous %s", docdir)
-        docdir.mkdir(exist_ok=True)
+        if args.serafim:
+            docdir = args.outdir / "data"
+            imgdir = args.outdir / "public" / "img" / path.stem
+            LOGGER.info("Génération de fichiers SÈRAFIM sous %s", docdir)
+            LOGGER.info("Extraction d'images sous %s", imgdir)
+            docdir.mkdir(exist_ok=True)
+            imgdir.mkdir(exist_ok=True)
+        else:
+            docdir = imgdir = args.outdir / path.stem
+            LOGGER.info("Génération de pages HTML sous %s", docdir)
+            docdir.mkdir(exist_ok=True)
 
         if conv:
             LOGGER.info("Extraction d'images de %s", path)
             blocs = list(group_iob(iob))
-            blocs = extract_images(blocs, conv, docdir)
+            blocs = extract_images(blocs, conv, imgdir)
             doc = analyseur(iob, blocs)
         else:
             LOGGER.info("Analyse de la structure de %s", path)
             doc = analyseur(iob)
 
-        for palier, elements in doc.paliers.items():
-            for idx, element in enumerate(elements):
-                if palier == "Document":
-                    element = None
-                    title = "index"
-                else:
-                    title = f"{palier}_{idx+1}"
-                with open(docdir / f"{title}.html", "wt") as outfh:
-                    LOGGER.info("Génération de %s/%s.html", docdir, title)
-                    outfh.write(format_html(doc, element=element))
-                with open(docdir / f"{title}.txt", "wt") as outfh:
-                    LOGGER.info("Génération de %s/%s.txt", docdir, title)
-                    outfh.write(format_text(doc, element=element))
+        if args.serafim:
+            # Generate legacy JSON for SERAFIM
+            with open(docdir / f"{path.stem}.json", "wt") as outfh:
+                LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
+                docdict = format_dict(doc, imgdir=path.stem)
+                docdict["fichier"] = pdf_path.name
+                json.dump(docdict, outfh, indent=2, ensure_ascii=False)
+        else:
+            # Generate HTML and Markdown
+            for palier, elements in doc.paliers.items():
+                for idx, element in enumerate(elements):
+                    if palier == "Document":
+                        element = None
+                        title = "index"
+                    else:
+                        title = f"{palier}_{idx+1}"
+                    with open(docdir / f"{title}.html", "wt") as outfh:
+                        LOGGER.info("Génération de %s/%s.html", docdir, title)
+                        outfh.write(format_html(doc, element=element))
+                    with open(docdir / f"{title}.txt", "wt") as outfh:
+                        LOGGER.info("Génération de %s/%s.txt", docdir, title)
+                        outfh.write(format_text(doc, element=element))
 
 
 if __name__ == "__main__":

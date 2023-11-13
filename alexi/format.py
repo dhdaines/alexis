@@ -146,6 +146,16 @@ def format_html(
     return "\n".join((doc_header, doc_body, doc_footer))
 
 
+MDHEADER = {
+    "Document": "#",
+    "Annexe": "#",
+    "Chapitre": "#",
+    "Section": "##",
+    "SousSection": "###",
+    "Article": "####",
+}
+
+
 def format_text(
     doc: Document,
     element: Optional[Element] = None,
@@ -154,14 +164,19 @@ def format_text(
 
     def bloc_text(bloc: Bloc) -> str:
         tag = BLOC[bloc.type]
-        if tag == "":
+        if tag in ("", "img"):
             return ""
         return "\n".join(
             " ".join(w["text"] for w in line) for line in line_breaks(bloc.contenu)
         )
 
     def element_text(el: Element) -> list[str]:
-        lines = [el.titre, "-" * len(el.titre), ""]
+        """Générer du texte (en fait du Markdown) d'un élément."""
+        header = MDHEADER[el.type]
+        lines = []
+        if el.titre:
+            lines.append(" ".join((header, el.titre)))
+            lines.append("")
         idx = el.debut
         fin = len(doc.contenu) if el.fin == -1 else el.fin
         subidx = 0
@@ -173,8 +188,10 @@ def format_text(
                 subidx += 1
                 sub = el.sub[subidx] if subidx < len(el.sub) else None
             else:
-                lines.append(bloc_text(doc.contenu[idx]))
-                lines.append("")
+                txt = bloc_text(doc.contenu[idx])
+                if txt:
+                    lines.append(txt)
+                    lines.append("")
                 idx += 1
         lines.append("")
         return lines
@@ -184,7 +201,7 @@ def format_text(
     return "\n".join(element_text(element))
 
 
-def format_dict(doc: Document) -> str:  # noqa: C901
+def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
     """Formatter un document en dictionnaire afin d'émettre un JSON pour
     utilisation dans SÈRAFIM"""
     # structure de base
@@ -198,26 +215,37 @@ def format_dict(doc: Document) -> str:  # noqa: C901
             "adoption": None,
         },
     }
+    if doc_dict.get("numero") is None and doc_dict.get("titre") is not None:
+        tokens = doc_dict["titre"].split()
+        for t in tokens:
+            if re.match(r".*\d\d", t) and re.match(r"^[0-9A-Z-]+$", t):
+                LOGGER.info("Quelque chose qui ressemble à un numéro: %s", t)
+                doc_dict["numero"] = t
 
-    def bloc_dict(bloc: Bloc) -> str:
+    def bloc_dict(bloc: Bloc) -> dict:
         tag = BLOC[bloc.type]
         if tag == "":
-            return ""
+            return {}
         elif tag == "img":
+            imgpath = "/".join((imgdir, bloc.img))
             if bloc.type == "Tableau":
-                return {"texte": bloc.texte, "tableau": bloc.img}
+                return {"texte": bloc.texte, "tableau": imgpath}
             else:
-                return {"texte": bloc.texte, "figure": bloc.img}
+                return {"texte": bloc.texte, "figure": imgpath}
         else:
             return {"texte": bloc.texte}
 
     # group together "contenu" as "texte" (they are not the same thing)
     def make_texte(titre: str, contenus: Sequence[Bloc]) -> dict:
-        # FIXME: Handle images, etc
+        contenu = []
+        for bloc in contenus:
+            bd = bloc_dict(bloc)
+            if bd:
+                contenu.append(bd)
         texte = {
             "titre": titre,
             "pages": [int(contenus[0].page_number), int(contenus[-1].page_number)],
-            "contenu": [bloc_dict(bloc) for bloc in contenus],
+            "contenu": contenu,
         }
         if m := re.match(r"(?:article )?(\d+)", titre, re.I):
             texte["article"] = int(m.group(1))
@@ -247,6 +275,7 @@ def format_dict(doc: Document) -> str:  # noqa: C901
                 chapitre_idx += 1
                 if m := re.match(r"(?:chapitre )?(\d+|[XIV]+)", el.titre, re.I):
                     chapitre_numero = m.group(1)
+                    el.titre = el.titre[m.end(1) :]
                 else:
                     chapitre_numero = "%d" % chapitre_idx
                 first_page = int(doc.contenu[el.debut].page_number)
@@ -271,6 +300,7 @@ def format_dict(doc: Document) -> str:  # noqa: C901
                 section_idx += 1
                 if m := re.match(r"(?:section )?(\d+|[XIV]+)", el.titre, re.I):
                     section_numero = m.group(1)
+                    el.titre = el.titre[m.end(1) :]
                 else:
                     section_numero = "%d" % section_idx
                 first_page = int(doc.contenu[el.debut].page_number)
@@ -293,6 +323,7 @@ def format_dict(doc: Document) -> str:  # noqa: C901
                 sous_section_idx += 1
                 if m := re.match(r"(?:sous-section )?([\d\.]+)", el.titre, re.I):
                     sous_section_numero = m.group(1)
+                    el.titre = el.titre[m.end(1) :]
                 else:
                     sous_section_numero = "%d" % sous_section_idx
                 first_page = int(doc.contenu[el.debut].page_number)
