@@ -14,7 +14,7 @@ from typing import Any, Iterable, Iterator
 
 from alexi.types import Bloc, T_bbox
 from alexi.analyse import Analyseur, group_iob
-from alexi.convert import Converteur, bbox_contains
+from alexi.convert import Converteur, bbox_contains, bbox_overlaps
 from alexi.segment import Segmenteur
 from alexi.format import format_html, format_text
 from alexi.label import Extracteur
@@ -93,37 +93,70 @@ def insert_outside_blocs(
         page_blocs = list(group)
         page_insert_blocs = insert_blocs[page]
         if len(page_blocs) == 0:
-            yield from insert_blocs[page]
-        else:
-            top_bloc = page_blocs[0]
-            bottom_bloc = page_blocs[-1]
+            yield from page_insert_blocs
+            continue
+        top_bloc = page_blocs[0]
+        bottom_bloc = page_blocs[-1]
+        inserted_blocs = set()
+        for bloc in page_insert_blocs:
+            if bloc in inserted_blocs:
+                continue
+            if bbox_above(bloc.bbox, top_bloc.bbox):
+                LOGGER.info(
+                    "inserted non-text bloc %s at top of page %d",
+                    bloc.bbox,
+                    bloc.page_number,
+                )
+                inserted_blocs.add(bloc)
+                yield bloc
+        for bloc_a, bloc_b in itertools.pairwise(page_blocs):
+            yield bloc_a
             for bloc in page_insert_blocs:
-                if bbox_above(bloc.bbox, top_bloc.bbox):
+                if bloc in inserted_blocs:
+                    continue
+                if bbox_between(bloc.bbox, bloc_a.bbox, bloc_b.bbox):
                     LOGGER.info(
-                        "inserted non-text bloc %s at top of page %d",
+                        "inserted non-text bloc %s inside page %d",
                         bloc.bbox,
                         bloc.page_number,
                     )
+                    inserted_blocs.add(bloc)
                     yield bloc
-            for bloc_a, bloc_b in itertools.pairwise(page_blocs):
-                yield bloc_a
-                for bloc in page_insert_blocs:
-                    if bbox_between(bloc.bbox, bloc_a.bbox, bloc_b.bbox):
-                        LOGGER.info(
-                            "inserted non-text bloc %s inside page %d",
-                            bloc.bbox,
-                            bloc.page_number,
-                        )
-                        yield bloc
-            yield bloc_b
-            for bloc in page_insert_blocs:
-                if bbox_below(bloc.bbox, bottom_bloc.bbox):
+                elif bbox_overlaps(bloc.bbox, bloc_a.bbox) and bbox_above(
+                    bloc.bbox, bloc_b.bbox
+                ):
                     LOGGER.info(
-                        "inserted non-text bloc %s at bottom page %d",
+                        "inserted non-text bloc %s (overlaps %s, above %s) page %d",
                         bloc.bbox,
+                        bloc_a.bbox,
+                        bloc_b.bbox,
                         bloc.page_number,
                     )
+                    inserted_blocs.add(bloc)
                     yield bloc
+                elif bbox_overlaps(bloc.bbox, bloc_b.bbox) and bbox_below(
+                    bloc.bbox, bloc_a.bbox
+                ):
+                    LOGGER.info(
+                        "inserted non-text bloc %s (overlaps %s, below %s) page %d",
+                        bloc.bbox,
+                        bloc_b.bbox,
+                        bloc_a.bbox,
+                        bloc.page_number,
+                    )
+                    inserted_blocs.add(bloc)
+                    yield bloc
+        yield bloc_b
+        for bloc in page_insert_blocs:
+            if bloc in inserted_blocs:
+                continue
+            if bbox_below(bloc.bbox, bottom_bloc.bbox):
+                LOGGER.info(
+                    "inserted non-text bloc %s at bottom page %d",
+                    bloc.bbox,
+                    bloc.page_number,
+                )
+                yield bloc
 
 
 def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterator[Bloc]:
@@ -139,15 +172,32 @@ def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterato
     for idx, bloc in enumerate(blocs):
         if bloc in replace_blocs:
             blocs[idx] = replace_blocs[bloc]
-    # Find ones not linked to any text into document structure
+    # Find ones not linked to any text and not contained in existing blocs
     insert_blocs = {}
     for bloc in struct_blocs:
-        if not bloc.contenu:
+        if bloc.contenu:
+            continue
+        is_contained = False
+        for outer_bloc in images.setdefault(bloc.page_number, []):
+            if bbox_contains(outer_bloc.bbox, bloc.bbox):
+                is_contained = True
+                break
+        for outer_bloc in struct_blocs:
+            if outer_bloc is bloc or outer_bloc.page_number != bloc.page_number:
+                continue
+            if bbox_contains(outer_bloc.bbox, bloc.bbox):
+                is_contained = True
+                break
+        if not is_contained:
             insert_blocs.setdefault(bloc.page_number, []).append(bloc)
-            images.setdefault(bloc.page_number, []).append(bloc)
+            images[bloc.page_number].append(bloc)
     # Render image files
     for page_number, image_blocs in images.items():
         for bloc in image_blocs:
+            x0, top, x1, bottom = bloc.bbox
+            if x0 == x1 or top == bottom:
+                LOGGER.warning("Skipping empty image bbox %s", bloc.bbox)
+                continue
             img = (
                 conv.pdf.pages[page_number - 1]
                 .crop(bloc.bbox)
