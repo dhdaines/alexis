@@ -164,10 +164,10 @@ def make_argparse() -> argparse.ArgumentParser:
         default="ville.sainte-adele.qc.ca/publications.php",
     )
     select.add_argument(
-        "-s",
-        "--section",
+        "section",
         help="Expression régulière pour sélectionner la section des documents",
         default=r"règlements",
+        nargs="?",
     )
     select.set_defaults(func=select_main)
 
