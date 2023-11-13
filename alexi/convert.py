@@ -181,6 +181,10 @@ class Converteur:
             # Index characters for lookup
             chars = dict(((c["x0"], c["top"]), c) for c in page.chars)
             for word in words:
+                if word["x0"] < 0 or word["top"] < 0:
+                    continue
+                if word["x1"] > page.width or word["bottom"] > page.height:
+                    continue
                 yield get_word_features(word, page, chars, elmap)
 
     def make_bloc(
