@@ -70,17 +70,6 @@ def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> 
         return objects_to_bbox(mcid_objs)
 
 
-def add_margin(bbox: T_bbox, page: Page, margin: int):
-    """Ajouter une marge autour d'un BBox"""
-    x0, top, x1, bottom = bbox
-    return (
-        max(0, x0 - margin),
-        max(0, top - margin),
-        min(page.width, x1 + margin),
-        min(page.height, bottom + margin),
-    )
-
-
 def get_rgb(c: dict) -> str:
     """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
