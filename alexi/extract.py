@@ -255,66 +255,41 @@ def extract_html(args, path, iob, conv):
     else:
         LOGGER.info("Analyse de la structure de %s", path)
         doc = analyseur(iob)
-    # Extract the various constituents, referencing images in the
-    # generated image directory.
+
+    def extract_element(el, path):
+        """Extract the various constituents, referencing images in the
+        generated image directory."""
+        outdir = docdir / path
+        outdir.mkdir(parents=True, exist_ok=True)
+        LOGGER.info("%s %s", outdir, el.titre)
+        # Can't use Path.relative_to until 3.12 :(
+        rel_imgdir = os.path.relpath(imgdir, outdir)
+        with open(outdir / "index.html", "wt") as outfh:
+            outfh.write(format_html(doc, element=el, imgdir=rel_imgdir))
+        with open(outdir / "index.md", "wt") as outfh:
+            outfh.write(format_text(doc, element=el))
+
+    # Do articles/annexes at top level
     seen_paliers = set()
     for palier in ("Article", "Annexe"):
         if palier not in doc.paliers:
             continue
-        LOGGER.info("%s", palier)
         seen_paliers.add(palier)
         # These go in the top level
         for idx, el in enumerate(doc.paliers[palier]):
-            # For the moment, use regular expressions to get
-            # chapter/section/article numbers
-            outdir = docdir / palier / el.numero
-            outdir.mkdir(parents=True, exist_ok=True)
-            LOGGER.info(
-                "%s numero %s titre %s page %d",
-                outdir,
-                el.numero,
-                el.titre,
-                el.page,
-            )
-            # Can't use Path.relative_to until 3.12 :(
-            rel_imgdir = os.path.relpath(imgdir, outdir)
-            LOGGER.info("imgdir %s", rel_imgdir)
-            with open(outdir / "index.html", "wt") as outfh:
-                outfh.write(format_html(doc, element=el, imgdir=rel_imgdir))
-            with open(outdir / "index.md", "wt") as outfh:
-                outfh.write(format_text(doc, element=el))
-
-    # Find the top level of the hierarchy under Document and start
-    # there for everything else, if necessary
+            extract_element(el, docdir / palier / el.numero)
+    # Now do the rest of the Document hierarchy if it exists
     top = Path(".")
     d = deque((el, idx, top) for idx, el in enumerate(doc.structure.sub))
     while d:
         el, idx, parent = d.popleft()
         if el.type in seen_paliers:
             continue
-        outdir = docdir / parent / el.type / el.numero
-        outdir.mkdir(parents=True, exist_ok=True)
-        LOGGER.info(
-            "%s numero %s titre %s page %d",
-            outdir,
-            el.numero,
-            el.titre,
-            el.page,
-        )
-        # Can't use Path.relative_to until 3.12 :(
-        rel_imgdir = os.path.relpath(imgdir, outdir)
-        LOGGER.info("imgdir %s", rel_imgdir)
-        with open(outdir / "index.html", "wt") as outfh:
-            outfh.write(format_html(doc, element=el, imgdir=rel_imgdir))
-        with open(outdir / "index.md", "wt") as outfh:
-            outfh.write(format_text(doc, element=el))
+        extract_element(el, parent / el.type / el.numero)
         d.extendleft(
             (subel, idx, parent / el.type / el.numero)
             for idx, subel in reversed(list(enumerate(el.sub)))
         )
-
-    # Depending on how big it might get, make a top-level index.html
-    # with everything or just links to chapters/annexes
 
 
 def main(args):
