@@ -199,15 +199,18 @@ def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterato
             images[bloc.page_number].append(bloc)
     # Render image files
     for page_number, image_blocs in images.items():
+        page = conv.pdf.pages[page_number - 1]
         for bloc in image_blocs:
             x0, top, x1, bottom = bloc.bbox
             if x0 == x1 or top == bottom:
                 LOGGER.warning("Skipping empty image bbox %s", bloc.bbox)
                 continue
-            img = (
-                conv.pdf.pages[page_number - 1]
-                .crop(bloc.bbox)
-                .to_image(resolution=150, antialias=True)
+            x0 = max(0, x0)
+            top = max(0, top)
+            x1 = min(page.width, x1)
+            bottom = min(page.height, bottom)
+            img = page.crop((x0, top, x1, bottom)).to_image(
+                resolution=150, antialias=True
             )
             LOGGER.info("Extraction de %s", docdir / bloc.img)
             img.save(docdir / bloc.img)
@@ -256,10 +259,9 @@ def extract_html(args, path, iob, conv):
         LOGGER.info("Analyse de la structure de %s", path)
         doc = analyseur(iob)
 
-    def extract_element(el, path):
+    def extract_element(el, outdir):
         """Extract the various constituents, referencing images in the
         generated image directory."""
-        outdir = docdir / path
         outdir.mkdir(parents=True, exist_ok=True)
         LOGGER.info("%s %s", outdir, el.titre)
         # Can't use Path.relative_to until 3.12 :(
@@ -279,7 +281,7 @@ def extract_html(args, path, iob, conv):
         for idx, el in enumerate(doc.paliers[palier]):
             extract_element(el, docdir / palier / el.numero)
     # Now do the rest of the Document hierarchy if it exists
-    top = Path(".")
+    top = Path(docdir)
     d = deque((el, idx, top) for idx, el in enumerate(doc.structure.sub))
     while d:
         el, idx, parent = d.popleft()
@@ -290,6 +292,8 @@ def extract_html(args, path, iob, conv):
             (subel, idx, parent / el.type / el.numero)
             for idx, subel in reversed(list(enumerate(el.sub)))
         )
+    # And do a full extraction (which might crash your browser)
+    extract_element(doc.structure, docdir)
 
 
 def main(args):

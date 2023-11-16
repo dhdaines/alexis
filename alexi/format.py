@@ -112,15 +112,21 @@ def format_html(
             return f"<{tag}>{bloc.texte}</{tag}>"
 
     def element_html(el: Element, indent: int = 2, offset: int = 0) -> list[str]:
-        spacing = " " * offset
-        subspacing = " " * (offset + indent)
+        off = " " * offset
+        sp = " " * indent
         tag = TAG[el.type]
         header = HEADER[el.type]
-        lines = [spacing + f"<{tag}>"]
+        lines = [f'{off}<{tag} class="{el.type}">']
         if el.numero and offset:
-            lines.append(subspacing + f'<a name="{el.type}/{el.numero}"></a>')
+            lines.append(
+                f'{off}{sp}<a class="anchor" name="{el.type}/{el.numero}"></a>'
+            )
         if el.titre:
-            lines.append(subspacing + f"<{header}>{el.titre}</{header}>")
+            lines.append(f'{off}{sp}<{header} class="header">')
+            lines.append(f'{off}{sp}{sp}<span class="level">{el.type}</span>')
+            lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
+            lines.append(f'{off}{sp}{sp}<span class="title">{el.titre}</span>')
+            lines.append(f"{off}{sp}</{header}>")
         idx = el.debut
         fin = len(doc.contenu) if el.fin == -1 else el.fin
         subidx = 0
@@ -134,9 +140,9 @@ def format_html(
             else:
                 html = bloc_html(doc.contenu[idx])
                 if html:
-                    lines.append(subspacing + html)
+                    lines.append(off + sp + html)
                 idx += 1
-        lines.append(spacing + f"</{tag}>")
+        lines.append(off + f"</{tag}>")
         return lines
 
     if element is not None:

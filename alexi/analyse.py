@@ -59,9 +59,9 @@ class Element:
 
 
 ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"
-DOTSPACEDASH = r"(?:\.|\s*[—–-]| )"
+DOTSPACEDASH = r"(?:\.|\s*[:—–-]| )"
 NUM = r"(\d+)"
-NUMDOT = r"(?:\d+\.)+(\d+)"
+NUMDOT = r"((?:\d+\.)+\d+)"
 ALPHA = r"[A-Z]"
 ROMAN = r"[XIV]+"
 NUMRE = re.compile(
@@ -75,6 +75,7 @@ NUMRE = re.compile(
     r")"
     r"\s*"
 )
+NUMENDRE = re.compile(rf".*\b{NUM}{DOTSPACEDASH}\s*$")
 
 
 class Document:
@@ -96,16 +97,19 @@ class Document:
         """Extraire le numero d'un article/chapitre/section/annexe, si possible."""
         # FIXME: UNIT TEST THIS!!!
         if m := NUMRE.match(titre):
-            if m.group(1):  # sous section x.y.(z)
+            if m.group(1):  # sous section (x.y.z)
                 numero = m.group(1)
-            elif m.group(2):  # article (x).
+            elif m.group(2):  # article (x)
                 numero = m.group(2)
-            elif m.group(3):  # annexe A -
+            elif m.group(3):  # annexe (A), chapitre (III)
                 numero = m.group(3)
             else:
                 numero = str(self.unknown_id)
                 self.unknown_id += 1
             titre = titre[m.end(0) :]
+        elif m := NUMENDRE.match(titre):
+            numero = m.group(1)
+            titre = titre[: m.start(1)]
         else:
             numero = str(self.unknown_id)
             self.unknown_id += 1
