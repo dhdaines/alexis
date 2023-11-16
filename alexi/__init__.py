@@ -25,41 +25,9 @@ from .label import Extracteur
 from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
-from . import extract
+from . import extract, download
 
 LOGGER = logging.getLogger("alexi")
-
-
-def download_main(args):
-    """Télécharger les fichiers avec wget"""
-    try:
-        subprocess.run(
-            [
-                "wget",
-                "--no-check-certificate",
-                "--timestamping",
-                "--recursive",
-                "--level=1",
-                "--accept-regex",
-                r".*upload/documents/.*\.pdf",
-                "https://ville.sainte-adele.qc.ca/publications.php",
-            ],
-            check=True,
-        )
-    except subprocess.CalledProcessError as err:
-        if err.returncode != 8:
-            raise
-
-
-def select_main(args):
-    """Trouver une liste de fichiers dans la page web des documents."""
-    with open(args.infile) as infh:
-        soup = BeautifulSoup(infh, "lxml")
-        for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
-            ul = h2.find_next("ul")
-            for li in ul.find_all("li"):
-                path = Path(li.a["href"])
-                print(path.relative_to("/"))
 
 
 def write_csv(
@@ -152,27 +120,11 @@ def make_argparse() -> argparse.ArgumentParser:
         "-v", "--verbose", help="Émettre des messages", action="store_true"
     )
     subp = parser.add_subparsers(required=True)
-    subp.add_parser(
+    download_command = subp.add_parser(
         "download", help="Télécharger les documents plus récents du site web"
-    ).set_defaults(func=download_main)
-
-    select = subp.add_parser(
-        "select", help="Générer la liste de documents pour une ou plusieurs catégories"
     )
-    select.add_argument(
-        "-i",
-        "--infile",
-        help="Page HTML avec liste de publications",
-        type=Path,
-        default="ville.sainte-adele.qc.ca/publications.php",
-    )
-    select.add_argument(
-        "section",
-        help="Expression régulière pour sélectionner la section des documents",
-        default=r"règlements",
-        nargs="?",
-    )
-    select.set_defaults(func=select_main)
+    download.add_arguments(download_command)
+    download_command.set_defaults(func=download.main)
 
     convert = subp.add_parser(
         "convert", help="Convertir le texte et les objets des fichiers PDF en CSV"
