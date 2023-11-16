@@ -117,6 +117,8 @@ def format_html(
         tag = TAG[el.type]
         header = HEADER[el.type]
         lines = [spacing + f"<{tag}>"]
+        if el.numero and offset:
+            lines.append(subspacing + f'<a name="{el.type}/{el.numero}"></a>')
         if el.titre:
             lines.append(subspacing + f"<{header}>{el.titre}</{header}>")
         idx = el.debut

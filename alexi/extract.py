@@ -9,13 +9,12 @@ import json
 import logging
 import operator
 import os
-import re
 from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from alexi.types import Bloc, T_bbox
-from alexi.analyse import Analyseur, group_iob, Element
+from alexi.analyse import Analyseur, group_iob
 from alexi.convert import Converteur, bbox_contains, bbox_overlaps
 from alexi.segment import Segmenteur
 from alexi.format import format_html, format_text, format_dict
@@ -241,40 +240,6 @@ def extract_serafim(args, path, iob, conv):
         json.dump(docdict, outfh, indent=2, ensure_ascii=False)
 
 
-ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"
-DOTSPACEDASH = r"(?:\.|\s*[—–-]| )"
-NUM = r"(\d+)"
-NUMDOT = r"(?:\d+\.)+(\d+)"
-ALPHA = r"[A-Z]"
-ROMAN = r"[XIV]+"
-NUMRE = re.compile(
-    rf"{ELTYPE}?\s*"
-    r"(?:"
-    rf"{NUMDOT}{DOTSPACEDASH}?"
-    r"|"
-    rf"{NUM}{DOTSPACEDASH}?"
-    r"|"
-    rf"({ALPHA}|{ROMAN}){DOTSPACEDASH}"
-    r")"
-    r"\s*"
-)
-
-
-def extract_numero(el: Element, default: str) -> str:
-    """Extraire le numero d'un article/chapitre/section/annexe, si possible."""
-    # FIXME: UNIT TEST THIS!!!
-    numero = default
-    if m := NUMRE.match(el.titre):
-        if m.group(1):  # sous section x.y.(z)
-            numero = m.group(1)
-        elif m.group(2):  # article (x).
-            numero = m.group(2)
-        elif m.group(3):  # annexe A -
-            numero = m.group(3)
-        el.titre = el.titre[m.end(0) :]
-    return numero
-
-
 def extract_html(args, path, iob, conv):
     docdir = args.outdir / path.stem
     imgdir = args.outdir / path.stem / "img"
@@ -302,13 +267,12 @@ def extract_html(args, path, iob, conv):
         for idx, el in enumerate(doc.paliers[palier]):
             # For the moment, use regular expressions to get
             # chapter/section/article numbers
-            numero = extract_numero(el, f"_{idx}")
-            outdir = docdir / palier / numero
+            outdir = docdir / palier / el.numero
             outdir.mkdir(parents=True, exist_ok=True)
             LOGGER.info(
                 "%s numero %s titre %s page %d",
                 outdir,
-                numero,
+                el.numero,
                 el.titre,
                 el.page,
             )
@@ -328,13 +292,12 @@ def extract_html(args, path, iob, conv):
         el, idx, parent = d.popleft()
         if el.type in seen_paliers:
             continue
-        numero = extract_numero(el, f"_{idx}")
-        outdir = docdir / parent / el.type / numero
+        outdir = docdir / parent / el.type / el.numero
         outdir.mkdir(parents=True, exist_ok=True)
         LOGGER.info(
             "%s numero %s titre %s page %d",
             outdir,
-            numero,
+            el.numero,
             el.titre,
             el.page,
         )
@@ -346,7 +309,7 @@ def extract_html(args, path, iob, conv):
         with open(outdir / "index.md", "wt") as outfh:
             outfh.write(format_text(doc, element=el))
         d.extendleft(
-            (subel, idx, parent / el.type / numero)
+            (subel, idx, parent / el.type / el.numero)
             for idx, subel in reversed(list(enumerate(el.sub)))
         )
 

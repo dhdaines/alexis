@@ -5,6 +5,7 @@ Analyser un document étiquetté pour en extraire la structure.
 import itertools
 import logging
 import operator
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Optional
@@ -50,30 +51,74 @@ PALIERS = [
 class Element:
     type: str
     titre: str
+    numero: str
     debut: int
     fin: int
     sub: list["Element"]
     page: int
 
 
+ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"
+DOTSPACEDASH = r"(?:\.|\s*[—–-]| )"
+NUM = r"(\d+)"
+NUMDOT = r"(?:\d+\.)+(\d+)"
+ALPHA = r"[A-Z]"
+ROMAN = r"[XIV]+"
+NUMRE = re.compile(
+    rf"{ELTYPE}?\s*"
+    r"(?:"
+    rf"{NUMDOT}{DOTSPACEDASH}?"
+    r"|"
+    rf"{NUM}{DOTSPACEDASH}?"
+    r"|"
+    rf"({ALPHA}|{ROMAN}){DOTSPACEDASH}"
+    r")"
+    r"\s*"
+)
+
+
 class Document:
     """Document avec blocs de texte et structure."""
 
     meta: dict[str, str]
+    unknown_id: int = 0
 
     def __init__(self) -> None:
         self.contenu: list[Bloc] = []
         self.paliers: defaultdict[str, list[Element]] = defaultdict(list)
-        doc = Element(type="Document", titre="", debut=0, fin=-1, sub=[], page=1)
+        doc = Element(
+            type="Document", titre="", numero="", debut=0, fin=-1, sub=[], page=1
+        )
         self.paliers["Document"].append(doc)
         self.meta = {}
+
+    def extract_numero(self, titre: str) -> str:
+        """Extraire le numero d'un article/chapitre/section/annexe, si possible."""
+        # FIXME: UNIT TEST THIS!!!
+        if m := NUMRE.match(titre):
+            if m.group(1):  # sous section x.y.(z)
+                numero = m.group(1)
+            elif m.group(2):  # article (x).
+                numero = m.group(2)
+            elif m.group(3):  # annexe A -
+                numero = m.group(3)
+            else:
+                numero = str(self.unknown_id)
+                self.unknown_id += 1
+            titre = titre[m.end(0) :]
+        else:
+            numero = str(self.unknown_id)
+            self.unknown_id += 1
+        return numero, titre
 
     def add_bloc(self, bloc: Bloc):
         """Ajouter un bloc de texte."""
         if bloc.type in PALIERS:
+            numero, titre = self.extract_numero(bloc.texte)
             element = Element(
                 type=bloc.type,
-                titre=bloc.texte,
+                titre=titre,
+                numero=numero,
                 debut=len(self.contenu),
                 fin=-1,
                 sub=[],
