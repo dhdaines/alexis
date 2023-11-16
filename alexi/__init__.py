@@ -6,7 +6,6 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
-import itertools
 import json
 import logging
 import re
@@ -26,6 +25,7 @@ from .label import Extracteur
 from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
+from . import extract
 
 LOGGER = logging.getLogger("alexi")
 
@@ -124,11 +124,14 @@ def html_main(args):
 
 def json_main(args):
     """Convertir un CSV segmenté et étiquetté en JSON"""
-    reader = csv.DictReader(args.csv)
+    iob = csv.DictReader(args.csv)
+    analyseur = Analyseur()
     if args.images:
         with open(args.images, "rt") as infh:
             images = json.load(infh)
-    doc = Analyseur()(reader)
+            doc = analyseur(iob, images)
+    else:
+        doc = analyseur(iob)
     print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
 
@@ -236,6 +239,13 @@ def make_argparse() -> argparse.ArgumentParser:
         "--images", help="Répertoire contenant les images des tableaux", type=Path
     )
     jsonf.set_defaults(func=json_main)
+
+    extract_command = subp.add_parser(
+        "extract",
+        help="Extraire la structure complète de fichiers PDF",
+    )
+    extract.add_arguments(extract_command)
+    extract_command.set_defaults(func=extract.main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"

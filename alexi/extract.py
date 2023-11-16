@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 """
-Convertir les règlements en HTML structuré.
+Convertir les règlements en HTML, texte, et/ou JSON structuré.
 """
 
 import argparse
@@ -10,27 +8,29 @@ import itertools
 import json
 import logging
 import operator
+import os
+import re
+from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from alexi.types import Bloc, T_bbox
-from alexi.analyse import Analyseur, group_iob
+from alexi.analyse import Analyseur, group_iob, Element
 from alexi.convert import Converteur, bbox_contains, bbox_overlaps
 from alexi.segment import Segmenteur
 from alexi.format import format_html, format_text, format_dict
 from alexi.label import Extracteur
 
-LOGGER = logging.getLogger("convert")
+LOGGER = logging.getLogger("extract")
 
 
-def make_argparse():
-    """Make the argparse"""
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add the arguments to the argparse"""
     parser.add_argument(
         "-o", "--outdir", help="Repertoire de sortie", type=Path, default="export"
     )
     parser.add_argument(
-        "-v", "--verbose", help="Notification plus verbose", action="store_true"
+        "-n", "--no-images", help="Ne pas extraire les images", action="store_true"
     )
     parser.add_argument(
         "-s",
@@ -216,14 +216,147 @@ def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterato
     return insert_outside_blocs(blocs, insert_blocs)
 
 
-def main():
-    parser = make_argparse()
-    args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
+def extract_serafim(args, path, iob, conv):
+    docdir = args.outdir / "data"
+    imgdir = args.outdir / "public" / "img" / path.stem
+    LOGGER.info("Génération de fichiers SÈRAFIM sous %s", docdir)
+    docdir.mkdir(parents=True, exist_ok=True)
+    analyseur = Analyseur()
+    if not args.no_images:
+        LOGGER.info("Extraction d'images sous %s", imgdir)
+        imgdir.mkdir(parents=True, exist_ok=True)
+    if conv and not args.no_images:
+        LOGGER.info("Extraction d'images de %s", path)
+        blocs = list(group_iob(iob))
+        blocs = extract_images(blocs, conv, imgdir)
+        doc = analyseur(iob, blocs)
+    else:
+        LOGGER.info("Analyse de la structure de %s", path)
+        doc = analyseur(iob)
+    with open(docdir / f"{path.stem}.json", "wt") as outfh:
+        LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
+        docdict = format_dict(doc, imgdir=path.stem)
+        pdf_path = path.with_suffix(".pdf")
+        docdict["fichier"] = pdf_path.name
+        json.dump(docdict, outfh, indent=2, ensure_ascii=False)
 
+
+ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"
+DOTSPACEDASH = r"(?:\.|\s*[—–-]| )"
+NUM = r"(\d+)"
+NUMDOT = r"(?:\d+\.)+(\d+)"
+ALPHA = r"[A-Z]"
+ROMAN = r"[XIV]+"
+NUMRE = re.compile(
+    rf"{ELTYPE}?\s*"
+    r"(?:"
+    rf"{NUMDOT}{DOTSPACEDASH}?"
+    r"|"
+    rf"{NUM}{DOTSPACEDASH}?"
+    r"|"
+    rf"({ALPHA}|{ROMAN}){DOTSPACEDASH}"
+    r")"
+    r"\s*"
+)
+
+
+def extract_numero(el: Element, default: str) -> str:
+    """Extraire le numero d'un article/chapitre/section/annexe, si possible."""
+    # FIXME: UNIT TEST THIS!!!
+    numero = default
+    if m := NUMRE.match(el.titre):
+        if m.group(1):  # sous section x.y.(z)
+            numero = m.group(1)
+        elif m.group(2):  # article (x).
+            numero = m.group(2)
+        elif m.group(3):  # annexe A -
+            numero = m.group(3)
+        el.titre = el.titre[m.end(0) :]
+    return numero
+
+
+def extract_html(args, path, iob, conv):
+    docdir = args.outdir / path.stem
+    imgdir = args.outdir / path.stem / "img"
+    LOGGER.info("Génération de pages HTML sous %s", docdir)
+    docdir.mkdir(parents=True, exist_ok=True)
+    analyseur = Analyseur()
+    if conv and not args.no_images:
+        LOGGER.info("Extraction d'images sous %s", imgdir)
+        imgdir.mkdir(parents=True, exist_ok=True)
+        blocs = list(group_iob(iob))
+        blocs = extract_images(blocs, conv, imgdir)
+        doc = analyseur(iob, blocs)
+    else:
+        LOGGER.info("Analyse de la structure de %s", path)
+        doc = analyseur(iob)
+    # Extract the various constituents, referencing images in the
+    # generated image directory.
+    seen_paliers = set()
+    for palier in ("Article", "Annexe"):
+        if palier not in doc.paliers:
+            continue
+        LOGGER.info("%s", palier)
+        seen_paliers.add(palier)
+        # These go in the top level
+        for idx, el in enumerate(doc.paliers[palier]):
+            # For the moment, use regular expressions to get
+            # chapter/section/article numbers
+            numero = extract_numero(el, f"_{idx}")
+            outdir = docdir / palier / numero
+            outdir.mkdir(parents=True, exist_ok=True)
+            LOGGER.info(
+                "%s numero %s titre %s page %d",
+                outdir,
+                numero,
+                el.titre,
+                el.page,
+            )
+            # Can't use Path.relative_to until 3.12 :(
+            rel_imgdir = os.path.relpath(imgdir, outdir)
+            LOGGER.info("imgdir %s", rel_imgdir)
+            with open(outdir / "index.html", "wt") as outfh:
+                outfh.write(format_html(doc, element=el, imgdir=rel_imgdir))
+            with open(outdir / "index.md", "wt") as outfh:
+                outfh.write(format_text(doc, element=el))
+
+    # Find the top level of the hierarchy under Document and start
+    # there for everything else, if necessary
+    top = Path(".")
+    d = deque((el, idx, top) for idx, el in enumerate(doc.structure.sub))
+    while d:
+        el, idx, parent = d.popleft()
+        if el.type in seen_paliers:
+            continue
+        numero = extract_numero(el, f"_{idx}")
+        outdir = docdir / parent / el.type / numero
+        outdir.mkdir(parents=True, exist_ok=True)
+        LOGGER.info(
+            "%s numero %s titre %s page %d",
+            outdir,
+            numero,
+            el.titre,
+            el.page,
+        )
+        # Can't use Path.relative_to until 3.12 :(
+        rel_imgdir = os.path.relpath(imgdir, outdir)
+        LOGGER.info("imgdir %s", rel_imgdir)
+        with open(outdir / "index.html", "wt") as outfh:
+            outfh.write(format_html(doc, element=el, imgdir=rel_imgdir))
+        with open(outdir / "index.md", "wt") as outfh:
+            outfh.write(format_text(doc, element=el))
+        d.extendleft(
+            (subel, idx, parent / el.type / numero)
+            for idx, subel in reversed(list(enumerate(el.sub)))
+        )
+
+    # Depending on how big it might get, make a top-level index.html
+    # with everything or just links to chapters/annexes
+
+
+def main(args):
     crf = None
     extracteur = Extracteur()
-    analyseur = Analyseur()
     args.outdir.mkdir(parents=True, exist_ok=True)
     for path in args.docs:
         conv = None
@@ -241,51 +374,19 @@ def main():
         pdf_path = path.with_suffix(".pdf")
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
-
         if args.serafim:
-            docdir = args.outdir / "data"
-            imgdir = args.outdir / "public" / "img" / path.stem
-            LOGGER.info("Génération de fichiers SÈRAFIM sous %s", docdir)
-            LOGGER.info("Extraction d'images sous %s", imgdir)
-            docdir.mkdir(parents=True, exist_ok=True)
-            imgdir.mkdir(parents=True, exist_ok=True)
+            extract_serafim(args, path, iob, conv)
         else:
-            docdir = imgdir = args.outdir / path.stem
-            LOGGER.info("Génération de pages HTML sous %s", docdir)
-            docdir.mkdir(parents=True, exist_ok=True)
-
-        if conv:
-            LOGGER.info("Extraction d'images de %s", path)
-            blocs = list(group_iob(iob))
-            blocs = extract_images(blocs, conv, imgdir)
-            doc = analyseur(iob, blocs)
-        else:
-            LOGGER.info("Analyse de la structure de %s", path)
-            doc = analyseur(iob)
-
-        if args.serafim:
-            # Generate legacy JSON for SERAFIM
-            with open(docdir / f"{path.stem}.json", "wt") as outfh:
-                LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
-                docdict = format_dict(doc, imgdir=path.stem)
-                docdict["fichier"] = pdf_path.name
-                json.dump(docdict, outfh, indent=2, ensure_ascii=False)
-        else:
-            # Generate HTML and Markdown
-            for palier, elements in doc.paliers.items():
-                for idx, element in enumerate(elements):
-                    if palier == "Document":
-                        element = None
-                        title = "index"
-                    else:
-                        title = f"{palier}_{idx+1}"
-                    with open(docdir / f"{title}.html", "wt") as outfh:
-                        LOGGER.info("Génération de %s/%s.html", docdir, title)
-                        outfh.write(format_html(doc, element=element))
-                    with open(docdir / f"{title}.txt", "wt") as outfh:
-                        LOGGER.info("Génération de %s/%s.txt", docdir, title)
-                        outfh.write(format_text(doc, element=element))
+            extract_html(args, path, iob, conv)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    add_arguments(parser)
+    # Done by top-level alexi if not running this as script
+    parser.add_argument(
+        "-v", "--verbose", help="Notification plus verbose", action="store_true"
+    )
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
+    main(args)

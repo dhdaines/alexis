@@ -77,7 +77,7 @@ class Document:
                 debut=len(self.contenu),
                 fin=-1,
                 sub=[],
-                page=bloc.page_number,
+                page=int(bloc.page_number),
             )
             self.add_element(element)
         else:

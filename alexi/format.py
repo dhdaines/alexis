@@ -2,10 +2,11 @@
 Formatter la structure extraite d'un PDF
 """
 
-from collections import deque
 import itertools
 import logging
 import re
+from collections import deque
+from pathlib import Path
 from typing import Iterator, Optional, Sequence
 
 from alexi.analyse import Bloc, Document, Element, T_obj
@@ -96,15 +97,17 @@ def format_html(
     doc: Document,
     indent: int = 2,
     element: Optional[Element] = None,
+    imgdir: str = ".",
 ) -> str:
     """Représentation HTML5 du document."""
+    imgpath = Path(imgdir)
 
     def bloc_html(bloc: Bloc) -> str:
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
         elif tag == "img":
-            return f'<img alt="{bloc.texte}" src="{bloc.img}"><br>'
+            return f'<img alt="{bloc.texte}" src="{imgpath / bloc.img}"><br>'
         else:
             return f"<{tag}>{bloc.texte}</{tag}>"
 
