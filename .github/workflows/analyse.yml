@@ -1,4 +1,4 @@
-name: Download and analyse planning bylaws
+name: Téléchargement, analyse et indexation des règlements d'urbanisme
 
 on:
   workflow_dispatch:

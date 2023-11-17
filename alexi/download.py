@@ -68,7 +68,7 @@ def main(args):
             raise
     excludes = [re.compile(r) for r in args.exclude]
     paths = []
-    with open(f"{u.netloc}/{u.path}") as infh:
+    with open(args.outdir / Path(u.path).name) as infh:
         soup = BeautifulSoup(infh, "lxml")
         for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
             ul = h2.find_next("ul")
