@@ -25,6 +25,12 @@ jobs:
       run: |
         python3 -m pip install --upgrade pip
         python3 -m pip install -e .
+    - name: Cache downloads
+      id: cache-downloads
+      uses: actions/cache@v3
+      with:
+        path: download/*.pdf
+        key: downloads-${{ hashFiles('download/publications.php') }}
     - name: Download
       run: |
         alexi -v download --exclude=Plan --exclude=/derogation \
