@@ -407,9 +407,11 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
 
 def make_doc_tree(docs: list[tuple[Document, str]], outdir: Path):
     HTML_HEADER = """<!DOCTYPE html>
-<html>
+<html lang="fr">
   <head>
     <title>ALEXI, EXtracteur d'Information</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
     <link rel="stylesheet" href="./style.css">
   </head>
@@ -455,12 +457,33 @@ def make_doc_tree(docs: list[tuple[Document, str]], outdir: Path):
 }
 #body {
     overflow-y: scroll;
+    padding: 2px;
+}
+@media (min-width: 600px) {
+    #body {
+        padding: 20px;
+    }
+}
+ul {
+    padding-left: 1em;
 }
 li {
     list-style-type: none;
 }
+li.text {
+    margin-left: -1em;
+    margin-top: 0.5em;
+    margin-bottom: 1em;
+}
+details {
+    margin-bottom: 1em;
+}
+summary {
+    cursor: pointer;
+}
 li.leaf {
     list-style-type: disc;
+    margin-bottom: 0.25em;
 }
 """
         )
