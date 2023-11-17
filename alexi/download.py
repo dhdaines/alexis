@@ -5,6 +5,7 @@ Télécharger juste les documents dont on a besoin.
 """
 
 import argparse
+import json
 import logging
 import re
 import urllib
@@ -81,18 +82,18 @@ def main(args):
                         break
                 if not excluded:
                     paths.append(path)
-    urls = []
+    urls = {}
     for p in paths:
         up = urllib.parse.urlparse(p)
         if up.netloc:
-            urls.append(p)
+            url = p
         else:
-            urls.append(f"{u.scheme}://{u.netloc}{up.path}")
-        print(Path(up.path).name)
+            url = f"{u.scheme}://{u.netloc}{up.path}"
+        urls[Path(up.path).name] = url
     if not urls:
         LOGGER.error("Could not find any documents to download!")
         return
-    for u in urls:
+    for u in urls.values():
         LOGGER.info("Downloading %s", u)
     try:
         subprocess.run(
@@ -103,13 +104,15 @@ def main(args):
                 "--quiet",
                 "-P",
                 str(args.outdir),
-                *urls,
+                *urls.values(),
             ],
             check=True,
         )
     except subprocess.CalledProcessError as err:
         if err.returncode != 8:
             raise
+    with open(args.outdir / "index.json", "wt") as outfh:
+        json.dump(urls, outfh, indent=2)
 
 
 if __name__ == "__main__":
