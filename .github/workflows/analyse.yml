@@ -29,10 +29,9 @@ jobs:
       run: |
         alexi -v download --exclude=Plan --exclude=/derogation \
                  --exclude='\d-[aA]dopt' --exclude='Z-\d' \
-                 > urbanisme.txt 
     - name: Extract
       run: |
-        sed -e 's,^,download/,' urbanisme.txt | xargs alexi -v extract
+        alexi -v extract download/*.pdf
     - name: Index
       run: |
         alexi -v index export
