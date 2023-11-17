@@ -259,7 +259,7 @@ def extract_html(args, path, iob, conv):
         LOGGER.info("Analyse de la structure de %s", path)
         doc = analyseur(iob)
 
-    def extract_element(el, outdir):
+    def extract_element(el, outdir, fragment=True):
         """Extract the various constituents, referencing images in the
         generated image directory."""
         outdir.mkdir(parents=True, exist_ok=True)
@@ -267,7 +267,9 @@ def extract_html(args, path, iob, conv):
         # Can't use Path.relative_to until 3.12 :(
         rel_imgdir = os.path.relpath(imgdir, outdir)
         with open(outdir / "index.html", "wt") as outfh:
-            outfh.write(format_html(doc, element=el, imgdir=rel_imgdir))
+            outfh.write(
+                format_html(doc, element=el, imgdir=rel_imgdir, fragment=fragment)
+            )
         with open(outdir / "index.md", "wt") as outfh:
             outfh.write(format_text(doc, element=el))
 
@@ -293,7 +295,7 @@ def extract_html(args, path, iob, conv):
             for idx, subel in reversed(list(enumerate(el.sub)))
         )
     # And do a full extraction (which might crash your browser)
-    extract_element(doc.structure, docdir)
+    extract_element(doc.structure, docdir, fragment=False)
 
 
 def main(args):

@@ -84,11 +84,11 @@ class Document:
     meta: dict[str, str]
     unknown_id: int = 0
 
-    def __init__(self) -> None:
+    def __init__(self, numero: str = "", titre: str = "") -> None:
         self.contenu: list[Bloc] = []
         self.paliers: defaultdict[str, list[Element]] = defaultdict(list)
         doc = Element(
-            type="Document", titre="", numero="", debut=0, fin=-1, sub=[], page=1
+            type="Document", titre=titre, numero=numero, debut=0, fin=-1, sub=[], page=1
         )
         self.paliers["Document"].append(doc)
         self.meta = {}
@@ -166,14 +166,18 @@ class Analyseur:
         self, words: Iterable[T_obj], blocs: Optional[Iterable[Bloc]] = None
     ) -> Document:
         """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
-        doc = Document()
         # Store all inputs as we will do two passes (for sequence and segment tags)
         word_sequence = list(words)
         # Get metadata from sequence tags
+        metadata = {}
         for bloc in group_iob(word_sequence, "sequence"):
-            if bloc.type not in doc.meta:
+            if bloc.type not in metadata:
                 LOGGER.info(f"{bloc.type}: {bloc.texte}")
-                doc.meta[bloc.type] = bloc.texte
+                metadata[bloc.type] = bloc.texte
+        doc = Document(
+            titre=metadata.get("Titre", ""), numero=metadata.get("Numero", "")
+        )
+        doc.meta = metadata
         # Group block-level text elements by page from segment tags
         if blocs is None:
             blocs = group_iob(word_sequence)

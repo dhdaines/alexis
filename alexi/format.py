@@ -98,6 +98,7 @@ def format_html(
     indent: int = 2,
     element: Optional[Element] = None,
     imgdir: str = ".",
+    fragment: bool = True,
 ) -> str:
     """Représentation HTML5 du document."""
     imgpath = Path(imgdir)
@@ -123,8 +124,9 @@ def format_html(
             )
         if el.titre:
             lines.append(f'{off}{sp}<{header} class="header">')
-            lines.append(f'{off}{sp}{sp}<span class="level">{el.type}</span>')
-            lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
+            if el.type != "Document":
+                lines.append(f'{off}{sp}{sp}<span class="level">{el.type}</span>')
+                lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
             lines.append(f'{off}{sp}{sp}<span class="title">{el.titre}</span>')
             lines.append(f"{off}{sp}</{header}>")
         idx = el.debut
@@ -145,16 +147,20 @@ def format_html(
         lines.append(off + f"</{tag}>")
         return lines
 
-    if element is not None:
+    if element is None:
+        doc_body = "\n".join(element_html(doc.structure, indent))
+    else:
+        doc_body = "\n".join(element_html(element, indent))
+    if fragment:
         return "\n".join(element_html(element, indent))
-    doc_body = "\n".join(element_html(doc.structure, indent))
-    doc_header = f"""<!DOCTYPE html>
+    else:
+        doc_header = f"""<!DOCTYPE html>
 <html>
   <head>
     <title>{doc.meta.get("Titre", "Document")}</title>
   </head>"""
-    doc_footer = "</html>"
-    return "\n".join((doc_header, doc_body, doc_footer))
+        doc_footer = "</html>"
+        return "\n".join((doc_header, doc_body, doc_footer))
 
 
 MDHEADER = {
