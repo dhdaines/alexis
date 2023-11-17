@@ -2,6 +2,7 @@
 Construire un index pour faire des recherches dans les données extraites.
 """
 
+import logging
 from pathlib import Path
 from typing import List
 
@@ -11,12 +12,12 @@ from whoosh.index import create_in  # type: ignore
 from whoosh.support.charset import charset_table_to_dict  # type: ignore
 from whoosh.support.charset import default_charset
 
-
+LOGGER = logging.getLogger("index")
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
 
 
-def index(outdir: Path, jsons: List[Path]):
+def index(indir: Path, outdir: Path):
     outdir.mkdir(exist_ok=True)
     schema = Schema(
         document=ID(stored=True),
@@ -26,24 +27,7 @@ def index(outdir: Path, jsons: List[Path]):
     )
     ix = create_in(outdir, schema)
     writer = ix.writer()
-
-
-"""
-    for path in jsons:
-        reg = Reglement.parse_file(path)
-        for texte in reg.textes:
-            titre = [f"Règlement {reg.numero}"]
-            if hasattr(texte, "article"):
-                titre.append(f"Article {texte.article}")
-            elif hasattr(texte, "annexe"):
-                titre.append(f"Annexe {texte.annexe}")
-            if texte.titre is not None:
-                titre.append(texte.titre)
-            writer.add_document(
-                document=str(reg.fichier),
-                page=texte.pages[0],
-                titre=" ".join(titre),
-                contenu="\n\n".join(c.texte for c in texte.contenu),
-            )
-    writer.commit()
-"""
+    for docdir in indir.iterdir():
+        if not docdir.is_dir():
+            continue
+        LOGGER.info("Indexing %s", docdir.name)

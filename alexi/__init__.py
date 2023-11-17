@@ -105,7 +105,7 @@ def json_main(args):
 
 def index_main(args):
     """Construire un index sur des fichiers JSON"""
-    index(args.outdir, args.jsons)
+    index(args.indir, args.outdir)
 
 
 def search_main(args):
@@ -209,7 +209,7 @@ def make_argparse() -> argparse.ArgumentParser:
         type=Path,
         default="indexdir",
     )
-    index.add_argument("jsons", help="Fichiers JSON", type=Path, nargs="+")
+    index.add_argument("indir", help="Repertoire avec les fichiers extraits", type=Path)
     index.set_defaults(func=index_main)
 
     search = subp.add_parser("search", help="Effectuer une recherche sur l'index")
