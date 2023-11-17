@@ -29,6 +29,7 @@ jobs:
       run: |
         alexi -v download --exclude=Plan --exclude=/derogation \
                  --exclude='\d-[aA]dopt' --exclude='Z-\d' \
+                 --exclude=Reso
     - name: Extract
       run: |
         alexi -v extract download/*.pdf

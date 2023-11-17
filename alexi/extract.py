@@ -12,7 +12,7 @@ import operator
 import os
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, TextIO
 
 from alexi.types import Bloc, T_bbox
 from alexi.analyse import Analyseur, group_iob, Element, Document
@@ -310,18 +310,14 @@ def extract_html(args, path, iob, conv):
         imgdir.mkdir(parents=True, exist_ok=True)
         blocs = list(group_iob(iob))
         blocs = extract_images(blocs, conv, imgdir)
-        doc = analyseur(iob, blocs)
+        doc = analyseur(path.stem, iob, blocs)
     else:
         LOGGER.info("Analyse de la structure de %s", path)
-        doc = analyseur(iob)
+        doc = analyseur(path.stem, iob)
 
     # Do articles/annexes at top level
-    titre = doc.structure.titre if doc.structure.titre else path.stem
-    contents = [
-        f'<h2><a href="{path.stem}/index.html">{titre}</a></h2>',
-        "<ul>",
-    ]
     seen_paliers = set()
+    doc_titre = doc.titre if doc.titre != "Document" else path.stem
     for palier in ("Article", "Annexe"):
         if palier not in doc.paliers:
             continue
@@ -331,53 +327,148 @@ def extract_html(args, path, iob, conv):
         # These go in the top level
         for idx, el in enumerate(doc.paliers[palier]):
             extract_element(doc, el, docdir / palier / el.numero, imgdir)
-        make_index_html(docdir / palier, f"{titre}: {palier}s", doc.paliers[palier])
-        contents.append(
-            f'<li><a href="{path.stem}/{palier}/index.html">{palier}s</a></li>'
-        )
+        make_index_html(docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier])
+
     # Now do the rest of the Document hierarchy if it exists
-    top = Path(docdir)
-    if doc.structure.sub:
-        subtypes = list(doc.structure.sub)
+    def make_sub_index(el: Element, path: Path, titre: str):
+        subtypes = list(el.sub)
         subtypes.sort(key=operator.attrgetter("type"))
         for subtype, elements in itertools.groupby(
             subtypes, operator.attrgetter("type")
         ):
             if subtype not in seen_paliers:
-                make_index_html(docdir / subtype, f"{titre}: {subtype}s", elements)
-                contents.append(
-                    f'<li><a href="{path.stem}/{subtype}/index.html">{subtype}s</a></li>'
-                )
-    d = deque((el, idx, top) for idx, el in enumerate(doc.structure.sub))
+                make_index_html(path / subtype, f"{titre}: {subtype}s", elements)
+
+    top = Path(docdir)
+    # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
+    if doc.structure.sub:
+        make_sub_index(doc.structure, docdir, doc_titre)
+    # Extract content and create index.html for descendants of all elements
+    d = deque((el, top) for el in doc.structure.sub)
     while d:
-        el, idx, parent = d.popleft()
+        el, parent = d.popleft()
         if el.type in seen_paliers:
             continue
         extract_element(doc, el, parent / el.type / el.numero, imgdir)
         if not el.sub:
             continue
-        subtype = el.sub[0].type
-        if subtype not in seen_paliers:
-            make_index_html(
-                parent / el.type / el.numero / el.sub[0].type,
-                f"{el.type} {el.numero}",
-                el.sub,
-            )
+        make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
         d.extendleft(
-            (subel, idx, parent / el.type / el.numero)
-            for idx, subel in reversed(list(enumerate(el.sub)))
+            (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
         )
     # And do a full extraction (which might crash your browser)
     extract_element(doc, doc.structure, docdir, imgdir, fragment=False)
-    contents.append("</ul>")
-    return contents
+    return doc
+
+
+def make_doc_subtree(doc: Document, outfh: TextIO):
+    outfh.write("<ul>\n")
+    outfh.write(
+        f'<li class="text"><a href="{doc.fileid}/index.html">Texte intégral</a></li>\n'
+    )
+    top = Path(doc.fileid)
+    d = deque((el, top, 1) for el in doc.structure.sub)
+    prev_level = 1
+    while d:
+        el, parent, level = d.popleft()
+        if el.type in ("Article", "Annexe"):
+            eldir = top / el.type / el.numero
+        else:
+            eldir = parent / el.type / el.numero
+        if el.numero[0] == "_":
+            if el.titre:
+                eltitre = el.titre
+            else:
+                eltitre = el.type
+        else:
+            if el.titre:
+                eltitre = f"{el.type} {el.numero}: {el.titre}"
+            else:
+                eltitre = f"{el.type} {el.numero}"
+        while level < prev_level:
+            outfh.write("</ul></li>\n")
+            prev_level -= 1
+        if el.sub:
+            outfh.write(f'<li class="node"><details><summary>{eltitre}</summary><ul>\n')
+            link = f'<a href="{eldir}/index.html">Texte intégral</a>'
+            outfh.write(f'<li class="text">{link}</li>\n')
+        else:
+            link = f'<a href="{eldir}/index.html">{eltitre}</a>'
+            outfh.write(f'<li class="leaf">{link}</li>\n')
+        d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
+        prev_level = level
+    while prev_level > 1:
+        outfh.write("</ul></li>\n")
+        prev_level -= 1
+    outfh.write("</ul>\n")
+
+
+def make_doc_tree(docs: list[tuple[Document, str]], outdir: Path):
+    HTML_HEADER = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>ALEXI, EXtracteur d'Information</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div class="container">
+    <h1 id="header">ALEXI, EXtracteur d'Information</h1>
+    <ul id="body">
+"""
+    HTML_FOOTER = """</ul>
+    </div>
+  </body>
+</html>
+"""
+    docs.sort(key=operator.attrgetter("numero"))
+    with open(outdir / "index.html", "wt") as outfh:
+        LOGGER.info("Génération de %s", outdir / "index.html")
+        outfh.write(HTML_HEADER)
+        for doc in docs:
+            outfh.write('<li class="node"><details>\n')
+            outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
+            make_doc_subtree(doc, outfh)
+            outfh.write("</li>\n")
+        outfh.write(HTML_FOOTER)
+    with open(outdir / "style.css", "wt") as outfh:
+        outfh.write(
+            """html, body {
+    margin: 0;
+    height: 100%;
+}
+.container {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+#header {
+    font-family: sans-serif;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 0.5ex;
+    margin: 0;
+    background: #2d3e50;
+    color: #eee;
+}
+#body {
+    overflow-y: scroll;
+}
+li {
+    list-style-type: none;
+}
+li.leaf {
+    list-style-type: disc;
+}
+"""
+        )
 
 
 def main(args):
     crf = None
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
-    contents = []
+    docs = []
     for path in args.docs:
         conv = None
         if path.suffix == ".csv":
@@ -397,27 +488,9 @@ def main(args):
         if args.serafim:
             extract_serafim(args, path, iob, conv)
         else:
-            contents.extend(extract_html(args, path, iob, conv))
+            docs.append(extract_html(args, path, iob, conv))
     if not args.serafim:
-        HTML_HEADER = """<!DOCTYPE html>
-<html>
-  <head>
-    <title>ALEXI, EXtracteur d'Information</title>
-  </head>
-  <body>
-    <h1>ALEXI, EXtracteur d'Information</h1>
-    <ul>
-"""
-        HTML_FOOTER = """</ul>
-  </body>
-</html>
-"""
-        with open(args.outdir / "index.html", "wt") as outfh:
-            LOGGER.info("Génération de %s", args.outdir / "index.html")
-            outfh.write(HTML_HEADER)
-            for line in contents:
-                print(line, file=outfh)
-            outfh.write(HTML_FOOTER)
+        make_doc_tree(docs, args.outdir)
 
 
 if __name__ == "__main__":

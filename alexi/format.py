@@ -160,7 +160,7 @@ def format_html(
         doc_header = f"""<!DOCTYPE html>
 <html>
   <head>
-    <title>{doc.meta.get("Titre", "Document")}</title>
+    <title>{doc.titre}</title>
   </head>"""
         doc_footer = "</html>"
         return "\n".join((doc_header, doc_body, doc_footer))
