@@ -104,14 +104,14 @@ class Document:
             elif m.group(3):  # annexe (A), chapitre (III)
                 numero = m.group(3)
             else:
-                numero = str(self.unknown_id)
+                numero = "_%d" % self.unknown_id
                 self.unknown_id += 1
             titre = titre[m.end(0) :]
         elif m := NUMENDRE.match(titre):
             numero = m.group(1)
             titre = titre[: m.start(1)]
         else:
-            numero = str(self.unknown_id)
+            numero = "_%d" % self.unknown_id
             self.unknown_id += 1
         return numero, titre
 

@@ -125,8 +125,11 @@ def format_html(
         if el.titre:
             lines.append(f'{off}{sp}<{header} class="header">')
             if el.type != "Document":
-                lines.append(f'{off}{sp}{sp}<span class="level">{el.type}</span>')
-                lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
+                if el.numero[0] != "_":
+                    lines.append(f'{off}{sp}{sp}<span class="level">{el.type}</span>')
+                    lines.append(
+                        f'{off}{sp}{sp}<span class="number">{el.numero}</span>'
+                    )
             lines.append(f'{off}{sp}{sp}<span class="title">{el.titre}</span>')
             lines.append(f"{off}{sp}</{header}>")
         idx = el.debut
