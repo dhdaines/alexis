@@ -4,6 +4,7 @@ Convertir les règlements en HTML, texte, et/ou JSON structuré.
 
 import argparse
 import csv
+import dataclasses
 import itertools
 import json
 import logging
@@ -272,6 +273,8 @@ def extract_html(args, path, iob, conv):
             )
         with open(outdir / "index.md", "wt") as outfh:
             outfh.write(format_text(doc, element=el))
+        with open(outdir / "index.json", "wt") as outfh:
+            json.dump(dataclasses.asdict(el), outfh)
 
     # Do articles/annexes at top level
     seen_paliers = set()
