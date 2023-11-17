@@ -1,154 +1,47 @@
-from pathlib import Path
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from pdfplumber.utils.geometry import T_bbox, merge_bboxes
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
-
-
-class Ancrage(BaseModel):
-    """Représente une partie du texte d'un document, soit un chapitre ou une section."""
-
-    numero: str = Field(
-        description="Numéro de ce chapitre ou section tel qu'il apparaît dans le texte"
-    )
-    titre: str
-    pages: Tuple[int, int] = Field(
-        description="Première et dernière indices de pages (en partant de 0) de cette partie"
-    )
-    textes: Tuple[int, int] = Field(
-        (-1, -1),
-        description="Première et dernière indices de textes",
-    )
+T_obj = dict[str, Any]
 
 
-class SousSection(Ancrage):
-    """Sous-section du texte.
+@dataclass
+class Bloc:
+    """Élément de présentation (bloc de texte ou image)"""
 
-    Le numéro comprend aussi celui de la section, par exemple
-    'SOUS-SECTION 3.1 GROUPE HABITATION'
-    """
+    type: str
+    contenu: list[T_obj]
+    _bbox: Optional[T_bbox] = None
+    _page_number: Optional[int] = None
 
-    pass
+    def __hash__(self):
+        if self._bbox:
+            return hash((self.type, self._bbox, self._page_number))
+        else:
+            return hash((self.type, self.texte))
 
+    @property
+    def texte(self) -> str:
+        """Représentation textuel du bloc."""
+        return " ".join(x["text"] for x in self.contenu)
 
-class Section(Ancrage):
-    """Section du texte.
+    @property
+    def page_number(self) -> int:
+        """Numéro de page de ce bloc."""
+        if self._page_number is not None:
+            return self._page_number
+        return self.contenu[0]["page"]
 
-    Le numéro ne comprend pas celui du chapitre, par exemple 'SECTION
-    3 CLASSIFICATION DES USAGES'
-    """
+    @property
+    def bbox(self) -> T_bbox:
+        if self._bbox is not None:
+            return self._bbox
+        return merge_bboxes(
+            (int(word["x0"]), int(word["top"]), int(word["x1"]), int(word["bottom"]))
+            for word in self.contenu
+        )
 
-    sous_sections: List[SousSection] = []
-
-
-class Chapitre(Ancrage):
-    """Chapitre du texte."""
-
-    sections: List[Section] = []
-
-
-class Contenu(BaseModel):
-    """Modèle de base pour un élément du contenu, dont un alinéa, une énumération,
-    un tableau, une image, etc."""
-
-    texte: str = Field(description="Texte indexable pour ce contenu")
-
-
-class Tableau(Contenu):
-    """Tableau, représenté pour le moment en image (peut-être HTML à l'avenir)"""
-
-    tableau: Path = Field(description="Fichier avec la représentation du tableau")
-
-
-class Figure(Contenu):
-    """Figure, associée à une image"""
-
-    figure: Optional[Path] = Field(None, description="Fichier avec la figure")
-
-
-class Texte(BaseModel):
-    """Modèle de base pour un unité atomique (indexable) de texte, dont un
-    article, une liste d'attendus, ou un annexe.
-    """
-
-    titre: Optional[str] = None
-    pages: Tuple[int, int]
-    contenu: List[Contenu | Tableau | Figure] = Field(
-        [], description="Contenus (alinéas, tableaux, images) de ce texte"
-    )
-
-
-class Annexe(Texte):
-    """Annexe d'un document ou règlement."""
-
-    annexe: str = Field(description="Numéro de cet annexe")
-
-
-class Attendus(Texte):
-    """Attendus d'un reglement ou resolution."""
-
-    attendu: bool = True
-
-
-class Article(Texte):
-    """Article du texte."""
-
-    article: int = Field(
-        description="Numéro de cet article tel qu'il apparaît dans le texte, ou -1 pour un article sans numéro"
-    )
-    sous_section: int = Field(
-        -1,
-        description="Indice (en partant de 0) de la sous-section dans laquelle cet article apparaît, ou -1 s'il n'y en a pas",
-    )
-    section: int = Field(
-        -1,
-        description="Indice (en partant de 0) de la section dans laquelle cet article apparaît, ou -1 s'il n'y en a pas",
-    )
-    chapitre: int = Field(
-        -1,
-        description="Indice (en partant de 0) du chapitre dans laquelle cet article apparaît, ou -1 s'il n'y en a pas",
-    )
-
-
-class Dates(BaseModel):
-    """Dates de publication ou adoption d'un document ou règlement."""
-
-    adoption: str = Field(
-        description="Date de l'adoption d'un règlement ou résolution, ou de publication d'autre document"
-    )
-    projet: Optional[str] = Field(
-        None, description="Date de l'adoption d'un projet de règlement"
-    )
-    avis: Optional[str] = Field(
-        None, description="Date de l'avis de motion pour un règlement"
-    )
-    entree: Optional[str] = Field(
-        None, description="Date d'entrée en vigueur d'un règlement"
-    )
-    publique: Optional[str] = Field(
-        None, description="Date de la consultation publique"
-    )
-    ecrite: Optional[str] = Field(None, description="Date de la consultation écrite")
-    mrc: Optional[str] = Field(
-        None, description="Date du certificat de conformité de la MRC"
-    )
-
-
-class Document(BaseModel):
-    """Document municipal générique."""
-
-    fichier: Path = Field(description="Nom du fichier source PDF du document")
-    titre: Optional[str] = Field(
-        None, description="Titre du document (tel qu'il apparaît sur le site web)"
-    )
-    chapitres: List[Chapitre] = []
-    textes: List[Article | Attendus | Annexe | Texte] = []
-
-
-class Reglement(Document):
-    """Structure et contenu d'un règlement."""
-
-    numero: str = Field(description="Numéro du règlement, e.g. 1314-Z-09")
-    objet: Optional[str] = Field(
-        None, description="Objet du règlement, e.g. 'Lotissement'"
-    )
-    dates: Dates
+    @property
+    def img(self) -> str:
+        bbox = ",".join(str(round(x)) for x in self.bbox)
+        return f"page{self.page_number}-{bbox}.png"

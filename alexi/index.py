@@ -2,8 +2,10 @@
 Construire un index pour faire des recherches dans les données extraites.
 """
 
+import json
+import logging
+import os
 from pathlib import Path
-from typing import List
 
 from whoosh.analysis import CharsetFilter, StemmingAnalyzer  # type: ignore
 from whoosh.fields import ID, NUMERIC, TEXT, Schema  # type: ignore
@@ -11,13 +13,24 @@ from whoosh.index import create_in  # type: ignore
 from whoosh.support.charset import charset_table_to_dict  # type: ignore
 from whoosh.support.charset import default_charset
 
-from alexi.types import Reglement
-
+LOGGER = logging.getLogger("index")
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
 
 
-def index(outdir: Path, jsons: List[Path]):
+def add_from_dir(writer, document, docdir):
+    LOGGER.info("Indexing %s", docdir)
+    with open(docdir / "index.json") as infh:
+        element = json.load(infh)
+        titre = f'{element["type"]} {element["numero"]}: {element["titre"]}'
+        page = element.get("page", 1)
+    with open(docdir / "index.md") as infh:
+        writer.add_document(
+            document=document, page=page, titre=titre, contenu=infh.read()
+        )
+
+
+def index(indir: Path, outdir: Path):
     outdir.mkdir(exist_ok=True)
     schema = Schema(
         document=ID(stored=True),
@@ -27,20 +40,15 @@ def index(outdir: Path, jsons: List[Path]):
     )
     ix = create_in(outdir, schema)
     writer = ix.writer()
-    for path in jsons:
-        reg = Reglement.parse_file(path)
-        for texte in reg.textes:
-            titre = [f"Règlement {reg.numero}"]
-            if hasattr(texte, "article"):
-                titre.append(f"Article {texte.article}")
-            elif hasattr(texte, "annexe"):
-                titre.append(f"Annexe {texte.annexe}")
-            if texte.titre is not None:
-                titre.append(texte.titre)
-            writer.add_document(
-                document=str(reg.fichier),
-                page=texte.pages[0],
-                titre=" ".join(titre),
-                contenu="\n\n".join(c.texte for c in texte.contenu),
-            )
+    for docdir in indir.iterdir():
+        if not docdir.is_dir():
+            continue
+        document = docdir.with_suffix(".pdf").name
+        add_from_dir(writer, document, docdir)
+        for subdir in docdir.iterdir():
+            if not docdir.is_dir():
+                continue
+            for dirpath, dirnames, filenames in os.walk(subdir):
+                if "index.json" in filenames:
+                    add_from_dir(writer, document, Path(dirpath))
     writer.commit()

@@ -1,0 +1,53 @@
+name: Download and analyse planning bylaws
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Install
+      run: |
+        apt-get install wget
+        python3 -m pip install --upgrade pip
+        python3 -m pip install .
+    - name: Download
+      run: |
+        alexi -v download --exclude=Plan --exclude=/derogation \
+                 --exclude='\d-[aA]dopt' --exclude='Z-\d' \
+                 > urbanisme.txt 
+    - name: Extract
+      run: |
+        sed -e 's,^,download/,' urbanisme.txt | xargs alexi -v extract
+    - name: Index
+      run: |
+        alexi -v index export
+    - name: Upload index
+      uses: actions/upload-artifact@v3
+      with:
+        name: index
+        path: indexdir/
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v1
+      with:
+        path: export/
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2

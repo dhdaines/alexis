@@ -6,6 +6,7 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
+import json
 import logging
 import re
 import subprocess
@@ -15,61 +16,18 @@ from typing import Any, Iterable, TextIO
 
 from bs4 import BeautifulSoup
 
-from .convert import Converteur
+from .analyse import Analyseur
+from .convert import FIELDNAMES, Converteur
+from .format import format_dict, format_html, format_xml
 from .index import index
-from .json import Formatteur
-from .label import Classificateur
+from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
+from .label import Extracteur
 from .search import search
+from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
+from . import extract, download
 
 LOGGER = logging.getLogger("alexi")
-FIELDNAMES = [
-    "tag",
-    "text",
-    "page",
-    "page_width",
-    "page_height",
-    "r",
-    "g",
-    "b",
-    "x0",
-    "x1",
-    "top",
-    "bottom",
-    "doctop",
-]
-
-
-def download_main(args):
-    """Télécharger les fichiers avec wget"""
-    try:
-        subprocess.run(
-            [
-                "wget",
-                "--no-check-certificate",
-                "--timestamping",
-                "--recursive",
-                "--level=1",
-                "--accept-regex",
-                r".*upload/documents/.*\.pdf",
-                "https://ville.sainte-adele.qc.ca/publications.php",
-            ],
-            check=True,
-        )
-    except subprocess.CalledProcessError as err:
-        if err.returncode != 8:
-            raise
-
-
-def select_main(args):
-    """Trouver une liste de fichiers dans la page web des documents."""
-    with open(args.infile) as infh:
-        soup = BeautifulSoup(infh, "lxml")
-        for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
-            ul = h2.find_next("ul")
-            for li in ul.find_all("li"):
-                path = Path(li.a["href"])
-                print(path.relative_to("/"))
 
 
 def write_csv(
@@ -82,65 +40,72 @@ def write_csv(
 
 def convert_main(args):
     """Convertir les PDF en CSV"""
-    if args.images is not None:
-        args.images.mkdir(parents=True, exist_ok=True)
     if args.pages:
         pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
     else:
         pages = None
-    conv = Converteur(imgdir=args.images)
-    write_csv(conv(args.pdf, pages), sys.stdout)
+    conv = Converteur(args.pdf)
+    if args.images is not None:
+        args.images.mkdir(parents=True, exist_ok=True)
+        images = {}
+        for bloc in conv.extract_images(pages):
+            images.setdefault(bloc.page_number, []).append(bloc.img)
+            img = (
+                conv.pdf.pages[bloc.page_number - 1]
+                .crop(bloc.bbox)
+                .to_image(resolution=150, antialias=True)
+            )
+            LOGGER.info("Extraction de %s", args.images / bloc.img)
+            img.save(args.images / bloc.img)
+        with open(args.images / "images.json", "wt") as outfh:
+            json.dump(images, outfh)
+    write_csv(conv.extract_words(pages), sys.stdout)
 
 
 def segment_main(args):
-    """Extraire les unités de texte des CSV"""
-    seg = Segmenteur()
+    """Segmenter un CSV"""
+    crf = Segmenteur(args.model)
     reader = csv.DictReader(args.csv)
-    write_csv(seg(reader), sys.stdout)
+    write_csv(crf(reader), sys.stdout)
 
 
 def label_main(args):
-    """Étiquetter les unités de texte des CSV"""
-    classificateur = Classificateur()
+    """Étiquetter un CSV"""
+    crf = Extracteur(args.model)
     reader = csv.DictReader(args.csv)
-    write_csv(classificateur(reader), sys.stdout)
+    write_csv(crf(reader), sys.stdout)
+
+
+def xml_main(args):
+    """Convertir un CSV segmenté et étiquetté en XML"""
+    reader = csv.DictReader(args.csv)
+    doc = Analyseur()(reader)
+    print(format_xml(doc))
+
+
+def html_main(args):
+    """Convertir un CSV segmenté et étiquetté en HTML"""
+    reader = csv.DictReader(args.csv)
+    doc = Analyseur()(reader)
+    print(format_html(doc))
 
 
 def json_main(args):
-    """Convertir un CSV segmenté en JSON"""
-    conv = Formatteur(fichier=args.name, imgdir=args.images)
-    reader = csv.DictReader(args.csv)
-    doc = conv(reader)
-    print(doc.model_dump_json(indent=2, exclude_defaults=True))
-
-
-def extract_main(args):
-    """Convertir un PDF en JSON"""
-    if args.images is not None:
-        imgdir = args.images / Path(args.pdf.name).stem
-        imgdir.mkdir(parents=True, exist_ok=True)
-        converteur = Converteur(imgdir=imgdir)
-        formatteur = Formatteur(fichier=Path(args.pdf.name).name, imgdir=imgdir)
+    """Convertir un CSV segmenté et étiquetté en JSON"""
+    iob = csv.DictReader(args.csv)
+    analyseur = Analyseur()
+    if args.images:
+        with open(args.images, "rt") as infh:
+            images = json.load(infh)
+            doc = analyseur(iob, images)
     else:
-        converteur = Converteur()
-        formatteur = Formatteur(fichier=Path(args.pdf.name).name)
-    segmenteur = Segmenteur()
-    classificateur = Classificateur()
-
-    if args.pages:
-        pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
-    else:
-        pages = None
-    doc = converteur(args.pdf, pages)
-    doc = segmenteur(doc)
-    doc = classificateur(doc)
-    doc = formatteur(doc)
-    print(doc.model_dump_json(indent=2, exclude_defaults=True))
+        doc = analyseur(iob)
+    print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
 
 def index_main(args):
     """Construire un index sur des fichiers JSON"""
-    index(args.outdir, args.jsons)
+    index(args.indir, args.outdir)
 
 
 def search_main(args):
@@ -155,27 +120,11 @@ def make_argparse() -> argparse.ArgumentParser:
         "-v", "--verbose", help="Émettre des messages", action="store_true"
     )
     subp = parser.add_subparsers(required=True)
-    subp.add_parser(
+    download_command = subp.add_parser(
         "download", help="Télécharger les documents plus récents du site web"
-    ).set_defaults(func=download_main)
-
-    select = subp.add_parser(
-        "select", help="Générer la liste de documents pour une ou plusieurs catégories"
     )
-    select.add_argument(
-        "-i",
-        "--infile",
-        help="Page HTML avec liste de publications",
-        type=Path,
-        default="ville.sainte-adele.qc.ca/publications.php",
-    )
-    select.add_argument(
-        "-s",
-        "--section",
-        help="Expression régulière pour sélectionner la section des documents",
-        default=r"règlements",
-    )
-    select.set_defaults(func=select_main)
+    download.add_arguments(download_command)
+    download_command.set_defaults(func=download.main)
 
     convert = subp.add_parser(
         "convert", help="Convertir le texte et les objets des fichiers PDF en CSV"
@@ -184,14 +133,19 @@ def make_argparse() -> argparse.ArgumentParser:
         "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
     )
     convert.add_argument(
-        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
+        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
     )
     convert.add_argument(
-        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
+        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
     convert.set_defaults(func=convert_main)
 
-    segment = subp.add_parser("segment", help="Extraire les unités de texte des CSV")
+    segment = subp.add_parser(
+        "segment", help="Segmenter et étiquetter les segments d'un CSV"
+    )
+    segment.add_argument(
+        "--model", help="Modele CRF", type=Path, default=DEFAULT_SEGMENT_MODEL
+    )
     segment.add_argument(
         "csv",
         help="Fichier CSV à traiter",
@@ -199,7 +153,12 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     segment.set_defaults(func=segment_main)
 
-    label = subp.add_parser("label", help="Étiquetter les unités de texte dans un CSV")
+    label = subp.add_parser(
+        "label", help="Étiquetter (extraire des informations) un CSV segmenté"
+    )
+    label.add_argument(
+        "--model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
+    )
     label.add_argument(
         "csv",
         help="Fichier CSV à traiter",
@@ -207,30 +166,38 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     label.set_defaults(func=label_main)
 
-    json = subp.add_parser(
+    xml = subp.add_parser(
+        "xml",
+        help="Extraire la structure en format XML en partant du CSV étiquetté",
+    )
+    xml.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    xml.set_defaults(func=xml_main)
+
+    html = subp.add_parser(
+        "html",
+        help="Extraire la structure en format HTML en partant du CSV étiquetté",
+    )
+    html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    html.set_defaults(func=html_main)
+
+    jsonf = subp.add_parser(
         "json",
         help="Extraire la structure en format JSON en partant du CSV étiquetté",
     )
-    json.add_argument(
-        "-n", "--name", help="Nom du fichier PDF originel", type=Path, default="INCONNU"
+    jsonf.add_argument(
+        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
     )
-    json.add_argument(
-        "--images", help="Répertoire où trouver des images de figures", type=Path
+    jsonf.add_argument(
+        "--images", help="Répertoire contenant les images des tableaux", type=Path
     )
-    json.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
-    json.set_defaults(func=json_main)
+    jsonf.set_defaults(func=json_main)
 
-    extract = subp.add_parser("extract", help="Extractir la structure d'un PDF en JSON")
-    extract.add_argument(
-        "pdf", help="Fichier PDF à traiter", type=argparse.FileType("rb")
+    extract_command = subp.add_parser(
+        "extract",
+        help="Extraire la structure complète de fichiers PDF",
     )
-    extract.add_argument(
-        "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
-    )
-    extract.add_argument(
-        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
-    )
-    extract.set_defaults(func=extract_main)
+    extract.add_arguments(extract_command)
+    extract_command.set_defaults(func=extract.main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
@@ -242,7 +209,7 @@ def make_argparse() -> argparse.ArgumentParser:
         type=Path,
         default="indexdir",
     )
-    index.add_argument("jsons", help="Fichiers JSON", type=Path, nargs="+")
+    index.add_argument("indir", help="Repertoire avec les fichiers extraits", type=Path)
     index.set_defaults(func=index_main)
 
     search = subp.add_parser("search", help="Effectuer une recherche sur l'index")
