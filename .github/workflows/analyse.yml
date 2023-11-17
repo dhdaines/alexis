@@ -30,6 +30,14 @@ jobs:
         alexi -v download --exclude=Plan --exclude=/derogation \
                  --exclude='\d-[aA]dopt' --exclude='Z-\d' \
                  --exclude=Reso
+        for d in download/*.pdf; do
+            bn=$(basename $d .pdf)
+            for dd in data/train data/dev data/test; do
+                if [ -e "${dd}/${bn}.csv" ]; then
+                    cp "${dd}/${bn}.csv" download/
+                fi
+            done
+        done
     - name: Extract
       run: |
         alexi -v extract download/*.pdf

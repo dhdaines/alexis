@@ -30,7 +30,7 @@ class Bloc:
         """Numéro de page de ce bloc."""
         if self._page_number is not None:
             return self._page_number
-        return self.contenu[0]["page"]
+        return int(self.contenu[0]["page"])
 
     @property
     def bbox(self) -> T_bbox:

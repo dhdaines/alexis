@@ -171,6 +171,7 @@ def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterato
     # Find images in tagged text
     for bloc in blocs:
         if bloc.type in ("Tableau", "Figure"):
+            assert isinstance(bloc.page_number, int)
             images.setdefault(bloc.page_number, []).append(bloc)
     # Replace tag blocs with structure blocs if possible
     struct_blocs = list(conv.extract_images())
@@ -182,6 +183,7 @@ def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterato
     # Find ones not linked to any text and not contained in existing blocs
     insert_blocs = {}
     for bloc in struct_blocs:
+        assert isinstance(bloc.page_number, int)
         if bloc.contenu:
             continue
         is_contained = False
@@ -475,12 +477,17 @@ def main(args):
             LOGGER.info("Lecture de %s", path)
             iob = list(read_csv(path))
         elif path.suffix == ".pdf":
-            LOGGER.info("Conversion, segmentation et classification de %s", path)
-            conv = Converteur(path)
-            feats = conv.extract_words()
-            if crf is None:
-                crf = Segmenteur()
-            iob = list(extracteur(crf(feats)))
+            csvpath = path.with_suffix(".csv")
+            if csvpath.exists():
+                LOGGER.info("Lecture de %s", csvpath)
+                iob = list(read_csv(csvpath))
+            else:
+                LOGGER.info("Conversion, segmentation et classification de %s", path)
+                conv = Converteur(path)
+                feats = conv.extract_words()
+                if crf is None:
+                    crf = Segmenteur()
+                iob = list(extracteur(crf(feats)))
 
         pdf_path = path.with_suffix(".pdf")
         if conv is None and pdf_path.exists():

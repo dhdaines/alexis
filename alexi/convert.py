@@ -184,7 +184,7 @@ class Converteur:
         return Bloc(
             type="Tableau" if el.type == "Table" else el.type,
             contenu=[],
-            _page_number=page_number,
+            _page_number=int(page_number),
             _bbox=(round(x0), round(top), round(x1), round(bottom)),
         )
 
