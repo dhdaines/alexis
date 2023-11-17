@@ -18,5 +18,4 @@ def search(indexdir: Path, terms: List[str]):
     with ix.searcher() as searcher:
         results = searcher.search(query)
         for r in results:
-            print(r.score, r["titre"])
-            print()
+            print(f'{r["document"]}: {r["titre"]} (page {r["page"]})')
