@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from alexi.types import Bloc, T_bbox
-from alexi.analyse import Analyseur, group_iob
+from alexi.analyse import Analyseur, group_iob, Element, Document
 from alexi.convert import Converteur, bbox_contains, bbox_overlaps
 from alexi.segment import Segmenteur
 from alexi.format import format_html, format_text, format_dict
@@ -244,6 +244,61 @@ def extract_serafim(args, path, iob, conv):
         json.dump(docdict, outfh, indent=2, ensure_ascii=False)
 
 
+def extract_element(
+    doc: Document, el: Element, outdir: Path, imgdir: Path, fragment=True
+):
+    """Extract the various constituents, referencing images in the
+    generated image directory."""
+    outdir.mkdir(parents=True, exist_ok=True)
+    LOGGER.info("%s %s", outdir, el.titre)
+    # Can't use Path.relative_to until 3.12 :(
+    rel_imgdir = os.path.relpath(imgdir, outdir)
+    with open(outdir / "index.html", "wt") as outfh:
+        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=fragment))
+    with open(outdir / "index.md", "wt") as outfh:
+        outfh.write(format_text(doc, element=el))
+    with open(outdir / "index.json", "wt") as outfh:
+        json.dump(dataclasses.asdict(el), outfh)
+
+
+def make_index_html(docdir: Path, title: str, elements: list[Element]):
+    """Create an index.html for docdir."""
+    HTML_HEADER = f"""<!DOCTYPE html>
+<html>
+  <head>
+    <title>{title}</title>
+  </head>
+  <body>
+    <h1>{title}</h1>
+    <ul>
+"""
+    lines = []
+    off = "    "
+    sp = "  "
+    for el in elements:
+        lines.append(f"{off}{sp}<li>")
+        if el.numero[0] == "_":
+            titre = el.titre if el.titre else f"{el.type} (numéro inconnu)"
+        else:
+            lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
+            titre = el.titre if el.titre else f"{el.type} {el.numero}"
+        lines.append(
+            f'{off}{sp}{sp}<a href="{el.numero}/index.html" class="title">{titre}</a>'
+        )
+        lines.append(f"{off}{sp}</li>")
+    HTML_FOOTER = """</ul>
+  </body>
+</html>
+"""
+    docdir.mkdir(parents=True, exist_ok=True)
+    with open(docdir / "index.html", "wt") as outfh:
+        LOGGER.info("Génération de %s", docdir / "index.html")
+        outfh.write(HTML_HEADER)
+        for line in lines:
+            print(line, file=outfh)
+        outfh.write(HTML_FOOTER)
+
+
 def extract_html(args, path, iob, conv):
     docdir = args.outdir / path.stem
     imgdir = args.outdir / path.stem / "img"
@@ -260,51 +315,69 @@ def extract_html(args, path, iob, conv):
         LOGGER.info("Analyse de la structure de %s", path)
         doc = analyseur(iob)
 
-    def extract_element(el, outdir, fragment=True):
-        """Extract the various constituents, referencing images in the
-        generated image directory."""
-        outdir.mkdir(parents=True, exist_ok=True)
-        LOGGER.info("%s %s", outdir, el.titre)
-        # Can't use Path.relative_to until 3.12 :(
-        rel_imgdir = os.path.relpath(imgdir, outdir)
-        with open(outdir / "index.html", "wt") as outfh:
-            outfh.write(
-                format_html(doc, element=el, imgdir=rel_imgdir, fragment=fragment)
-            )
-        with open(outdir / "index.md", "wt") as outfh:
-            outfh.write(format_text(doc, element=el))
-        with open(outdir / "index.json", "wt") as outfh:
-            json.dump(dataclasses.asdict(el), outfh)
-
     # Do articles/annexes at top level
+    titre = doc.structure.titre if doc.structure.titre else path.stem
+    contents = [
+        f'<h2><a href="{path.stem}/index.html">{titre}</a></h2>',
+        "<ul>",
+    ]
     seen_paliers = set()
     for palier in ("Article", "Annexe"):
         if palier not in doc.paliers:
             continue
         seen_paliers.add(palier)
+        if not doc.paliers[palier]:
+            continue
         # These go in the top level
         for idx, el in enumerate(doc.paliers[palier]):
-            extract_element(el, docdir / palier / el.numero)
+            extract_element(doc, el, docdir / palier / el.numero, imgdir)
+        make_index_html(docdir / palier, f"{titre}: {palier}s", doc.paliers[palier])
+        contents.append(
+            f'<li><a href="{path.stem}/{palier}/index.html">{palier}s</a></li>'
+        )
     # Now do the rest of the Document hierarchy if it exists
     top = Path(docdir)
+    if doc.structure.sub:
+        subtypes = list(doc.structure.sub)
+        subtypes.sort(key=operator.attrgetter("type"))
+        for subtype, elements in itertools.groupby(
+            subtypes, operator.attrgetter("type")
+        ):
+            if subtype not in seen_paliers:
+                make_index_html(docdir / subtype, f"{titre}: {subtype}s", elements)
+                contents.append(
+                    f'<li><a href="{path.stem}/{subtype}/index.html">{subtype}s</a></li>'
+                )
     d = deque((el, idx, top) for idx, el in enumerate(doc.structure.sub))
     while d:
         el, idx, parent = d.popleft()
         if el.type in seen_paliers:
             continue
-        extract_element(el, parent / el.type / el.numero)
+        extract_element(doc, el, parent / el.type / el.numero, imgdir)
+        if not el.sub:
+            continue
+        subtype = el.sub[0].type
+        if subtype not in seen_paliers:
+            make_index_html(
+                parent / el.type / el.numero / el.sub[0].type,
+                f"{el.type} {el.numero}",
+                el.sub,
+            )
         d.extendleft(
             (subel, idx, parent / el.type / el.numero)
             for idx, subel in reversed(list(enumerate(el.sub)))
         )
     # And do a full extraction (which might crash your browser)
-    extract_element(doc.structure, docdir, fragment=False)
+    extract_element(doc, doc.structure, docdir, imgdir, fragment=False)
+    contents.append("</ul>")
+    return contents
 
 
 def main(args):
     crf = None
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
+    contents = []
     for path in args.docs:
         conv = None
         if path.suffix == ".csv":
@@ -324,7 +397,27 @@ def main(args):
         if args.serafim:
             extract_serafim(args, path, iob, conv)
         else:
-            extract_html(args, path, iob, conv)
+            contents.extend(extract_html(args, path, iob, conv))
+    if not args.serafim:
+        HTML_HEADER = """<!DOCTYPE html>
+<html>
+  <head>
+    <title>ALEXI, EXtracteur d'Information</title>
+  </head>
+  <body>
+    <h1>ALEXI, EXtracteur d'Information</h1>
+    <ul>
+"""
+        HTML_FOOTER = """</ul>
+  </body>
+</html>
+"""
+        with open(args.outdir / "index.html", "wt") as outfh:
+            LOGGER.info("Génération de %s", args.outdir / "index.html")
+            outfh.write(HTML_HEADER)
+            for line in contents:
+                print(line, file=outfh)
+            outfh.write(HTML_FOOTER)
 
 
 if __name__ == "__main__":
