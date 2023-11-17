@@ -246,34 +246,60 @@ def extract_serafim(args, path, iob, conv):
         json.dump(docdict, outfh, indent=2, ensure_ascii=False)
 
 
+HTML_GLOBAL_HEADER = """<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
+"""
+
+
 def extract_element(
     doc: Document, el: Element, outdir: Path, imgdir: Path, fragment=True
 ):
     """Extract the various constituents, referencing images in the
     generated image directory."""
-    outdir.mkdir(parents=True, exist_ok=True)
-    LOGGER.info("%s %s", outdir, el.titre)
     # Can't use Path.relative_to until 3.12 :(
     rel_imgdir = os.path.relpath(imgdir, outdir)
+    rel_style = os.path.relpath(imgdir.parent.parent / "style.css", outdir)
+    HTML_HEADER = (
+        HTML_GLOBAL_HEADER
+        + f"""    <link rel="stylesheet" href="{rel_style}">
+    <title>{el.titre}</title>
+  </head>
+  <body>
+    <div id="body">
+"""
+    )
+    HTML_FOOTER = """</div></body>
+</html>
+"""
+    outdir.mkdir(parents=True, exist_ok=True)
+    LOGGER.info("%s %s", outdir, el.titre)
     with open(outdir / "index.html", "wt") as outfh:
+        outfh.write(HTML_HEADER)
         outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=fragment))
+        outfh.write(HTML_FOOTER)
     with open(outdir / "index.md", "wt") as outfh:
         outfh.write(format_text(doc, element=el))
     with open(outdir / "index.json", "wt") as outfh:
         json.dump(dataclasses.asdict(el), outfh)
 
 
-def make_index_html(docdir: Path, title: str, elements: list[Element]):
+def make_index_html(topdir: Path, docdir: Path, title: str, elements: list[Element]):
     """Create an index.html for docdir."""
-    HTML_HEADER = f"""<!DOCTYPE html>
-<html>
-  <head>
+    style = os.path.relpath(topdir / "style.css", docdir)
+    HTML_HEADER = (
+        HTML_GLOBAL_HEADER
+        + f"""    <link rel="stylesheet" href="{style}">
     <title>{title}</title>
   </head>
   <body>
-    <h1>{title}</h1>
-    <ul>
+    <h1 id="header">{title}</h1>
+    <ul id="body">
 """
+    )
     lines = []
     off = "    "
     sp = "  "
@@ -329,7 +355,9 @@ def extract_html(args, path, iob, conv):
         # These go in the top level
         for idx, el in enumerate(doc.paliers[palier]):
             extract_element(doc, el, docdir / palier / el.numero, imgdir)
-        make_index_html(docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier])
+        make_index_html(
+            args.outdir, docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier]
+        )
 
     # Now do the rest of the Document hierarchy if it exists
     def make_sub_index(el: Element, path: Path, titre: str):
@@ -339,7 +367,9 @@ def extract_html(args, path, iob, conv):
             subtypes, operator.attrgetter("type")
         ):
             if subtype not in seen_paliers:
-                make_index_html(path / subtype, f"{titre}: {subtype}s", elements)
+                make_index_html(
+                    args.outdir, path / subtype, f"{titre}: {subtype}s", elements
+                )
 
     top = Path(docdir)
     # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
@@ -366,7 +396,7 @@ def extract_html(args, path, iob, conv):
 def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("<ul>\n")
     outfh.write(
-        f'<li class="text"><a href="{doc.fileid}/index.html">Texte intégral</a></li>\n'
+        f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a></li>\n'
     )
     top = Path(doc.fileid)
     d = deque((el, top, 1) for el in doc.structure.sub)
@@ -392,10 +422,10 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
             prev_level -= 1
         if el.sub:
             outfh.write(f'<li class="node"><details><summary>{eltitre}</summary><ul>\n')
-            link = f'<a href="{eldir}/index.html">Texte intégral</a>'
+            link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
             outfh.write(f'<li class="text">{link}</li>\n')
         else:
-            link = f'<a href="{eldir}/index.html">{eltitre}</a>'
+            link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
             outfh.write(f'<li class="leaf">{link}</li>\n')
         d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
@@ -406,13 +436,9 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
 
 
 def make_doc_tree(docs: list[tuple[Document, str]], outdir: Path):
-    HTML_HEADER = """<!DOCTYPE html>
-<html lang="fr">
-  <head>
-    <title>ALEXI, EXtracteur d'Information</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
+    HTML_HEADER = (
+        HTML_GLOBAL_HEADER
+        + """    <title>ALEXI, EXtracteur d'Information</title>
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
@@ -420,6 +446,7 @@ def make_doc_tree(docs: list[tuple[Document, str]], outdir: Path):
     <h1 id="header">ALEXI, EXtracteur d'Information</h1>
     <ul id="body">
 """
+    )
     HTML_FOOTER = """</ul>
     </div>
   </body>
