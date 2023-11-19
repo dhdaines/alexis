@@ -3,7 +3,7 @@
 import argparse
 import itertools
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Iterator, Optional
 
 import joblib  # type: ignore
 import sklearn_crfsuite as crfsuite  # type: ignore
@@ -31,6 +31,13 @@ def make_argparse():
     return parser
 
 
+def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
+    for w in words:
+        if "Tableau" in w["segment"]:
+            continue
+        yield w
+
+
 def train(
     train_set: Iterable[dict],
     dev_set: Optional[Iterable[dict]] = None,
@@ -41,7 +48,7 @@ def train(
     c1=0.1,
     c2=0.1,
 ) -> crfsuite.CRF:
-    train_pages = list(split_pages(train_set))
+    train_pages = list(split_pages(filter_tab(train_set)))
     X_train = [page2features(s, features, n) for s in train_pages]
     y_train = [page2labels(s, labels) for s in train_pages]
 
@@ -54,7 +61,7 @@ def train(
     }
     crf = crfsuite.CRF(**params, verbose=True)
     if dev_set is not None:
-        dev_pages = list(split_pages(dev_set))
+        dev_pages = list(split_pages(filter_tab(dev_set)))
         X_dev = [page2features(s, features, n) for s in dev_pages]
         y_dev = [page2labels(s, labels) for s in dev_pages]
         crf.fit(X_train, y_train, X_dev=X_dev, y_dev=y_dev)
