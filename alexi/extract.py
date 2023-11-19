@@ -17,9 +17,9 @@ from typing import Any, Iterable, Iterator, TextIO
 from alexi.types import Bloc, T_bbox
 from alexi.analyse import Analyseur, group_iob, Element, Document
 from alexi.convert import Converteur, bbox_contains, bbox_overlaps
-from alexi.segment import Segmenteur
+from alexi.segment import Segmenteur, DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from alexi.format import format_html, format_text, format_dict
-from alexi.label import Extracteur
+from alexi.label import Extracteur, DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 
 LOGGER = logging.getLogger("extract")
 
@@ -31,6 +31,18 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-n", "--no-images", help="Ne pas extraire les images", action="store_true"
+    )
+    parser.add_argument(
+        "-C",
+        "--no-csv",
+        help="Ne pas utiliser le CSV de référence",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--segment-model", help="Modele CRF", type=Path, default=DEFAULT_SEGMENT_MODEL
+    )
+    parser.add_argument(
+        "--label-model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
     )
     parser.add_argument(
         "-s",
@@ -343,6 +355,9 @@ def extract_html(args, path, iob, conv):
         LOGGER.info("Analyse de la structure de %s", path)
         doc = analyseur(path.stem, iob)
 
+    if doc.numero and doc.numero != path.stem:
+        LOGGER.info("Lien %s => %s", doc.numero, path.stem)
+        Path(args.outdir / doc.numero).symlink_to(path.stem)
     # Do articles/annexes at top level
     seen_paliers = set()
     doc_titre = doc.titre if doc.titre != "Document" else path.stem
@@ -528,7 +543,7 @@ def main(args):
             iob = list(read_csv(path))
         elif path.suffix == ".pdf":
             csvpath = path.with_suffix(".csv")
-            if csvpath.exists():
+            if not args.no_csv and csvpath.exists():
                 LOGGER.info("Lecture de %s", csvpath)
                 iob = list(read_csv(csvpath))
             else:
@@ -536,7 +551,7 @@ def main(args):
                 conv = Converteur(path)
                 feats = conv.extract_words()
                 if crf is None:
-                    crf = Segmenteur()
+                    crf = Segmenteur(args.segment_model)
                 iob = list(extracteur(crf(feats)))
 
         pdf_path = path.with_suffix(".pdf")
