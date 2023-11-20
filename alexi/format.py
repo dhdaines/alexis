@@ -155,7 +155,7 @@ def format_html(
     else:
         doc_body = "\n".join(element_html(element, indent))
     if fragment:
-        return "\n".join(doc_body)
+        return doc_body
     else:
         doc_header = f"""<!DOCTYPE html>
 <html>

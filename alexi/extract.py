@@ -270,6 +270,55 @@ HTML_GLOBAL_HEADER = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
 """
+STYLE_CSS = """html, body {
+    margin: 0;
+    height: 100%;
+}
+.container {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+}
+#header {
+    font-family: sans-serif;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 0.5ex;
+    margin: 0;
+    background: #2d3e50;
+    color: #eee;
+}
+#body {
+    overflow-y: scroll;
+    padding: 2px;
+}
+@media (min-width: 600px) {
+    #body {
+        padding: 20px;
+    }
+}
+ul {
+    padding-left: 1em;
+}
+li {
+    list-style-type: none;
+}
+li.text {
+    margin-left: -1em;
+    margin-top: 0.5em;
+    margin-bottom: 1em;
+}
+details {
+    margin-bottom: 1em;
+}
+summary {
+    cursor: pointer;
+}
+li.leaf {
+    list-style-type: disc;
+    margin-bottom: 0.25em;
+}
+"""
 
 
 def extract_element(
@@ -364,7 +413,9 @@ def extract_html(args, path, iob, conv):
 
     if doc.numero and doc.numero != path.stem:
         LOGGER.info("Lien %s => %s", doc.numero, path.stem)
-        Path(args.outdir / doc.numero).symlink_to(path.stem)
+        numero_link = Path(args.outdir / doc.numero)
+        numero_link.unlink(missing_ok=True)
+        numero_link.symlink_to(path.stem)
     # Do articles/annexes at top level
     seen_paliers = set()
     doc_titre = doc.titre if doc.titre != "Document" else path.stem
@@ -485,57 +536,7 @@ def make_doc_tree(docs: list[Document], outdir: Path):
             outfh.write("</li>\n")
         outfh.write(HTML_FOOTER)
     with open(outdir / "style.css", "wt") as outfh:
-        outfh.write(
-            """html, body {
-    margin: 0;
-    height: 100%;
-}
-.container {
-    display: flex;
-    flex-flow: column;
-    height: 100%;
-}
-#header {
-    font-family: sans-serif;
-    text-align: center;
-    text-transform: uppercase;
-    padding: 0.5ex;
-    margin: 0;
-    background: #2d3e50;
-    color: #eee;
-}
-#body {
-    overflow-y: scroll;
-    padding: 2px;
-}
-@media (min-width: 600px) {
-    #body {
-        padding: 20px;
-    }
-}
-ul {
-    padding-left: 1em;
-}
-li {
-    list-style-type: none;
-}
-li.text {
-    margin-left: -1em;
-    margin-top: 0.5em;
-    margin-bottom: 1em;
-}
-details {
-    margin-bottom: 1em;
-}
-summary {
-    cursor: pointer;
-}
-li.leaf {
-    list-style-type: disc;
-    margin-bottom: 0.25em;
-}
-"""
-        )
+        outfh.write(STYLE_CSS)
 
 
 def main(args):

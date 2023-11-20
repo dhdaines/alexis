@@ -179,7 +179,7 @@ class Analyseur:
         words: Iterable[T_obj],
         blocs: Optional[Iterable[Bloc]] = None,
     ) -> Document:
-        """Extraire la structure d'un règlement d'urbanisme d'un PDF."""
+        """Analyse du structure d'un document."""
         # Store all inputs as we will do two passes (for sequence and segment tags)
         word_sequence = list(words)
         # Get metadata from sequence tags
