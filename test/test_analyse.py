@@ -30,8 +30,8 @@ def test_iob():
 def test_analyse():
     with open(TRAINDIR / "zonage_sections.csv", "rt") as infh:
         reader = csv.DictReader(infh)
-        analyseur = Analyseur()
-        doc = analyseur(reader)
+        analyseur = Analyseur("zonage_sections", reader)
+        doc = analyseur()
         xml = format_xml(doc)
         assert xml.count("<Chapitre") == 1
         assert xml.count("<Section") == 4
@@ -43,7 +43,7 @@ def test_analyse_tableaux_figures():
     conv = Converteur(DATADIR / "pdf_figures.pdf")
     with open(DATADIR / "pdf_figures.csv", "rt") as infh:
         reader = csv.DictReader(infh)
-        analyseur = Analyseur(reader)
+        analyseur = Analyseur("pdf_figures", reader)
         analyseur.add_images(conv.extract_images())
         doc = analyseur()
         assert "Figure" in (bloc.type for bloc in doc.contenu)

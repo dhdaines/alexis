@@ -1,111 +1,111 @@
 sequence,segment,text,page,page_width,page_height,fontname,rgb,x0,x1,top,bottom,doctop,mcid,mctag,tagstack
-,B-Titre,Document,1,612,792,BAAAAA+LiberationSans-Bold,#000,75,212,67,95,67,0,Title,Document;P
-,I-Titre,avec,1,612,792,BAAAAA+LiberationSans-Bold,#000,220,282,67,95,67,0,Title,Document;P
-,I-Titre,tableaux,1,612,792,BAAAAA+LiberationSans-Bold,#000,289,403,67,95,67,0,Title,Document;P
-,I-Titre,et,1,612,792,BAAAAA+LiberationSans-Bold,#000,411,436,67,95,67,0,Title,Document;P
-,I-Titre,figures,1,612,792,BAAAAA+LiberationSans-Bold,#000,443,537,67,95,67,0,Title,Document;P
-,B-Chapitre,Chapitre,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,130,118,136,118,1,H1,Document;H1
-,I-Chapitre,1,1,612,792,BAAAAA+LiberationSans-Bold,#000,135,145,118,136,118,1,H1,Document;H1
-,I-Chapitre,:,1,612,792,BAAAAA+LiberationSans-Bold,#000,150,156,118,136,118,3,H1,Document;H1
-,I-Chapitre,Chapitre,1,612,792,BAAAAA+LiberationSans-Bold,#000,161,234,118,136,118,3,H1,Document;H1
-,I-Chapitre,Un,1,612,792,BAAAAA+LiberationSans-Bold,#000,239,263,118,136,118,3,H1,Document;H1
-,B-Section,Section,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,115,155,171,155,4,H2,Document;H2
-,I-Section,1,1,612,792,BAAAAA+LiberationSans-Bold,#000,119,128,155,171,155,4,H2,Document;H2
-,I-Section,:,1,612,792,BAAAAA+LiberationSans-Bold,#000,132,138,155,171,155,6,H2,Document;H2
-,I-Section,Section,1,612,792,BAAAAA+LiberationSans-Bold,#000,142,200,155,171,155,6,H2,Document;H2
-,I-Section,Un,1,612,792,BAAAAA+LiberationSans-Bold,#000,204,226,155,171,155,6,H2,Document;H2
-,B-Alinea,Lorem,1,612,792,CAAAAA+LiberationSerif,#000,57,89,179,191,179,7,Text body,Document;P
-,I-Alinea,ipsum,1,612,792,CAAAAA+LiberationSerif,#000,92,121,179,191,179,7,Text body,Document;P
-,I-Alinea,dolor,1,612,792,CAAAAA+LiberationSerif,#000,124,149,179,191,179,7,Text body,Document;P
-,I-Alinea,sit,1,612,792,CAAAAA+LiberationSerif,#000,152,164,179,191,179,7,Text body,Document;P
-,I-Alinea,"amet,",1,612,792,CAAAAA+LiberationSerif,#000,167,193,179,191,179,7,Text body,Document;P
-,I-Alinea,consectetur,1,612,792,CAAAAA+LiberationSerif,#000,196,251,179,191,179,7,Text body,Document;P
-,I-Alinea,adipiscing,1,612,792,CAAAAA+LiberationSerif,#000,254,303,179,191,179,7,Text body,Document;P
-,I-Alinea,"elit,",1,612,792,CAAAAA+LiberationSerif,#000,306,324,179,191,179,7,Text body,Document;P
-,I-Alinea,sed,1,612,792,CAAAAA+LiberationSerif,#000,327,343,179,191,179,7,Text body,Document;P
-,I-Alinea,do,1,612,792,CAAAAA+LiberationSerif,#000,346,358,179,191,179,7,Text body,Document;P
-,I-Alinea,eiusmod,1,612,792,CAAAAA+LiberationSerif,#000,361,402,179,191,179,7,Text body,Document;P
-,I-Alinea,tempor,1,612,792,CAAAAA+LiberationSerif,#000,405,439,179,191,179,7,Text body,Document;P
-,I-Alinea,incididunt,1,612,792,CAAAAA+LiberationSerif,#000,442,490,179,191,179,7,Text body,Document;P
-,I-Alinea,ut,1,612,792,CAAAAA+LiberationSerif,#000,494,503,179,191,179,7,Text body,Document;P
-,I-Alinea,labore,1,612,792,CAAAAA+LiberationSerif,#000,506,536,179,191,179,7,Text body,Document;P
-,I-Alinea,et,1,612,792,CAAAAA+LiberationSerif,#000,539,547,179,191,179,7,Text body,Document;P
-,I-Alinea,dolore,1,612,792,CAAAAA+LiberationSerif,#000,57,87,195,207,195,8,Text body,Document;P
-,I-Alinea,magna,1,612,792,CAAAAA+LiberationSerif,#000,90,122,195,207,195,8,Text body,Document;P
-,I-Alinea,aliqua.,1,612,792,CAAAAA+LiberationSerif,#000,125,158,195,207,195,8,Text body,Document;P
-,I-Alinea,Ut,1,612,792,CAAAAA+LiberationSerif,#000,161,173,195,207,195,8,Text body,Document;P
-,I-Alinea,enim,1,612,792,CAAAAA+LiberationSerif,#000,176,200,195,207,195,8,Text body,Document;P
-,I-Alinea,ad,1,612,792,CAAAAA+LiberationSerif,#000,203,214,195,207,195,8,Text body,Document;P
-,I-Alinea,minim,1,612,792,CAAAAA+LiberationSerif,#000,217,248,195,207,195,8,Text body,Document;P
-,I-Alinea,"veniam,",1,612,792,CAAAAA+LiberationSerif,#000,251,290,195,207,195,8,Text body,Document;P
-,I-Alinea,quis,1,612,792,CAAAAA+LiberationSerif,#000,293,313,195,207,195,8,Text body,Document;P
-,I-Alinea,nostrud,1,612,792,CAAAAA+LiberationSerif,#000,316,352,195,207,195,8,Text body,Document;P
-,I-Alinea,exercitation,1,612,792,CAAAAA+LiberationSerif,#000,355,411,195,207,195,8,Text body,Document;P
-,I-Alinea,ullamco,1,612,792,CAAAAA+LiberationSerif,#000,414,453,195,207,195,8,Text body,Document;P
-,I-Alinea,laboris,1,612,792,CAAAAA+LiberationSerif,#000,456,488,195,207,195,8,Text body,Document;P
-,I-Alinea,nisi,1,612,792,CAAAAA+LiberationSerif,#000,491,509,195,207,195,8,Text body,Document;P
-,I-Alinea,ut,1,612,792,CAAAAA+LiberationSerif,#000,512,521,195,207,195,8,Text body,Document;P
-,I-Alinea,aliquip,1,612,792,CAAAAA+LiberationSerif,#000,57,90,211,223,211,9,Text body,Document;P
-,I-Alinea,ex,1,612,792,CAAAAA+LiberationSerif,#000,93,104,211,223,211,9,Text body,Document;P
-,I-Alinea,ea,1,612,792,CAAAAA+LiberationSerif,#000,107,118,211,223,211,9,Text body,Document;P
-,I-Alinea,commodo,1,612,792,CAAAAA+LiberationSerif,#000,121,169,211,223,211,9,Text body,Document;P
-,I-Alinea,consequat.,1,612,792,CAAAAA+LiberationSerif,#000,172,223,211,223,211,9,Text body,Document;P
-,I-Alinea,Duis,1,612,792,CAAAAA+LiberationSerif,#000,226,249,211,223,211,9,Text body,Document;P
-,I-Alinea,aute,1,612,792,CAAAAA+LiberationSerif,#000,252,272,211,223,211,9,Text body,Document;P
-,I-Alinea,irure,1,612,792,CAAAAA+LiberationSerif,#000,275,297,211,223,211,9,Text body,Document;P
-,I-Alinea,dolor,1,612,792,CAAAAA+LiberationSerif,#000,300,326,211,223,211,9,Text body,Document;P
-,I-Alinea,in,1,612,792,CAAAAA+LiberationSerif,#000,329,338,211,223,211,9,Text body,Document;P
-,I-Alinea,reprehenderit,1,612,792,CAAAAA+LiberationSerif,#000,341,405,211,223,211,9,Text body,Document;P
-,I-Alinea,in,1,612,792,CAAAAA+LiberationSerif,#000,408,417,211,223,211,9,Text body,Document;P
-,I-Alinea,voluptate,1,612,792,CAAAAA+LiberationSerif,#000,420,465,211,223,211,9,Text body,Document;P
-,I-Alinea,velit,1,612,792,CAAAAA+LiberationSerif,#000,468,489,211,223,211,9,Text body,Document;P
-,I-Alinea,esse,1,612,792,CAAAAA+LiberationSerif,#000,492,512,211,223,211,9,Text body,Document;P
-,I-Alinea,cillum,1,612,792,CAAAAA+LiberationSerif,#000,515,546,211,223,211,9,Text body,Document;P
-,I-Alinea,dolore,1,612,792,CAAAAA+LiberationSerif,#000,57,87,227,239,227,10,Text body,Document;P
-,I-Alinea,eu,1,612,792,CAAAAA+LiberationSerif,#000,90,102,227,239,227,10,Text body,Document;P
-,I-Alinea,fugiat,1,612,792,CAAAAA+LiberationSerif,#000,105,133,227,239,227,10,Text body,Document;P
-,I-Alinea,nulla,1,612,792,CAAAAA+LiberationSerif,#000,136,160,227,239,227,10,Text body,Document;P
-,I-Alinea,pariatur.,1,612,792,CAAAAA+LiberationSerif,#000,163,202,227,239,227,10,Text body,Document;P
-,I-Alinea,Excepteur,1,612,792,CAAAAA+LiberationSerif,#000,205,254,227,239,227,10,Text body,Document;P
-,I-Alinea,sint,1,612,792,CAAAAA+LiberationSerif,#000,257,274,227,239,227,10,Text body,Document;P
-,I-Alinea,occaecat,1,612,792,CAAAAA+LiberationSerif,#000,277,319,227,239,227,10,Text body,Document;P
-,I-Alinea,cupidatat,1,612,792,CAAAAA+LiberationSerif,#000,322,366,227,239,227,10,Text body,Document;P
-,I-Alinea,non,1,612,792,CAAAAA+LiberationSerif,#000,369,387,227,239,227,10,Text body,Document;P
-,I-Alinea,"proident,",1,612,792,CAAAAA+LiberationSerif,#000,390,432,227,239,227,10,Text body,Document;P
-,I-Alinea,sunt,1,612,792,CAAAAA+LiberationSerif,#000,435,456,227,239,227,10,Text body,Document;P
-,I-Alinea,in,1,612,792,CAAAAA+LiberationSerif,#000,458,468,227,239,227,10,Text body,Document;P
-,I-Alinea,culpa,1,612,792,CAAAAA+LiberationSerif,#000,471,497,227,239,227,10,Text body,Document;P
-,I-Alinea,qui,1,612,792,CAAAAA+LiberationSerif,#000,500,515,227,239,227,10,Text body,Document;P
-,I-Alinea,officia,1,612,792,CAAAAA+LiberationSerif,#000,518,549,227,239,227,10,Text body,Document;P
-,I-Alinea,deserunt,1,612,792,CAAAAA+LiberationSerif,#000,57,97,243,255,243,11,Text body,Document;P
-,I-Alinea,mollit,1,612,792,CAAAAA+LiberationSerif,#000,100,129,243,255,243,11,Text body,Document;P
-,I-Alinea,anim,1,612,792,CAAAAA+LiberationSerif,#000,132,156,243,255,243,11,Text body,Document;P
-,I-Alinea,id,1,612,792,CAAAAA+LiberationSerif,#000,159,168,243,255,243,11,Text body,Document;P
-,I-Alinea,est,1,612,792,CAAAAA+LiberationSerif,#000,171,185,243,255,243,11,Text body,Document;P
-,I-Alinea,laborum.,1,612,792,CAAAAA+LiberationSerif,#000,188,231,243,255,243,11,Text body,Document;P
-,B-Titre,Tableau,1,612,792,CAAAAA+LiberationSerif,#000,57,95,266,278,266,12,Text body,Document;P
-,I-Titre,1,1,612,792,CAAAAA+LiberationSerif,#000,98,104,266,278,266,12,Text body,Document;P
-,I-Titre,:,1,612,792,CAAAAA+LiberationSerif,#000,107,110,266,278,266,14,Text body,Document;P
-,I-Titre,Bibittes,1,612,792,CAAAAA+LiberationSerif,#000,113,150,266,278,266,14,Text body,Document;P
-,B-Tableau,Alouette,1,612,792,BAAAAA+LiberationSans-Bold,#fff,57,105,288,300,288,15,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Belette,1,612,792,BAAAAA+LiberationSans-Bold,#fff,306,346,288,300,288,16,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,57,80,303,315,303,17,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,1,1,612,792,DAAAAA+LiberationSans,#000,83,90,303,315,303,17,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,306,329,303,315,303,18,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,2,1,612,792,DAAAAA+LiberationSans,#000,333,339,303,315,303,18,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,57,80,317,329,317,19,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,3,1,612,792,DAAAAA+LiberationSans,#000,83,90,317,329,317,19,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,306,329,317,329,317,20,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,4,1,612,792,DAAAAA+LiberationSans,#000,333,339,317,329,317,20,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Item,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,81,331,343,331,21,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,5,1,612,792,BAAAAA+LiberationSans-Bold,#000,85,91,331,343,331,21,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,Item,1,612,792,BAAAAA+LiberationSans-Bold,#000,306,331,331,343,331,22,Table Contents,Document;Table;TR;TD;P
-,I-Tableau,6,1,612,792,BAAAAA+LiberationSans-Bold,#000,334,341,331,343,331,22,Table Contents,Document;Table;TR;TD;P
-,B-Alinea,Figure,1,612,792,CAAAAA+LiberationSerif,#000,57,88,369,381,369,23,Text body,Document;P
-,I-Alinea,1,1,612,792,CAAAAA+LiberationSerif,#000,91,97,369,381,369,23,Text body,Document;P
-,I-Alinea,:,1,612,792,CAAAAA+LiberationSerif,#000,100,104,369,381,369,25,Text body,Document;P
-,I-Alinea,Bébelles,1,612,792,CAAAAA+LiberationSerif,#000,106,148,369,381,369,25,Text body,Document;P
-,O,Tarte,1,612,792,DAAAAA+LiberationSans,#000,484,507,515,525,515,27,P,Document;P;Figure;P
-,O,Pommes,1,612,792,DAAAAA+LiberationSans,#000,484,523,529,539,529,28,P,Document;P;Figure;P
-,O,Sucre,1,612,792,DAAAAA+LiberationSans,#000,484,510,543,553,543,29,P,Document;P;Figure;P
-,O,Crème,1,612,792,DAAAAA+LiberationSans,#000,484,513,557,567,557,30,P,Document;P;Figure;P
+O,B-Titre,Document,1,612,792,BAAAAA+LiberationSans-Bold,#000,75,212,67,95,67,0,Title,Document;P
+O,I-Titre,avec,1,612,792,BAAAAA+LiberationSans-Bold,#000,220,282,67,95,67,0,Title,Document;P
+O,I-Titre,tableaux,1,612,792,BAAAAA+LiberationSans-Bold,#000,289,403,67,95,67,0,Title,Document;P
+O,I-Titre,et,1,612,792,BAAAAA+LiberationSans-Bold,#000,411,436,67,95,67,0,Title,Document;P
+O,I-Titre,figures,1,612,792,BAAAAA+LiberationSans-Bold,#000,443,537,67,95,67,0,Title,Document;P
+O,B-Chapitre,Chapitre,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,130,118,136,118,1,H1,Document;H1
+O,I-Chapitre,1,1,612,792,BAAAAA+LiberationSans-Bold,#000,135,145,118,136,118,1,H1,Document;H1
+O,I-Chapitre,:,1,612,792,BAAAAA+LiberationSans-Bold,#000,150,156,118,136,118,3,H1,Document;H1
+O,I-Chapitre,Chapitre,1,612,792,BAAAAA+LiberationSans-Bold,#000,161,234,118,136,118,3,H1,Document;H1
+O,I-Chapitre,Un,1,612,792,BAAAAA+LiberationSans-Bold,#000,239,263,118,136,118,3,H1,Document;H1
+O,B-Section,Section,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,115,155,171,155,4,H2,Document;H2
+O,I-Section,1,1,612,792,BAAAAA+LiberationSans-Bold,#000,119,128,155,171,155,4,H2,Document;H2
+O,I-Section,:,1,612,792,BAAAAA+LiberationSans-Bold,#000,132,138,155,171,155,6,H2,Document;H2
+O,I-Section,Section,1,612,792,BAAAAA+LiberationSans-Bold,#000,142,200,155,171,155,6,H2,Document;H2
+O,I-Section,Un,1,612,792,BAAAAA+LiberationSans-Bold,#000,204,226,155,171,155,6,H2,Document;H2
+O,B-Alinea,Lorem,1,612,792,CAAAAA+LiberationSerif,#000,57,89,179,191,179,7,Text body,Document;P
+O,I-Alinea,ipsum,1,612,792,CAAAAA+LiberationSerif,#000,92,121,179,191,179,7,Text body,Document;P
+O,I-Alinea,dolor,1,612,792,CAAAAA+LiberationSerif,#000,124,149,179,191,179,7,Text body,Document;P
+O,I-Alinea,sit,1,612,792,CAAAAA+LiberationSerif,#000,152,164,179,191,179,7,Text body,Document;P
+O,I-Alinea,"amet,",1,612,792,CAAAAA+LiberationSerif,#000,167,193,179,191,179,7,Text body,Document;P
+O,I-Alinea,consectetur,1,612,792,CAAAAA+LiberationSerif,#000,196,251,179,191,179,7,Text body,Document;P
+O,I-Alinea,adipiscing,1,612,792,CAAAAA+LiberationSerif,#000,254,303,179,191,179,7,Text body,Document;P
+O,I-Alinea,"elit,",1,612,792,CAAAAA+LiberationSerif,#000,306,324,179,191,179,7,Text body,Document;P
+O,I-Alinea,sed,1,612,792,CAAAAA+LiberationSerif,#000,327,343,179,191,179,7,Text body,Document;P
+O,I-Alinea,do,1,612,792,CAAAAA+LiberationSerif,#000,346,358,179,191,179,7,Text body,Document;P
+O,I-Alinea,eiusmod,1,612,792,CAAAAA+LiberationSerif,#000,361,402,179,191,179,7,Text body,Document;P
+O,I-Alinea,tempor,1,612,792,CAAAAA+LiberationSerif,#000,405,439,179,191,179,7,Text body,Document;P
+O,I-Alinea,incididunt,1,612,792,CAAAAA+LiberationSerif,#000,442,490,179,191,179,7,Text body,Document;P
+O,I-Alinea,ut,1,612,792,CAAAAA+LiberationSerif,#000,494,503,179,191,179,7,Text body,Document;P
+O,I-Alinea,labore,1,612,792,CAAAAA+LiberationSerif,#000,506,536,179,191,179,7,Text body,Document;P
+O,I-Alinea,et,1,612,792,CAAAAA+LiberationSerif,#000,539,547,179,191,179,7,Text body,Document;P
+O,I-Alinea,dolore,1,612,792,CAAAAA+LiberationSerif,#000,57,87,195,207,195,8,Text body,Document;P
+O,I-Alinea,magna,1,612,792,CAAAAA+LiberationSerif,#000,90,122,195,207,195,8,Text body,Document;P
+O,I-Alinea,aliqua.,1,612,792,CAAAAA+LiberationSerif,#000,125,158,195,207,195,8,Text body,Document;P
+O,I-Alinea,Ut,1,612,792,CAAAAA+LiberationSerif,#000,161,173,195,207,195,8,Text body,Document;P
+O,I-Alinea,enim,1,612,792,CAAAAA+LiberationSerif,#000,176,200,195,207,195,8,Text body,Document;P
+O,I-Alinea,ad,1,612,792,CAAAAA+LiberationSerif,#000,203,214,195,207,195,8,Text body,Document;P
+O,I-Alinea,minim,1,612,792,CAAAAA+LiberationSerif,#000,217,248,195,207,195,8,Text body,Document;P
+O,I-Alinea,"veniam,",1,612,792,CAAAAA+LiberationSerif,#000,251,290,195,207,195,8,Text body,Document;P
+O,I-Alinea,quis,1,612,792,CAAAAA+LiberationSerif,#000,293,313,195,207,195,8,Text body,Document;P
+O,I-Alinea,nostrud,1,612,792,CAAAAA+LiberationSerif,#000,316,352,195,207,195,8,Text body,Document;P
+O,I-Alinea,exercitation,1,612,792,CAAAAA+LiberationSerif,#000,355,411,195,207,195,8,Text body,Document;P
+O,I-Alinea,ullamco,1,612,792,CAAAAA+LiberationSerif,#000,414,453,195,207,195,8,Text body,Document;P
+O,I-Alinea,laboris,1,612,792,CAAAAA+LiberationSerif,#000,456,488,195,207,195,8,Text body,Document;P
+O,I-Alinea,nisi,1,612,792,CAAAAA+LiberationSerif,#000,491,509,195,207,195,8,Text body,Document;P
+O,I-Alinea,ut,1,612,792,CAAAAA+LiberationSerif,#000,512,521,195,207,195,8,Text body,Document;P
+O,I-Alinea,aliquip,1,612,792,CAAAAA+LiberationSerif,#000,57,90,211,223,211,9,Text body,Document;P
+O,I-Alinea,ex,1,612,792,CAAAAA+LiberationSerif,#000,93,104,211,223,211,9,Text body,Document;P
+O,I-Alinea,ea,1,612,792,CAAAAA+LiberationSerif,#000,107,118,211,223,211,9,Text body,Document;P
+O,I-Alinea,commodo,1,612,792,CAAAAA+LiberationSerif,#000,121,169,211,223,211,9,Text body,Document;P
+O,I-Alinea,consequat.,1,612,792,CAAAAA+LiberationSerif,#000,172,223,211,223,211,9,Text body,Document;P
+O,I-Alinea,Duis,1,612,792,CAAAAA+LiberationSerif,#000,226,249,211,223,211,9,Text body,Document;P
+O,I-Alinea,aute,1,612,792,CAAAAA+LiberationSerif,#000,252,272,211,223,211,9,Text body,Document;P
+O,I-Alinea,irure,1,612,792,CAAAAA+LiberationSerif,#000,275,297,211,223,211,9,Text body,Document;P
+O,I-Alinea,dolor,1,612,792,CAAAAA+LiberationSerif,#000,300,326,211,223,211,9,Text body,Document;P
+O,I-Alinea,in,1,612,792,CAAAAA+LiberationSerif,#000,329,338,211,223,211,9,Text body,Document;P
+O,I-Alinea,reprehenderit,1,612,792,CAAAAA+LiberationSerif,#000,341,405,211,223,211,9,Text body,Document;P
+O,I-Alinea,in,1,612,792,CAAAAA+LiberationSerif,#000,408,417,211,223,211,9,Text body,Document;P
+O,I-Alinea,voluptate,1,612,792,CAAAAA+LiberationSerif,#000,420,465,211,223,211,9,Text body,Document;P
+O,I-Alinea,velit,1,612,792,CAAAAA+LiberationSerif,#000,468,489,211,223,211,9,Text body,Document;P
+O,I-Alinea,esse,1,612,792,CAAAAA+LiberationSerif,#000,492,512,211,223,211,9,Text body,Document;P
+O,I-Alinea,cillum,1,612,792,CAAAAA+LiberationSerif,#000,515,546,211,223,211,9,Text body,Document;P
+O,I-Alinea,dolore,1,612,792,CAAAAA+LiberationSerif,#000,57,87,227,239,227,10,Text body,Document;P
+O,I-Alinea,eu,1,612,792,CAAAAA+LiberationSerif,#000,90,102,227,239,227,10,Text body,Document;P
+O,I-Alinea,fugiat,1,612,792,CAAAAA+LiberationSerif,#000,105,133,227,239,227,10,Text body,Document;P
+O,I-Alinea,nulla,1,612,792,CAAAAA+LiberationSerif,#000,136,160,227,239,227,10,Text body,Document;P
+O,I-Alinea,pariatur.,1,612,792,CAAAAA+LiberationSerif,#000,163,202,227,239,227,10,Text body,Document;P
+O,I-Alinea,Excepteur,1,612,792,CAAAAA+LiberationSerif,#000,205,254,227,239,227,10,Text body,Document;P
+O,I-Alinea,sint,1,612,792,CAAAAA+LiberationSerif,#000,257,274,227,239,227,10,Text body,Document;P
+O,I-Alinea,occaecat,1,612,792,CAAAAA+LiberationSerif,#000,277,319,227,239,227,10,Text body,Document;P
+O,I-Alinea,cupidatat,1,612,792,CAAAAA+LiberationSerif,#000,322,366,227,239,227,10,Text body,Document;P
+O,I-Alinea,non,1,612,792,CAAAAA+LiberationSerif,#000,369,387,227,239,227,10,Text body,Document;P
+O,I-Alinea,"proident,",1,612,792,CAAAAA+LiberationSerif,#000,390,432,227,239,227,10,Text body,Document;P
+O,I-Alinea,sunt,1,612,792,CAAAAA+LiberationSerif,#000,435,456,227,239,227,10,Text body,Document;P
+O,I-Alinea,in,1,612,792,CAAAAA+LiberationSerif,#000,458,468,227,239,227,10,Text body,Document;P
+O,I-Alinea,culpa,1,612,792,CAAAAA+LiberationSerif,#000,471,497,227,239,227,10,Text body,Document;P
+O,I-Alinea,qui,1,612,792,CAAAAA+LiberationSerif,#000,500,515,227,239,227,10,Text body,Document;P
+O,I-Alinea,officia,1,612,792,CAAAAA+LiberationSerif,#000,518,549,227,239,227,10,Text body,Document;P
+O,I-Alinea,deserunt,1,612,792,CAAAAA+LiberationSerif,#000,57,97,243,255,243,11,Text body,Document;P
+O,I-Alinea,mollit,1,612,792,CAAAAA+LiberationSerif,#000,100,129,243,255,243,11,Text body,Document;P
+O,I-Alinea,anim,1,612,792,CAAAAA+LiberationSerif,#000,132,156,243,255,243,11,Text body,Document;P
+O,I-Alinea,id,1,612,792,CAAAAA+LiberationSerif,#000,159,168,243,255,243,11,Text body,Document;P
+O,I-Alinea,est,1,612,792,CAAAAA+LiberationSerif,#000,171,185,243,255,243,11,Text body,Document;P
+O,I-Alinea,laborum.,1,612,792,CAAAAA+LiberationSerif,#000,188,231,243,255,243,11,Text body,Document;P
+O,B-Titre,Tableau,1,612,792,CAAAAA+LiberationSerif,#000,57,95,266,278,266,12,Text body,Document;P
+O,I-Titre,1,1,612,792,CAAAAA+LiberationSerif,#000,98,104,266,278,266,12,Text body,Document;P
+O,I-Titre,:,1,612,792,CAAAAA+LiberationSerif,#000,107,110,266,278,266,14,Text body,Document;P
+O,I-Titre,Bibittes,1,612,792,CAAAAA+LiberationSerif,#000,113,150,266,278,266,14,Text body,Document;P
+O,B-Tableau,Alouette,1,612,792,BAAAAA+LiberationSans-Bold,#fff,57,105,288,300,288,15,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Belette,1,612,792,BAAAAA+LiberationSans-Bold,#fff,306,346,288,300,288,16,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,57,80,303,315,303,17,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,1,1,612,792,DAAAAA+LiberationSans,#000,83,90,303,315,303,17,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,306,329,303,315,303,18,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,2,1,612,792,DAAAAA+LiberationSans,#000,333,339,303,315,303,18,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,57,80,317,329,317,19,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,3,1,612,792,DAAAAA+LiberationSans,#000,83,90,317,329,317,19,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Item,1,612,792,DAAAAA+LiberationSans,#000,306,329,317,329,317,20,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,4,1,612,792,DAAAAA+LiberationSans,#000,333,339,317,329,317,20,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Item,1,612,792,BAAAAA+LiberationSans-Bold,#000,57,81,331,343,331,21,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,5,1,612,792,BAAAAA+LiberationSans-Bold,#000,85,91,331,343,331,21,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,Item,1,612,792,BAAAAA+LiberationSans-Bold,#000,306,331,331,343,331,22,Table Contents,Document;Table;TR;TD;P
+O,I-Tableau,6,1,612,792,BAAAAA+LiberationSans-Bold,#000,334,341,331,343,331,22,Table Contents,Document;Table;TR;TD;P
+O,B-Alinea,Figure,1,612,792,CAAAAA+LiberationSerif,#000,57,88,369,381,369,23,Text body,Document;P
+O,I-Alinea,1,1,612,792,CAAAAA+LiberationSerif,#000,91,97,369,381,369,23,Text body,Document;P
+O,I-Alinea,:,1,612,792,CAAAAA+LiberationSerif,#000,100,104,369,381,369,25,Text body,Document;P
+O,I-Alinea,Bébelles,1,612,792,CAAAAA+LiberationSerif,#000,106,148,369,381,369,25,Text body,Document;P
+O,O,Tarte,1,612,792,DAAAAA+LiberationSans,#000,484,507,515,525,515,27,P,Document;P;Figure;P
+O,O,Pommes,1,612,792,DAAAAA+LiberationSans,#000,484,523,529,539,529,28,P,Document;P;Figure;P
+O,O,Sucre,1,612,792,DAAAAA+LiberationSans,#000,484,510,543,553,543,29,P,Document;P;Figure;P
+O,O,Crème,1,612,792,DAAAAA+LiberationSans,#000,484,513,557,567,557,30,P,Document;P;Figure;P

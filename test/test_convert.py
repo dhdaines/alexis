@@ -22,14 +22,14 @@ def test_extract_tables_and_figures():
     with open(DATADIR / "pdf_figures.pdf", "rb") as infh:
         conv = Converteur(infh)
         words = list(conv.extract_words())
-        tables = list(conv.extract_tables())
-        figures = list(conv.extract_figures())
-        assert len(tables) == 1
-        assert len(figures) == 1
+        images = list(conv.extract_images())
+        assert len(images) == 2
+        table = next(img for img in images if img.type == "Tableau")
+        figure = next(img for img in images if img.type == "Figure")
         for w in words:
-            if bbox_contains(tables[0].bbox, obj_to_bbox(w)):
+            if bbox_contains(table.bbox, obj_to_bbox(w)):
                 assert "Table" in w["tagstack"]
-            if bbox_contains(figures[0].bbox, obj_to_bbox(w)):
+            if bbox_contains(figure.bbox, obj_to_bbox(w)):
                 assert "Figure" in w["tagstack"]
 
 
