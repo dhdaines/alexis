@@ -277,8 +277,10 @@ FEATURES: dict[str, FeatureFunc] = {
 
 def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int = 1):
     if isinstance(feature_func, str):
-        feature_func = FEATURES.get(feature_func, literal)
-    features = [feature_func(i, w) for i, w in enumerate(page)]
+        feature_func_func = FEATURES.get(feature_func, literal)
+    else:
+        feature_func_func = feature_func
+    features = [feature_func_func(i, w) for i, w in enumerate(page)]
 
     def adjacent(features, label):
         return (":".join((label, feature)) for feature in features if feature != "bias")
