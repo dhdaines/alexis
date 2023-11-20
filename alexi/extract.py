@@ -251,10 +251,10 @@ def extract_serafim(args, path, iob, conv):
         LOGGER.info("Extraction d'images de %s", path)
         blocs = list(group_iob(iob))
         blocs = insert_images_from_pdf(blocs, conv, imgdir)
-        doc = analyseur(iob, blocs)
+        doc = analyseur(blocs)
     else:
         LOGGER.info("Analyse de la structure de %s", path)
-        doc = analyseur(iob)
+        doc = analyseur()
     with open(docdir / f"{path.stem}.json", "wt") as outfh:
         LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
         docdict = format_dict(doc, imgdir=path.stem)
@@ -406,10 +406,10 @@ def extract_html(args, path, iob, conv):
         imgdir.mkdir(parents=True, exist_ok=True)
         blocs = list(group_iob(iob))
         blocs = insert_images_from_pdf(blocs, conv, imgdir)
-        doc = analyseur(iob, blocs)
+        doc = analyseur(blocs)
     else:
         LOGGER.info("Analyse de la structure de %s", path)
-        doc = analyseur(iob)
+        doc = analyseur()
 
     if doc.numero and doc.numero != path.stem:
         LOGGER.info("Lien %s => %s", doc.numero, path.stem)

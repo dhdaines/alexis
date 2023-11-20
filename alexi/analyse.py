@@ -184,7 +184,6 @@ class Analyseur:
 
     def __call__(
         self,
-        words: Iterable[T_obj],
         blocs: Optional[Iterable[Bloc]] = None,
     ) -> Document:
         """Analyse du structure d'un document."""

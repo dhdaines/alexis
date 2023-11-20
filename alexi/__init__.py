@@ -78,7 +78,7 @@ def xml_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en XML"""
     reader = csv.DictReader(args.csv)
     analyseur = Analyseur(args.csv.name, reader)
-    print(format_xml(analyseur(reader)))
+    print(format_xml(analyseur()))
 
 
 def html_main(args: argparse.Namespace):
@@ -88,9 +88,9 @@ def html_main(args: argparse.Namespace):
     if args.images is not None:
         with open(args.images / "images.json", "rt") as infh:
             images = [Bloc(**image_dict) for image_dict in json.load(infh)]
-            doc = analyseur(reader, images)
+            doc = analyseur(images)
     else:
-        doc = analyseur(reader)
+        doc = analyseur()
     print(format_html(doc))
 
 
@@ -101,9 +101,9 @@ def json_main(args: argparse.Namespace):
     if args.images:
         with open(args.images / "images.json", "rt") as infh:
             images = [Bloc(**image_dict) for image_dict in json.load(infh)]
-            doc = analyseur(iob, images)
+            doc = analyseur(images)
     else:
-        doc = analyseur(iob)
+        doc = analyseur()
     print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
 
