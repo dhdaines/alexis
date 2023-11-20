@@ -6,6 +6,7 @@ from pathlib import Path
 
 import joblib  # type: ignore
 import sklearn_crfsuite as crfsuite  # type: ignore
+
 from alexi.label import load, make_data
 
 

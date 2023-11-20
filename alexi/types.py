@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from pdfplumber.utils.geometry import T_bbox, merge_bboxes
 from typing import Any, Optional
+
+from pdfplumber.utils.geometry import T_bbox, merge_bboxes
 
 T_obj = dict[str, Any]
 

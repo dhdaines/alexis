@@ -7,15 +7,17 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 import argparse
 import csv
 import dataclasses
+import itertools
 import json
 import logging
+import operator
 import sys
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
-
+from . import download, extract
 from .analyse import Analyseur, Bloc
-from .convert import FIELDNAMES, Converteur
+from .convert import FIELDNAMES, Converteur, merge_overlaps
 from .format import format_dict, format_html, format_xml
 from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
@@ -23,7 +25,6 @@ from .label import Extracteur
 from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
-from . import extract, download
 
 LOGGER = logging.getLogger("alexi")
 
@@ -46,15 +47,19 @@ def convert_main(args: argparse.Namespace):
     if args.images is not None:
         args.images.mkdir(parents=True, exist_ok=True)
         images: list[dict] = []
-        for bloc in conv.extract_images(pages):
-            images.append(dataclasses.asdict(bloc))
-            img = (
-                conv.pdf.pages[bloc.page_number - 1]
-                .crop(bloc.bbox)
-                .to_image(resolution=150, antialias=True)
-            )
-            LOGGER.info("Extraction de %s", args.images / bloc.img)
-            img.save(args.images / bloc.img)
+        for page_number, group in itertools.groupby(
+            conv.extract_images(pages), operator.attrgetter("page_number")
+        ):
+            merged = merge_overlaps(group)
+            for bloc in merged:
+                images.append(dataclasses.asdict(bloc))
+                img = (
+                    conv.pdf.pages[bloc.page_number - 1]
+                    .crop(bloc.bbox)
+                    .to_image(resolution=150, antialias=True)
+                )
+                LOGGER.info("Extraction de %s", args.images / bloc.img)
+                img.save(args.images / bloc.img)
         with open(args.images / "images.json", "wt") as outfh:
             json.dump(images, outfh, indent=2)
     write_csv(conv.extract_words(pages), sys.stdout)
@@ -87,11 +92,13 @@ def html_main(args: argparse.Namespace):
     analyseur = Analyseur(args.csv.name, reader)
     if args.images is not None:
         with open(args.images / "images.json", "rt") as infh:
-            images = [Bloc(**image_dict) for image_dict in json.load(infh)]
-            doc = analyseur(images)
+            images = (Bloc(**image_dict) for image_dict in json.load(infh))
+            analyseur.add_images(images, merge=False)
+        doc = analyseur()
+        print(format_html(doc, imgdir=args.images))
     else:
         doc = analyseur()
-    print(format_html(doc))
+        print(format_html(doc))
 
 
 def json_main(args: argparse.Namespace):

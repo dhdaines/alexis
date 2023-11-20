@@ -8,8 +8,8 @@ import argparse
 import json
 import logging
 import re
-import urllib
 import subprocess
+import urllib
 from pathlib import Path
 
 from bs4 import BeautifulSoup

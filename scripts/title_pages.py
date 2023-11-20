@@ -5,8 +5,8 @@ Extraire les pages pour entrainement du modèle de titre
 """
 
 import argparse
-import itertools
 import csv
+import itertools
 from pathlib import Path
 
 

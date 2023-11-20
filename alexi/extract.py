@@ -12,14 +12,16 @@ import operator
 import os
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, Iterator, TextIO
+from typing import Any, Iterable, TextIO
 
-from alexi.types import Bloc, T_bbox
-from alexi.analyse import Analyseur, group_iob, Element, Document
-from alexi.convert import Converteur, bbox_contains, bbox_overlaps
-from alexi.segment import Segmenteur, DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
-from alexi.format import format_html, format_text, format_dict
-from alexi.label import Extracteur, DEFAULT_MODEL as DEFAULT_LABEL_MODEL
+from alexi.analyse import Analyseur, Document, Element
+from alexi.convert import Converteur
+from alexi.format import format_dict, format_html, format_text
+from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
+from alexi.label import Extracteur
+from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
+from alexi.segment import Segmenteur
+from alexi.types import Bloc
 
 LOGGER = logging.getLogger("extract")
 
@@ -66,18 +68,17 @@ def extract_serafim(args, path, iob, conv):
     imgdir = args.outdir / "public" / "img" / path.stem
     LOGGER.info("Génération de fichiers SÈRAFIM sous %s", docdir)
     docdir.mkdir(parents=True, exist_ok=True)
-    analyseur = Analyseur(iob)
+    analyseur = Analyseur(path.stem, iob)
     if not args.no_images:
         LOGGER.info("Extraction d'images sous %s", imgdir)
         imgdir.mkdir(parents=True, exist_ok=True)
     if conv and not args.no_images:
         LOGGER.info("Extraction d'images de %s", path)
-        blocs = list(group_iob(iob))
-        blocs = insert_images_from_pdf(blocs, conv, imgdir)
-        doc = analyseur(blocs)
-    else:
-        LOGGER.info("Analyse de la structure de %s", path)
-        doc = analyseur()
+        images = conv.extract_images()
+        analyseur.add_images(images)
+        save_images_from_pdf(analyseur.blocs, conv, imgdir)
+    LOGGER.info("Analyse de la structure de %s", path)
+    doc = analyseur()
     with open(docdir / f"{path.stem}.json", "wt") as outfh:
         LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
         docdict = format_dict(doc, imgdir=path.stem)

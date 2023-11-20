@@ -7,7 +7,7 @@ import logging
 import re
 from collections import deque
 from pathlib import Path
-from typing import Iterator, Optional, Sequence, Any
+from typing import Any, Iterator, Optional, Sequence
 
 from alexi.analyse import Bloc, Document, Element, T_obj
 

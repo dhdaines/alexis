@@ -4,7 +4,7 @@ import csv
 import itertools
 import re
 from pathlib import Path
-from typing import Iterable, Any
+from typing import Any, Iterable
 
 import joblib  # type: ignore
 

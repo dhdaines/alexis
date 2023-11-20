@@ -1,8 +1,8 @@
 import csv
 from pathlib import Path
 
-from alexi.convert import Converteur
 from alexi.analyse import Analyseur, group_iob
+from alexi.convert import Converteur
 from alexi.format import format_xml
 
 DATADIR = Path(__file__).parent / "data"

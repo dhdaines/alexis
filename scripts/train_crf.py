@@ -7,6 +7,7 @@ from typing import Iterable, Iterator, Optional
 
 import joblib  # type: ignore
 import sklearn_crfsuite as crfsuite  # type: ignore
+
 from alexi.segment import load, page2features, page2labels, split_pages
 
 

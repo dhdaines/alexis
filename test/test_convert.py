@@ -1,8 +1,9 @@
 import csv
 from pathlib import Path
 
-from alexi.convert import Converteur, bbox_contains
 from pdfplumber.utils.geometry import obj_to_bbox
+
+from alexi.convert import Converteur, bbox_contains
 
 DATADIR = Path(__file__).parent / "data"
 
