@@ -25,7 +25,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
         pip install -e .
-        mypy --install-types
 
     - name: Validate against psf/black
       run: python -m black --check alexi test scripts
