@@ -19,8 +19,8 @@ from alexi.convert import Converteur
 from alexi.format import format_dict, format_html, format_text
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Extracteur
-from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL, DEFAULT_MODEL_NOSTRUCT
-from alexi.segment import Segmenteur
+from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
+from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
 from alexi.types import Bloc
 
 LOGGER = logging.getLogger("extract")
