@@ -9,7 +9,7 @@ import json
 import logging
 import re
 import subprocess
-import urllib
+import urllib.parse
 from pathlib import Path
 
 from bs4 import BeautifulSoup
