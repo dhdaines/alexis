@@ -6,17 +6,15 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 
 import argparse
 import csv
+import dataclasses
 import json
 import logging
-import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
-from bs4 import BeautifulSoup
 
-from .analyse import Analyseur
+from .analyse import Analyseur, Bloc
 from .convert import FIELDNAMES, Converteur
 from .format import format_dict, format_html, format_xml
 from .index import index
@@ -38,7 +36,7 @@ def write_csv(
     writer.writerows(doc)
 
 
-def convert_main(args):
+def convert_main(args: argparse.Namespace):
     """Convertir les PDF en CSV"""
     if args.pages:
         pages = [max(0, int(x) - 1) for x in args.pages.split(",")]
@@ -47,9 +45,9 @@ def convert_main(args):
     conv = Converteur(args.pdf)
     if args.images is not None:
         args.images.mkdir(parents=True, exist_ok=True)
-        images = {}
+        images: list[dict] = []
         for bloc in conv.extract_images(pages):
-            images.setdefault(bloc.page_number, []).append(bloc.img)
+            images.append(dataclasses.asdict(bloc))
             img = (
                 conv.pdf.pages[bloc.page_number - 1]
                 .crop(bloc.bbox)
@@ -58,57 +56,63 @@ def convert_main(args):
             LOGGER.info("Extraction de %s", args.images / bloc.img)
             img.save(args.images / bloc.img)
         with open(args.images / "images.json", "wt") as outfh:
-            json.dump(images, outfh)
+            json.dump(images, outfh, indent=2)
     write_csv(conv.extract_words(pages), sys.stdout)
 
 
-def segment_main(args):
+def segment_main(args: argparse.Namespace):
     """Segmenter un CSV"""
     crf = Segmenteur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
 
 
-def label_main(args):
+def label_main(args: argparse.Namespace):
     """Étiquetter un CSV"""
     crf = Extracteur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
 
 
-def xml_main(args):
+def xml_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en XML"""
     reader = csv.DictReader(args.csv)
-    doc = Analyseur()(reader)
-    print(format_xml(doc))
+    analyseur = Analyseur(args.csv.name, reader)
+    print(format_xml(analyseur(reader)))
 
 
-def html_main(args):
+def html_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en HTML"""
     reader = csv.DictReader(args.csv)
-    doc = Analyseur()(reader)
+    analyseur = Analyseur(args.csv.name, reader)
+    if args.images is not None:
+        with open(args.images / "images.json", "rt") as infh:
+            images = [Bloc(**image_dict) for image_dict in json.load(infh)]
+            doc = analyseur(reader, images)
+    else:
+        doc = analyseur(reader)
     print(format_html(doc))
 
 
-def json_main(args):
+def json_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en JSON"""
     iob = csv.DictReader(args.csv)
-    analyseur = Analyseur()
+    analyseur = Analyseur(args.csv.name, iob)
     if args.images:
-        with open(args.images, "rt") as infh:
-            images = json.load(infh)
+        with open(args.images / "images.json", "rt") as infh:
+            images = [Bloc(**image_dict) for image_dict in json.load(infh)]
             doc = analyseur(iob, images)
     else:
         doc = analyseur(iob)
     print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
 
-def index_main(args):
+def index_main(args: argparse.Namespace):
     """Construire un index sur des fichiers JSON"""
     index(args.indir, args.outdir)
 
 
-def search_main(args):
+def search_main(args: argparse.Namespace):
     """Lancer une recherche sur l'index"""
     search(args.indexdir, args.query)
 
@@ -178,6 +182,9 @@ def make_argparse() -> argparse.ArgumentParser:
         help="Extraire la structure en format HTML en partant du CSV étiquetté",
     )
     html.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
+    html.add_argument(
+        "--images", help="Répertoire avec des images des tableaux", type=Path
+    )
     html.set_defaults(func=html_main)
 
     jsonf = subp.add_parser(

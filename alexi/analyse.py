@@ -173,23 +173,23 @@ class Document:
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
+    def __init__(self, fileid: str, words: Iterable[T_obj]):
+        self.fileid = fileid
+        self.word_sequence: list[T_obj] = list(words)
+        self.metadata: dict[str, str] = {}
+        for bloc in group_iob(self.word_sequence, "sequence"):
+            if bloc.type not in self.metadata:
+                LOGGER.info(f"{bloc.type}: {bloc.texte}")
+                self.metadata[bloc.type] = bloc.texte
+
     def __call__(
         self,
-        fileid: str,
         words: Iterable[T_obj],
         blocs: Optional[Iterable[Bloc]] = None,
     ) -> Document:
         """Analyse du structure d'un document."""
-        # Store all inputs as we will do two passes (for sequence and segment tags)
-        word_sequence = list(words)
-        # Get metadata from sequence tags
-        metadata = {}
-        for bloc in group_iob(word_sequence, "sequence"):
-            if bloc.type not in metadata:
-                LOGGER.info(f"{bloc.type}: {bloc.texte}")
-                metadata[bloc.type] = bloc.texte
-        titre = metadata.get("Titre", "Document")
-        numero = metadata.get("Numero", "")
+        titre = self.metadata.get("Titre", "Document")
+        numero = self.metadata.get("Numero", "")
         if m := re.search(r"(?i:num[ée]ro)\s+([0-9][A-Z0-9-]+)", titre):
             LOGGER.info("Numéro extrait du titre: %s", m.group(1))
             numero = m.group(1)
@@ -198,11 +198,11 @@ class Analyseur:
             LOGGER.info("Numéro extrait du titre: %s", m.group(1))
             numero = m.group(1)
             titre = titre[: m.start(1)] + titre[m.end(1) :]
-        doc = Document(fileid, numero, titre)
-        doc.meta = metadata
+        doc = Document(self.fileid, numero, titre)
+        doc.meta = self.metadata
         # Group block-level text elements by page from segment tags
         if blocs is None:
-            blocs = group_iob(word_sequence)
+            blocs = group_iob(self.word_sequence)
         for page, blocs in itertools.groupby(blocs, operator.attrgetter("page_number")):
             for bloc in blocs:
                 doc.add_bloc(bloc)
