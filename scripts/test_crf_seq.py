@@ -5,7 +5,7 @@ import itertools
 from pathlib import Path
 from typing import Iterable
 
-import joblib
+import joblib  # type: ignore
 import sklearn_crfsuite as crfsuite  # type: ignore
 from sklearn_crfsuite import metrics
 from alexi.label import load, make_data

@@ -7,7 +7,7 @@ import logging
 import re
 from collections import deque
 from pathlib import Path
-from typing import Iterator, Optional, Sequence
+from typing import Iterator, Optional, Sequence, Any
 
 from alexi.analyse import Bloc, Document, Element, T_obj
 
@@ -155,7 +155,7 @@ def format_html(
     else:
         doc_body = "\n".join(element_html(element, indent))
     if fragment:
-        return "\n".join(element_html(element, indent))
+        return "\n".join(doc_body)
     else:
         doc_header = f"""<!DOCTYPE html>
 <html>
@@ -221,11 +221,11 @@ def format_text(
     return "\n".join(element_text(element))
 
 
-def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
+def format_dict(doc: Document, imgdir: str = ".") -> dict[str, Any]:  # noqa: C901
     """Formatter un document en dictionnaire afin d'émettre un JSON pour
     utilisation dans SÈRAFIM"""
     # structure de base
-    doc_dict = {
+    doc_dict: dict[str, Any] = {
         "fichier": None,
         "titre": doc.meta.get("Titre"),
         "numero": doc.meta.get("Numero"),
@@ -265,8 +265,8 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
         if len(contenus) == 0:
             pages = [page, page]
         else:
-            pages = ([int(contenus[0].page_number), int(contenus[-1].page_number)],)
-        texte = {
+            pages = [int(contenus[0].page_number), int(contenus[-1].page_number)]
+        texte: dict[str, Any] = {
             "titre": titre,
             "pages": pages,
             "contenu": contenu,
@@ -288,11 +288,11 @@ def format_dict(doc: Document, imgdir: str = ".") -> str:  # noqa: C901
     # depth-first traverse adding leaf nodes as textes. total hack,
     # not refactored, doomed to go away at some point
     d = deque(doc.structure.sub)
-    chapitre = None
+    chapitre: Optional[dict[str, Any]] = None
     chapitre_idx = 0
-    section = None
+    section: Optional[dict[str, Any]] = None
     section_idx = 0
-    sous_section = None
+    sous_section: Optional[dict[str, Any]] = None
     sous_section_idx = 0
     while d:
         el = d.popleft()

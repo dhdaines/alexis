@@ -205,6 +205,8 @@ class Converteur:
         def gather_elements() -> Iterator[PDFStructElement]:
             """Traverser l'arbre structurel en profondeur pour chercher les
             figures et tableaux."""
+            if self.tree is None:
+                return
             d = deque(self.tree)
             while d:
                 el = d.popleft()
@@ -219,11 +221,13 @@ class Converteur:
             """Trouver tous les MCIDs (avec numeros de page, sinon ils sont
             inutiles!) à l'intérieur d'un élément structurel"""
             for mcid in el.mcids:
+                assert el.page_number is not None
                 yield el.page_number, mcid
             d = deque(el.children)
             while d:
                 el = d.popleft()
                 for mcid in el.mcids:
+                    assert el.page_number is not None
                     yield el.page_number, mcid
                 d.extend(el.children)
 

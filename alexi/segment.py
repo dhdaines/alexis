@@ -305,7 +305,7 @@ def bonly(_, word):
     return "-".join((bio, name))
 
 
-LabelFunc = Callable[[str], str]
+LabelFunc = Callable[[int, dict[str, Any]], str]
 LABELS: dict[str, LabelFunc] = {
     "literal": lambda _, x: x.get("segment", "O"),
     "bonly": bonly,

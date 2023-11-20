@@ -178,8 +178,13 @@ def insert_outside_blocs(
                 yield bloc
 
 
-def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterator[Bloc]:
-    images = {}
+def insert_images_from_pdf(
+    blocs: list[Bloc], conv: Converteur, docdir: Path
+) -> Iterator[Bloc]:
+    """Convertir des éléments du PDF difficiles à réaliser en texte en
+    images et les insérer dans la structure du document (liste de blocs).
+    """
+    images: dict[int, list[Bloc]] = {}
     # Find images in tagged text
     for bloc in blocs:
         if bloc.type in ("Tableau", "Figure"):
@@ -193,7 +198,7 @@ def extract_images(blocs: list[Bloc], conv: Converteur, docdir: Path) -> Iterato
         if bloc in replace_blocs:
             blocs[idx] = replace_blocs[bloc]
     # Find ones not linked to any text and not contained in existing blocs
-    insert_blocs = {}
+    insert_blocs: dict[int, list[Bloc]] = {}
     for bloc in struct_blocs:
         assert isinstance(bloc.page_number, int)
         if bloc.contenu:
@@ -245,11 +250,11 @@ def extract_serafim(args, path, iob, conv):
     if conv and not args.no_images:
         LOGGER.info("Extraction d'images de %s", path)
         blocs = list(group_iob(iob))
-        blocs = extract_images(blocs, conv, imgdir)
-        doc = analyseur(iob, blocs)
+        blocs = insert_images_from_pdf(blocs, conv, imgdir)
+        doc = analyseur(path.stem, iob, blocs)
     else:
         LOGGER.info("Analyse de la structure de %s", path)
-        doc = analyseur(iob)
+        doc = analyseur(path.stem, iob)
     with open(docdir / f"{path.stem}.json", "wt") as outfh:
         LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
         docdict = format_dict(doc, imgdir=path.stem)
@@ -299,7 +304,9 @@ def extract_element(
         json.dump(dataclasses.asdict(el), outfh)
 
 
-def make_index_html(topdir: Path, docdir: Path, title: str, elements: list[Element]):
+def make_index_html(
+    topdir: Path, docdir: Path, title: str, elements: Iterable[Element]
+):
     """Create an index.html for docdir."""
     style = os.path.relpath(topdir / "style.css", docdir)
     HTML_HEADER = (
@@ -349,7 +356,7 @@ def extract_html(args, path, iob, conv):
         LOGGER.info("Extraction d'images sous %s", imgdir)
         imgdir.mkdir(parents=True, exist_ok=True)
         blocs = list(group_iob(iob))
-        blocs = extract_images(blocs, conv, imgdir)
+        blocs = insert_images_from_pdf(blocs, conv, imgdir)
         doc = analyseur(path.stem, iob, blocs)
     else:
         LOGGER.info("Analyse de la structure de %s", path)
@@ -450,7 +457,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("</ul>\n")
 
 
-def make_doc_tree(docs: list[tuple[Document, str]], outdir: Path):
+def make_doc_tree(docs: list[Document], outdir: Path):
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
         + """    <title>ALEXI, EXtracteur d'Information</title>

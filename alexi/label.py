@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Iterable, Any
 
-import joblib
+import joblib  # type: ignore
 
 from alexi.analyse import group_iob
 from alexi.convert import FIELDNAMES, Converteur
@@ -70,7 +70,7 @@ class Extracteur:
                     for _ in last_page:
                         yield "O"
             last_page = page
-        if last_page and last_page is not first_page:
+        if last_page:
             yield from self.crf.predict_single(
                 page2features(last_page, feature_func=features, n=2)
             )

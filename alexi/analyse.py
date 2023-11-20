@@ -94,7 +94,7 @@ class Document:
         doc = Element(type="Document", titre=titre, numero=numero)
         self.paliers.setdefault("Document", []).append(doc)
 
-    def extract_numero(self, titre: str) -> str:
+    def extract_numero(self, titre: str) -> tuple[str, str]:
         """Extraire le numero d'un article/chapitre/section/annexe, si possible."""
         # FIXME: UNIT TEST THIS!!!
         if m := NUMRE.match(titre):
