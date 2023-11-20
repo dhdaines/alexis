@@ -12,13 +12,14 @@ from whoosh.fields import ID, NUMERIC, TEXT, Schema  # type: ignore
 from whoosh.index import create_in  # type: ignore
 from whoosh.support.charset import charset_table_to_dict  # type: ignore
 from whoosh.support.charset import default_charset
+from whoosh.writing import IndexWriter  # type: ignore
 
 LOGGER = logging.getLogger("index")
 CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
 
 
-def add_from_dir(writer, document, docdir):
+def add_from_dir(writer: IndexWriter, document: str, docdir: Path) -> None:
     LOGGER.info("Indexing %s", docdir)
     with open(docdir / "index.json") as infh:
         element = json.load(infh)
@@ -30,7 +31,7 @@ def add_from_dir(writer, document, docdir):
         )
 
 
-def index(indir: Path, outdir: Path):
+def index(indir: Path, outdir: Path) -> None:
     outdir.mkdir(exist_ok=True)
     schema = Schema(
         document=ID(stored=True),

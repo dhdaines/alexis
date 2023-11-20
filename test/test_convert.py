@@ -8,7 +8,7 @@ from alexi.convert import Converteur, bbox_contains
 DATADIR = Path(__file__).parent / "data"
 
 
-def test_convert():
+def test_convert() -> None:
     with open(DATADIR / "pdf_structure.pdf", "rb") as infh:
         conv = Converteur(infh)
         words = list(conv.extract_words())
@@ -19,7 +19,7 @@ def test_convert():
         assert len(words) == len(ref_words)
 
 
-def test_extract_tables_and_figures():
+def test_extract_tables_and_figures() -> None:
     with open(DATADIR / "pdf_figures.pdf", "rb") as infh:
         conv = Converteur(infh)
         words = list(conv.extract_words())

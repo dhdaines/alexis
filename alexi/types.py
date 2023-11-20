@@ -15,7 +15,7 @@ class Bloc:
     _bbox: Optional[T_bbox] = None
     _page_number: Optional[int] = None
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self._bbox:
             return hash((self.type, self._bbox, self._page_number))
         else:

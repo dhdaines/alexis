@@ -9,7 +9,7 @@ from whoosh.index import open_dir  # type: ignore
 from whoosh.qparser import MultifieldParser, OrGroup  # type: ignore
 
 
-def search(indexdir: Path, terms: List[str]):
+def search(indexdir: Path, terms: List[str]) -> None:
     ix = open_dir(indexdir)
     parser = MultifieldParser(
         ["titre", "contenu"], ix.schema, group=OrGroup.factory(0.9)

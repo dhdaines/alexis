@@ -130,7 +130,7 @@ def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> 
         return geometry.objects_to_bbox(mcid_objs)
 
 
-def get_rgb(c: dict) -> str:
+def get_rgb(c: T_obj) -> str:
     """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
     if couleur is None:
@@ -146,11 +146,11 @@ def get_rgb(c: dict) -> str:
 
 
 def get_word_features(
-    word: dict,
+    word: T_obj,
     page: Page,
     chars: dict[tuple[int, int], T_obj],
     elmap: dict[int, str],
-) -> dict:
+) -> T_obj:
     # Extract things from first character (we do not use
     # extra_attrs because otherwise extract_words will
     # insert word breaks)
@@ -183,7 +183,9 @@ class Converteur:
     y_tolerance: int
 
     def __init__(
-        self, path_or_fp: Union[str, Path, BufferedReader, BytesIO], y_tolerance=2
+        self,
+        path_or_fp: Union[str, Path, BufferedReader, BytesIO],
+        y_tolerance: int = 2,
     ):
         self.pdf = PDF.open(path_or_fp)
         self.y_tolerance = y_tolerance
