@@ -12,10 +12,10 @@ TRAINDIR = Path(__file__).parent.parent / "data" / "train"
 def test_format_html():
     with open(TRAINDIR / "zonage_sections.csv", "rt") as infh:
         reader = csv.DictReader(infh)
-        analyseur = Analyseur()
-        doc = analyseur(reader)
+        analyseur = Analyseur("zonage_sections", reader)
+        doc = analyseur()
         html = format_html(doc)
-        assert html.count("<h1") == 1
+        assert html.count("<h1") == 2
         assert html.count("<h2") == 4
         assert html.count("<h3") == 3
         assert html.count("<h4") == 26
@@ -28,8 +28,8 @@ def test_format_html():
 def test_format_html_figures():
     with open(DATADIR / "pdf_structure.csv", "rt") as infh:
         reader = csv.DictReader(infh)
-        analyseur = Analyseur()
-        doc = analyseur(reader)
+        analyseur = Analyseur("pdf_structure", reader)
+        doc = analyseur()
         html = format_html(doc)
         print(html)
 
@@ -37,11 +37,10 @@ def test_format_html_figures():
 def test_format_text():
     with open(TRAINDIR / "zonage_sections.csv", "rt") as infh:
         reader = csv.DictReader(infh)
-        analyseur = Analyseur()
-        doc = analyseur(reader)
+        analyseur = Analyseur("zonage_sectoins", reader)
+        doc = analyseur()
         text = format_text(doc)
-        print(text)
-        assert len(re.findall(r"^--", text, re.MULTILINE)) == 33
+        assert len(re.findall(r"^#", text, re.MULTILINE)) == 34
 
 
 if __name__ == "__main__":

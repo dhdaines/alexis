@@ -11,7 +11,8 @@ from typing import Iterable, Iterator, Optional, Union
 from pdfplumber import PDF
 from pdfplumber.page import Page
 from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
-from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
+from pdfplumber.utils import geometry
+from pdfplumber.utils.geometry import T_bbox
 
 from .types import Bloc, T_obj
 
@@ -43,6 +44,65 @@ def bbox_overlaps(obox: T_bbox, bbox: T_bbox) -> bool:
     return ox0 < x1 and ox1 > x0 and otop < bottom and obottom > top
 
 
+def merge_overlaps(images: Iterable[Bloc]) -> list[Bloc]:
+    """Fusionner des blocs qui se touchent en préservant l'ordre"""
+    # FIXME: preserving order maybe not necessary :)
+    ordered_images = list(enumerate(images))
+    ordered_images.sort(key=lambda x: -geometry.calculate_area(x[1].bbox))
+    while True:
+        nimg = len(ordered_images)
+        new_ordered_images = []
+        overlapping = {}
+        for idx, image in ordered_images:
+            for ydx, other in ordered_images:
+                if other is image:
+                    continue
+                if bbox_overlaps(image.bbox, other.bbox):
+                    overlapping[ydx] = other
+            if overlapping:
+                big_box = geometry.merge_bboxes(
+                    (image.bbox, *(other.bbox for other in overlapping.values()))
+                )
+                LOGGER.info(
+                    "image %s overlaps %s merged to %s"
+                    % (
+                        image.bbox,
+                        [other.bbox for other in overlapping.values()],
+                        big_box,
+                    )
+                )
+                bloc_types = set(
+                    bloc.type
+                    for bloc in itertools.chain((image,), overlapping.values())
+                )
+                image_type = "Tableau" if "Tableau" in bloc_types else "Figure"
+                new_image = Bloc(
+                    type=image_type,
+                    contenu=list(
+                        itertools.chain(
+                            image.contenu,
+                            *(other.contenu for other in overlapping.values()),
+                        )
+                    ),
+                    _bbox=big_box,
+                    _page_number=image._page_number,
+                )
+                for oidx, image in ordered_images:
+                    if oidx == idx:
+                        new_ordered_images.append((idx, new_image))
+                    elif oidx in overlapping:
+                        pass
+                    else:
+                        new_ordered_images.append((oidx, image))
+                break
+        if overlapping:
+            ordered_images = new_ordered_images
+        if len(ordered_images) == nimg:
+            break
+    ordered_images.sort()
+    return [img for _, img in ordered_images]
+
+
 def bbox_contains(bbox: T_bbox, ibox: T_bbox) -> bool:
     """Déterminer si une BBox est contenu entièrement par une autre."""
     x0, top, x1, bottom = bbox
@@ -67,10 +127,10 @@ def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> 
         ]
         if not mcid_objs:
             return (-1, -1, -1, -1)  # An impossible BBox
-        return objects_to_bbox(mcid_objs)
+        return geometry.objects_to_bbox(mcid_objs)
 
 
-def get_rgb(c: dict) -> str:
+def get_rgb(c: T_obj) -> str:
     """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
     if couleur is None:
@@ -86,11 +146,11 @@ def get_rgb(c: dict) -> str:
 
 
 def get_word_features(
-    word: dict,
+    word: T_obj,
     page: Page,
     chars: dict[tuple[int, int], T_obj],
     elmap: dict[int, str],
-) -> dict:
+) -> T_obj:
     # Extract things from first character (we do not use
     # extra_attrs because otherwise extract_words will
     # insert word breaks)
@@ -123,7 +183,9 @@ class Converteur:
     y_tolerance: int
 
     def __init__(
-        self, path_or_fp: Union[str, Path, BufferedReader, BytesIO], y_tolerance=2
+        self,
+        path_or_fp: Union[str, Path, BufferedReader, BytesIO],
+        y_tolerance: int = 2,
     ):
         self.pdf = PDF.open(path_or_fp)
         self.y_tolerance = y_tolerance
@@ -161,9 +223,9 @@ class Converteur:
 
     def extract_words(self, pages: Optional[Iterable[int]] = None) -> Iterator[T_obj]:
         if pages is None:
-            pages = range(len(self.pdf.pages))
+            pages = range(1, len(self.pdf.pages) + 1)
         for idx in pages:
-            page = self.pdf.pages[idx]
+            page = self.pdf.pages[idx - 1]
             LOGGER.info("traitement de la page %d", page.page_number)
             words = page.extract_words(y_tolerance=self.y_tolerance)
             elmap = self.element_map(page.page_number)

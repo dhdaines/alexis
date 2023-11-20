@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from pdfplumber.utils.geometry import T_bbox, merge_bboxes
 from typing import Any, Optional
+
+from pdfplumber.utils.geometry import T_bbox, merge_bboxes
 
 T_obj = dict[str, Any]
 
@@ -14,7 +15,7 @@ class Bloc:
     _bbox: Optional[T_bbox] = None
     _page_number: Optional[int] = None
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self._bbox:
             return hash((self.type, self._bbox, self._page_number))
         else:

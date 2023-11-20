@@ -8,8 +8,8 @@ import argparse
 import json
 import logging
 import re
-import urllib
 import subprocess
+import urllib.parse
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -48,7 +48,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def main(args):
+def main(args: argparse.Namespace) -> None:
     u = urllib.parse.urlparse(args.url)
     LOGGER.info("Downloading %s", args.url)
     try:

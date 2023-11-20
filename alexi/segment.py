@@ -7,11 +7,12 @@ import re
 from enum import Enum
 from os import PathLike
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Union
+from typing import Any, Callable, Iterable, Iterator, Optional, Union
 
 import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
+from alexi.types import T_obj
 
 FEATNAMES = [name for name in FIELDNAMES if name not in ("segment", "sequence")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
@@ -26,7 +27,7 @@ class Bullet(Enum):
     BULLET = re.compile(r"^([•-])$")  # FIXME: need more bullets
 
 
-def sign(x: Union[int | float]):
+def sign(x: Union[int | float]) -> int:
     """Get the sign of a number (should exist...)"""
     if x == 0:
         return 0
@@ -36,11 +37,11 @@ def sign(x: Union[int | float]):
 
 
 def make_visual_structural_literal() -> FeatureFunc:
-    prev_word = None
-    prev_line_height = None
-    prev_line_start = None
+    prev_word: Optional[T_obj] = None
+    prev_line_height = 1.0
+    prev_line_start = 0.0
 
-    def visual_one(idx, word):
+    def visual_one(idx: int, word: T_obj) -> list[str]:
         nonlocal prev_word, prev_line_height, prev_line_start
         if idx == 0:  # page break
             prev_word = None
@@ -68,10 +69,10 @@ def make_visual_structural_literal() -> FeatureFunc:
         ]
         newline = False
         linedelta = 0.0
-        dx = 1
-        dy = 0
-        dh = 0
-        prev_height = 1
+        dx = 1.0
+        dy = 0.0
+        dh = 0.0
+        prev_height = 1.0
         if prev_word is not None:
             height = float(word["bottom"]) - float(word["top"])
             prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
@@ -118,10 +119,10 @@ def make_visual_structural_literal() -> FeatureFunc:
 
 def make_visual_literal() -> FeatureFunc:
     prev_word = None
-    prev_line_height = None
-    prev_line_start = None
+    prev_line_height = 1.0
+    prev_line_start = 0.0
 
-    def visual_one(idx, word):
+    def visual_one(idx, word) -> list[str]:
         nonlocal prev_word, prev_line_height, prev_line_start
         if idx == 0:  # page break
             prev_word = None
@@ -276,8 +277,10 @@ FEATURES: dict[str, FeatureFunc] = {
 
 def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int = 1):
     if isinstance(feature_func, str):
-        feature_func = FEATURES.get(feature_func, literal)
-    features = [feature_func(i, w) for i, w in enumerate(page)]
+        feature_func_func = FEATURES.get(feature_func, literal)
+    else:
+        feature_func_func = feature_func
+    features = [feature_func_func(i, w) for i, w in enumerate(page)]
 
     def adjacent(features, label):
         return (":".join((label, feature)) for feature in features if feature != "bias")

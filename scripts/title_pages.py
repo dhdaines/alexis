@@ -5,12 +5,12 @@ Extraire les pages pour entrainement du modèle de titre
 """
 
 import argparse
-import itertools
 import csv
+import itertools
 from pathlib import Path
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("indir", help="Repertoire d'entrée", type=Path)
     parser.add_argument("outdir", help="Repertoire de sortie", type=Path)
@@ -20,6 +20,7 @@ def main():
     for p in args.indir.glob("*.csv"):
         with open(p, "rt") as infh, open(args.outdir / p.name, "wt") as outfh:
             reader = csv.DictReader(infh)
+            assert reader.fieldnames is not None
             fieldnames = list(reader.fieldnames)
             fieldnames.insert(0, "seqtag")
             writer = csv.DictWriter(outfh, fieldnames=fieldnames)
@@ -32,7 +33,8 @@ def main():
                 if last_page is None:
                     writer.writerows(contents)
                 last_page = contents
-            writer.writerows(last_page)
+            if last_page is not None:
+                writer.writerows(last_page)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ def test_segment():
             writer = csv.DictWriter(testfh, fieldnames=reader.fieldnames)
             writer.writeheader()
             for word in reader:
-                del word["tag"]
+                del word["segment"]
                 writer.writerow(word)
             testfh.seek(0, 0)
             seg = Segmenteur()
@@ -26,7 +26,7 @@ def test_segment():
         ref_words = list(reader)
         assert len(words) == len(ref_words)
         for ref, hyp in zip(ref_words, words):
-            ref_tag = ref["tag"].partition("-")[0]
-            hyp_tag = hyp["tag"].partition("-")[0]
-            print(ref["tag"], hyp["tag"], ref["text"])
+            ref_tag = ref["segment"].partition("-")[0]
+            hyp_tag = hyp["segment"].partition("-")[0]
+            print(ref["segment"], hyp["segment"], ref["text"])
             assert ref_tag == hyp_tag

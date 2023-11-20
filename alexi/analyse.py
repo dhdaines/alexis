@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional
 
+from .convert import merge_overlaps
 from .types import Bloc, T_obj
 
 LOGGER = logging.getLogger("analyse")
@@ -173,23 +174,54 @@ class Document:
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
+    def __init__(self, fileid: str, words: Iterable[T_obj]):
+        self.fileid = fileid
+        self.words: list[T_obj] = list(words)
+        self.blocs: list[Bloc] = list(group_iob(self.words, "segment"))
+        self.metadata: dict[str, str] = {}
+        for bloc in group_iob(self.words, "sequence"):
+            if bloc.type not in self.metadata:
+                LOGGER.info(f"{bloc.type}: {bloc.texte}")
+                self.metadata[bloc.type] = bloc.texte
+
+    def add_images(self, images: Iterable[Bloc], merge: bool = True):
+        """Insérer les images en les fusionnant avec le texte (et entre elles)
+        si demandé."""
+        images_bypage: dict[int, list[Bloc]] = {
+            page_number: list(group)
+            for page_number, group in itertools.groupby(
+                images, operator.attrgetter("page_number")
+            )
+        }
+
+        # FIXME: assume that we can order things this way!
+        def bbox_order(bloc):
+            x0, top, x1, bottom = bloc.bbox
+            return (top, x0, bottom, x1)
+
+        new_blocs: list[Bloc] = []
+        for page_number, group in itertools.groupby(
+            self.blocs, operator.attrgetter("page_number")
+        ):
+            if page_number in images_bypage:
+                page_blocs = list(group)
+                page_blocs.extend(images_bypage[page_number])
+                page_blocs.sort(key=bbox_order)
+                if merge:
+                    new_blocs.extend(merge_overlaps(page_blocs))
+                else:
+                    new_blocs.extend(page_blocs)
+            else:
+                new_blocs.extend(group)
+        self.blocs = new_blocs
+
     def __call__(
         self,
-        fileid: str,
-        words: Iterable[T_obj],
         blocs: Optional[Iterable[Bloc]] = None,
     ) -> Document:
         """Analyse du structure d'un document."""
-        # Store all inputs as we will do two passes (for sequence and segment tags)
-        word_sequence = list(words)
-        # Get metadata from sequence tags
-        metadata = {}
-        for bloc in group_iob(word_sequence, "sequence"):
-            if bloc.type not in metadata:
-                LOGGER.info(f"{bloc.type}: {bloc.texte}")
-                metadata[bloc.type] = bloc.texte
-        titre = metadata.get("Titre", "Document")
-        numero = metadata.get("Numero", "")
+        titre = self.metadata.get("Titre", "Document")
+        numero = self.metadata.get("Numero", "")
         if m := re.search(r"(?i:num[ée]ro)\s+([0-9][A-Z0-9-]+)", titre):
             LOGGER.info("Numéro extrait du titre: %s", m.group(1))
             numero = m.group(1)
@@ -198,11 +230,11 @@ class Analyseur:
             LOGGER.info("Numéro extrait du titre: %s", m.group(1))
             numero = m.group(1)
             titre = titre[: m.start(1)] + titre[m.end(1) :]
-        doc = Document(fileid, numero, titre)
-        doc.meta = metadata
+        doc = Document(self.fileid, numero, titre)
+        doc.meta = self.metadata
         # Group block-level text elements by page from segment tags
         if blocs is None:
-            blocs = group_iob(word_sequence)
+            blocs = self.blocs
         for page, blocs in itertools.groupby(blocs, operator.attrgetter("page_number")):
             for bloc in blocs:
                 doc.add_bloc(bloc)
