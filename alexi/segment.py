@@ -16,6 +16,7 @@ from alexi.types import T_obj
 
 FEATNAMES = [name for name in FIELDNAMES if name not in ("segment", "sequence")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
+DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
 FeatureFunc = Callable[[int, dict], list[str]]
 
 

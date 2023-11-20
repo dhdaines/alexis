@@ -230,6 +230,10 @@ class Analyseur:
             LOGGER.info("Numéro extrait du titre: %s", m.group(1))
             numero = m.group(1)
             titre = titre[: m.start(1)] + titre[m.end(1) :]
+        elif m := re.match(r".*(\b\d+-\d+-[A-Z]+$)", titre):
+            LOGGER.info("Numéro extrait du titre: %s", m.group(1))
+            numero = m.group(1)
+            titre = titre[: m.start(1)]
         doc = Document(self.fileid, numero, titre)
         doc.meta = self.metadata
         # Group block-level text elements by page from segment tags

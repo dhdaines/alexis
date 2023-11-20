@@ -20,7 +20,7 @@ from alexi.format import format_dict, format_html, format_text
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Extracteur
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
-from alexi.segment import Segmenteur
+from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
 from alexi.types import Bloc
 
 LOGGER = logging.getLogger("extract")
@@ -40,9 +40,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Ne pas utiliser le CSV de référence",
         action="store_true",
     )
-    parser.add_argument(
-        "--segment-model", help="Modele CRF", type=Path, default=DEFAULT_SEGMENT_MODEL
-    )
+    parser.add_argument("--segment-model", help="Modele CRF", type=Path)
     parser.add_argument(
         "--label-model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
     )
@@ -390,7 +388,6 @@ def make_doc_tree(docs: list[Document], outdir: Path):
 
 
 def main(args):
-    crf = None
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
     docs = []
@@ -408,7 +405,13 @@ def main(args):
                 LOGGER.info("Conversion, segmentation et classification de %s", path)
                 conv = Converteur(path)
                 feats = conv.extract_words()
-                if crf is None:
+                if args.segment_model is None:
+                    if conv.tree is None:
+                        LOGGER.warning("Structure logique absente: %s", path)
+                        crf = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
+                    else:
+                        crf = Segmenteur(DEFAULT_SEGMENT_MODEL)
+                else:
                     crf = Segmenteur(args.segment_model)
                 iob = list(extracteur(crf(feats)))
 
