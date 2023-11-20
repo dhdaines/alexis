@@ -10,6 +10,9 @@ from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional
 
 from .types import Bloc, T_obj
+from .convert import bbox_overlaps
+
+from pdfplumber.utils import geometry
 
 LOGGER = logging.getLogger("analyse")
 
@@ -170,17 +173,105 @@ class Document:
         return self.structure.numero
 
 
+def merge_overlaps(images: Iterable[Bloc]) -> list[Bloc]:
+    """Fusionner des images et blocs qui se touchent en préservant l'ordre"""
+    # FIXME: preserving order maybe not necessary :)
+    ordered_images = list(enumerate(images))
+    ordered_images.sort(key=lambda x: -geometry.calculate_area(x[1].bbox))
+    while True:
+        nimg = len(ordered_images)
+        new_ordered_images = []
+        overlapping = {}
+        for idx, image in ordered_images:
+            for ydx, other in ordered_images:
+                if other is image:
+                    continue
+                if bbox_overlaps(image.bbox, other.bbox):
+                    overlapping[ydx] = other
+            if overlapping:
+                big_box = geometry.merge_bboxes(
+                    (image.bbox, *(other.bbox for other in overlapping.values()))
+                )
+                LOGGER.info(
+                    "image %s overlaps %s merged to %s"
+                    % (
+                        image.bbox,
+                        [other.bbox for other in overlapping.values()],
+                        big_box,
+                    )
+                )
+                bloc_types = set(
+                    bloc.type
+                    for bloc in itertools.chain((image,), overlapping.values())
+                )
+                image_type = "Tableau" if "Tableau" in bloc_types else "Figure"
+                new_image = Bloc(
+                    type=image_type,
+                    contenu=list(
+                        itertools.chain(
+                            image.contenu,
+                            *(other.contenu for other in overlapping.values()),
+                        )
+                    ),
+                    _bbox=big_box,
+                    _page_number=image._page_number,
+                )
+                for oidx, image in ordered_images:
+                    if oidx == idx:
+                        new_ordered_images.append((idx, new_image))
+                    elif oidx in overlapping:
+                        pass
+                    else:
+                        new_ordered_images.append((oidx, image))
+                break
+        if overlapping:
+            ordered_images = new_ordered_images
+        if len(ordered_images) == nimg:
+            break
+    ordered_images.sort()
+    return [img for _, img in ordered_images]
+
+
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
     def __init__(self, fileid: str, words: Iterable[T_obj]):
         self.fileid = fileid
-        self.word_sequence: list[T_obj] = list(words)
+        self.words: list[T_obj] = list(words)
+        self.blocs: list[Bloc] = list(group_iob(self.words, "segment"))
         self.metadata: dict[str, str] = {}
-        for bloc in group_iob(self.word_sequence, "sequence"):
+        for bloc in group_iob(self.words, "sequence"):
             if bloc.type not in self.metadata:
                 LOGGER.info(f"{bloc.type}: {bloc.texte}")
                 self.metadata[bloc.type] = bloc.texte
+
+    def add_images(self, images: Iterable[Bloc]):
+        """Insérer les images en les fusionnant avec le texte (et entre elles)
+        là où nécessaire."""
+        images_bypage: dict[int, list[Bloc]] = {
+            page_number: list(group)
+            for page_number, group in itertools.groupby(
+                images, operator.attrgetter("page_number")
+            )
+        }
+
+        # FIXME: assume that we can order things this way!
+        def bbox_order(bloc):
+            x0, top, x1, bottom = bloc.bbox
+            return (top, x0, bottom, x1)
+
+        new_blocs: list[Bloc] = []
+        for page_number, group in itertools.groupby(
+            self.blocs, operator.attrgetter("page_number")
+        ):
+            if page_number in images_bypage:
+                page_blocs = list(group)
+                page_blocs.extend(images_bypage[page_number])
+                page_blocs.sort(key=bbox_order)
+                new_blocs.extend(merge_overlaps(page_blocs))
+            else:
+                new_blocs.extend(group)
+        self.blocs = new_blocs
 
     def __call__(
         self,
@@ -201,7 +292,7 @@ class Analyseur:
         doc.meta = self.metadata
         # Group block-level text elements by page from segment tags
         if blocs is None:
-            blocs = group_iob(self.word_sequence)
+            blocs = self.blocs
         for page, blocs in itertools.groupby(blocs, operator.attrgetter("page_number")):
             for bloc in blocs:
                 doc.add_bloc(bloc)

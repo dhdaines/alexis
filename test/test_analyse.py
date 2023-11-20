@@ -43,8 +43,9 @@ def test_analyse_tableaux_figures():
     conv = Converteur(DATADIR / "pdf_figures.pdf")
     with open(DATADIR / "pdf_figures.csv", "rt") as infh:
         reader = csv.DictReader(infh)
-        analyseur = Analyseur()
-        doc = analyseur(reader, conv.extract_tables(), conv.extract_figures())
+        analyseur = Analyseur(reader)
+        analyseur.add_images(conv.extract_images())
+        doc = analyseur()
         assert "Figure" in (bloc.type for bloc in doc.contenu)
         assert "Tableau" in (bloc.type for bloc in doc.contenu)
 

@@ -161,9 +161,9 @@ class Converteur:
 
     def extract_words(self, pages: Optional[Iterable[int]] = None) -> Iterator[T_obj]:
         if pages is None:
-            pages = range(len(self.pdf.pages))
+            pages = range(1, len(self.pdf.pages) + 1)
         for idx in pages:
-            page = self.pdf.pages[idx]
+            page = self.pdf.pages[idx - 1]
             LOGGER.info("traitement de la page %d", page.page_number)
             words = page.extract_words(y_tolerance=self.y_tolerance)
             elmap = self.element_map(page.page_number)
