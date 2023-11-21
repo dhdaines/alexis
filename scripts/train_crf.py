@@ -14,7 +14,7 @@ from alexi.segment import load, page2features, page2labels, split_pages
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--niter", default=100, type=int, help="Nombre d'iterations d'entrainement"
+        "--niter", default=200, type=int, help="Nombre d'iterations d'entrainement"
     )
     parser.add_argument("--features", default="vsl", help="Extracteur de traits")
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
@@ -35,6 +35,8 @@ def make_argparse():
 def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
     for w in words:
         if "Tableau" in w["segment"]:
+            continue
+        if "Table" in w["tagstack"]:
             continue
         yield w
 
