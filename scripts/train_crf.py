@@ -72,7 +72,7 @@ def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
 def run_cv(args: argparse.Namespace, params: dict, X, y):
     if args.cross_validation_folds == 0:
         args.cross_validation_folds = os.cpu_count()
-        LOGGER.info("Using 1 fold per CPU")
+        LOGGER.debug("Using 1 fold per CPU")
     LOGGER.info("Running cross-validation in %d folds", args.cross_validation_folds)
     counts = {}
     for c in itertools.chain.from_iterable(y):
@@ -82,9 +82,9 @@ def run_cv(args: argparse.Namespace, params: dict, X, y):
     labels = []
     for c, n in counts.items():
         if n < args.min_count:
-            LOGGER.info("Label %s count %d (excluded)", c, n)
+            LOGGER.debug("Label %s count %d (excluded)", c, n)
         else:
-            LOGGER.info("Label %s count %d", c, n)
+            LOGGER.debug("Label %s count %d", c, n)
             labels.append(c)
     labels.sort()
     LOGGER.info("Evaluating on: %s", ",".join(labels))
