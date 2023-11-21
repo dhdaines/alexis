@@ -30,7 +30,7 @@ def group_iob(words: Iterable[T_obj], key: str = "segment") -> Iterator[Bloc]:
             if bloc.type == "":
                 bloc.type = tag
         else:
-            raise ValueError("Tag %s n'est pas I, O ou B" % word[key])
+            raise ValueError("Tag %s n'est pas I, O ou B: %s" % (word[key], word))
         if bio != "O":
             bloc.contenu.append(word)
     if bloc.type != "":
