@@ -114,6 +114,11 @@ STYLE_CSS = """html, body {
     overflow-y: scroll;
     padding: 2px;
 }
+@media (max-width: 599px) {
+    .nomobile {
+        display: none;
+    }
+}
 @media (min-width: 600px) {
     #body {
         padding: 20px;
@@ -151,16 +156,23 @@ def extract_element(
     # Can't use Path.relative_to until 3.12 :(
     rel_imgdir = os.path.relpath(imgdir, outdir)
     rel_style = os.path.relpath(imgdir.parent.parent / "style.css", outdir)
+    doc_titre = el.titre
+    if doc.titre != "Document":
+        doc_titre = doc.titre
+        if doc.numero:
+            doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
         + f"""    <link rel="stylesheet" href="{rel_style}">
     <title>{el.titre}</title>
   </head>
   <body>
+    <div class="container">
+    <h1 id="header">{doc_titre}</h1>
     <div id="body">
 """
     )
-    HTML_FOOTER = """</div></body>
+    HTML_FOOTER = """</div></div></body>
 </html>
 """
     outdir.mkdir(parents=True, exist_ok=True)
@@ -186,6 +198,7 @@ def make_index_html(
     <title>{title}</title>
   </head>
   <body>
+    <div class="container">
     <h1 id="header">{title}</h1>
     <ul id="body">
 """
@@ -205,6 +218,7 @@ def make_index_html(
         )
         lines.append(f"{off}{sp}</li>")
     HTML_FOOTER = """</ul>
+    </div>
   </body>
 </html>
 """
@@ -359,12 +373,12 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
 def make_doc_tree(docs: list[Document], outdir: Path):
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
-        + """    <title>ALEXI, EXtracteur d'Information</title>
+        + """    <title>ALEXI</title>
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
     <div class="container">
-    <h1 id="header">ALEXI, EXtracteur d'Information</h1>
+    <h1 id="header">ALEXI</h1>
     <ul id="body">
 """
     )
