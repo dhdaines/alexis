@@ -3,17 +3,21 @@
 import argparse
 import csv
 import itertools
+import logging
 import numpy as np
+import os
 from pathlib import Path
 from typing import Iterable, Iterator
 
 import joblib  # type: ignore
 import sklearn_crfsuite as crfsuite  # type: ignore
 from sklearn_crfsuite import metrics
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_validate, KFold
 from sklearn.metrics import make_scorer
 
 from alexi.segment import load, page2features, page2labels, split_pages
+
+LOGGER = logging.getLogger("train-crf")
 
 
 def make_argparse():
@@ -35,6 +39,13 @@ def make_argparse():
     )
     parser.add_argument(
         "--c2", default=0.1, type=float, help="Coefficient de regularisation L2"
+    )
+    parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
+    parser.add_argument(
+        "--min-count",
+        default=10,
+        type=int,
+        help="Seuil d'évaluation pour chaque classification",
     )
     parser.add_argument(
         "-x",
@@ -58,9 +69,83 @@ def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
         yield w
 
 
+def run_cv(args: argparse.Namespace, params: dict, X, y):
+    if args.cross_validation_folds == 0:
+        args.cross_validation_folds = os.cpu_count()
+        LOGGER.info("Using 1 fold per CPU")
+    LOGGER.info("Running cross-validation in %d folds", args.cross_validation_folds)
+    counts = {}
+    for c in itertools.chain.from_iterable(y):
+        if c.startswith("B-"):
+            count = counts.setdefault(c, 0)
+            counts[c] = count + 1
+    labels = []
+    for c, n in counts.items():
+        if n < args.min_count:
+            LOGGER.info("Label %s count %d (excluded)", c, n)
+        else:
+            LOGGER.info("Label %s count %d", c, n)
+            labels.append(c)
+    labels.sort()
+    LOGGER.info("Evaluating on: %s", ",".join(labels))
+    crf = crfsuite.CRF(**params)
+    scoring = {
+        "macro_f1": make_scorer(
+            metrics.flat_f1_score, labels=labels, average="macro", zero_division=0.0
+        ),
+        "micro_f1": make_scorer(
+            metrics.flat_f1_score, labels=labels, average="micro", zero_division=0.0
+        ),
+    }
+    for name in labels:
+        scoring[name] = make_scorer(
+            metrics.flat_f1_score,
+            labels=[name],
+            average="micro",
+            zero_division=0.0,
+        )
+    scores = cross_validate(
+        crf,
+        X,
+        y,
+        cv=KFold(args.cross_validation_folds, shuffle=True, random_state=args.seed),
+        scoring=scoring,
+        return_estimator=True,
+        n_jobs=os.cpu_count(),
+    )
+    LOGGER.info("Macro F1: %.3f", scores["test_macro_f1"].mean())
+    LOGGER.info("Micro F1: %.3f", scores["test_micro_f1"].mean())
+    if args.outfile:
+        for idx, xcrf in enumerate(scores["estimator"]):
+            joblib.dump(
+                (xcrf, args.n, args.features, args.labels),
+                args.outfile + f"_{idx + 1}.gz",
+            )
+    if args.scores:
+        with open(args.scores, "wt") as outfh:
+            fieldnames = [
+                "Label",
+                "Average",
+                *range(1, args.cross_validation_folds + 1),
+            ]
+            writer = csv.DictWriter(outfh, fieldnames=fieldnames)
+            writer.writeheader()
+
+            def makerow(name, scores):
+                row = {"Label": name, "Average": np.mean(scores)}
+                for idx, score in enumerate(scores):
+                    row[idx + 1] = score
+                return row
+
+            writer.writerow(makerow("ALL", scores["test_macro_f1"]))
+            for name in labels:
+                writer.writerow(makerow(name, scores[f"test_{name}"]))
+
+
 def main():
     parser = make_argparse()
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
     data = load(args.csvs)
     pages = list(split_pages(filter_tab(data)))
     X = [page2features(s, args.features, args.n) for s in pages]
@@ -72,63 +157,13 @@ def main():
         "max_iterations": args.niter,
         "all_possible_transitions": True,
     }
-    crf = crfsuite.CRF(**params, verbose=True)
-    labels = list(
-        set(c for c in itertools.chain.from_iterable(y) if c.startswith("B-"))
-    )
-    labels.sort()
     if args.cross_validation_folds == 1:
+        crf = crfsuite.CRF(**params, verbose=True)
         crf.fit(X, y)
         if args.outfile:
             joblib.dump((crf, args.n, args.features, args.labels), args.outfile)
     else:
-        scoring = {
-            "macro_f1": make_scorer(
-                metrics.flat_f1_score, labels=labels, average="macro", zero_division=0.0
-            ),
-        }
-        for name in labels:
-            scoring[name] = make_scorer(
-                metrics.flat_f1_score,
-                labels=[name],
-                average="macro",
-                zero_division=0.0,
-            )
-        scores = cross_validate(
-            crf,
-            X,
-            y,
-            cv=args.cross_validation_folds,
-            scoring=scoring,
-            return_estimator=True,
-        )
-        for key, val in scores.items():
-            print(f"{key}: {val}")
-        if args.outfile:
-            for idx, xcrf in enumerate(scores["estimator"]):
-                joblib.dump(
-                    (xcrf, args.n, args.features, args.labels),
-                    args.outfile + f"_{idx + 1}.gz",
-                )
-        if args.scores:
-            with open(args.scores, "wt") as outfh:
-                fieldnames = [
-                    "Label",
-                    "Average",
-                    *range(1, args.cross_validation_folds + 1),
-                ]
-                writer = csv.DictWriter(outfh, fieldnames=fieldnames)
-                writer.writeheader()
-
-                def makerow(name, scores):
-                    row = {"Label": name, "Average": np.mean(scores)}
-                    for idx, score in enumerate(scores):
-                        row[idx + 1] = score
-                    return row
-
-                writer.writerow(makerow("ALL", scores["test_macro_f1"]))
-                for name in labels:
-                    writer.writerow(makerow(name, scores[f"test_{name}"]))
+        run_cv(args, params, X, y)
 
 
 if __name__ == "__main__":
