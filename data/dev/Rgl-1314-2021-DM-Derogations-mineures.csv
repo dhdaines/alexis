@@ -1819,7 +1819,7 @@ O,I-Liste,demande,8,612,1008,BCDJEE+ArialNarrow,#222,372,406,716,726,7773,19,P,D
 O,I-Liste,de,8,612,1008,BCDJEE+ArialNarrow,#222,408,417,716,726,7773,19,P,Document;H5
 O,I-Liste,dérogation,8,612,1008,BCDJEE+ArialNarrow,#222,420,458,716,726,7773,19,P,Document;H5
 O,I-Liste,mineure;,8,612,1008,BCDJEE+ArialNarrow,#222,461,493,716,726,7773,19,P,Document;H5
-O,I-Liste,2.,8,612,1008,BCDGEE+ArialNarrow,#222,113,120,727,737,7784,20,P,Document;H5
+O,B-Liste,2.,8,612,1008,BCDGEE+ArialNarrow,#222,113,120,727,737,7784,20,P,Document;H5
 O,I-Liste,L’application,8,612,1008,BCDJEE+ArialNarrow,#222,132,177,727,737,7784,20,P,Document;H5
 O,I-Liste,des,8,612,1008,BCDJEE+ArialNarrow,#222,179,192,727,737,7784,20,P,Document;H5
 O,I-Liste,dispositions,8,612,1008,BCDJEE+ArialNarrow,#222,194,237,727,737,7784,20,P,Document;H5
@@ -2011,7 +2011,7 @@ O,I-Liste,faite,9,612,1008,BCDJEE+ArialNarrow,#222,390,405,213,223,8278,5,P,Docu
 O,I-Liste,par,9,612,1008,BCDJEE+ArialNarrow,#222,408,420,213,223,8278,5,P,Document;H5
 O,I-Liste,un,9,612,1008,BCDJEE+ArialNarrow,#222,422,431,213,223,8278,5,P,Document;H5
 O,I-Liste,mandataire;,9,612,1008,BCDJEE+ArialNarrow,#222,433,477,213,223,8278,5,P,Document;H5
-O,I-Liste,3.,9,612,1008,BCDGEE+ArialNarrow,#222,113,120,224,234,8289,6,P,Document;H5
+O,B-Liste,3.,9,612,1008,BCDGEE+ArialNarrow,#222,113,120,224,234,8289,6,P,Document;H5
 O,I-Liste,Les,9,612,1008,BCDGEE+ArialNarrow,#222,132,145,224,234,8289,6,P,Document;H5
 O,I-Liste,"noms,",9,612,1008,BCDGEE+ArialNarrow,#222,147,169,224,234,8289,6,P,Document;H5
 O,I-Liste,prénoms,9,612,1008,BCDGEE+ArialNarrow,#222,172,204,224,234,8289,6,P,Document;H5
@@ -2750,12 +2750,12 @@ O,B-Article,29.,10,612,1008,BCDHEE+ArialNarrow-Bold,#222,85,96,196,206,9269,4,P,
 O,I-Alinea,Étude,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,113,136,196,206,9269,4,P,Document;H3
 O,I-Alinea,de,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,138,148,196,206,9269,4,P,Document;H3
 O,I-Alinea,la,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,150,157,196,206,9269,4,P,Document;H3
-O,I-Article,demande,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,159,196,196,206,9269,4,P,Document;H3
-O,I-Article,par,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,198,210,196,206,9269,4,P,Document;H3
-O,I-Article,le,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,213,220,196,206,9269,4,P,Document;H3
-O,I-Article,comité,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,222,248,196,206,9269,4,P,Document;H3
-O,I-Article,consultatif,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,251,292,196,206,9269,4,P,Document;H3
-O,I-Article,d’urbanisme,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,294,343,196,206,9269,4,P,Document;H3
+O,I-Alinea,demande,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,159,196,196,206,9269,4,P,Document;H3
+O,I-Alinea,par,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,198,210,196,206,9269,4,P,Document;H3
+O,I-Alinea,le,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,213,220,196,206,9269,4,P,Document;H3
+O,I-Alinea,comité,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,222,248,196,206,9269,4,P,Document;H3
+O,I-Alinea,consultatif,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,251,292,196,206,9269,4,P,Document;H3
+O,I-Alinea,d’urbanisme,10,612,1008,BCDKEE+ArialNarrow-Bold,#222,294,343,196,206,9269,4,P,Document;H3
 O,B-Alinea,Le,10,612,1008,BCDGEE+ArialNarrow,#222,85,94,213,223,9286,5,P,Document;H4
 O,I-Alinea,comité,10,612,1008,BCDGEE+ArialNarrow,#222,97,121,213,223,9286,5,P,Document;H4
 O,I-Alinea,consultatif,10,612,1008,BCDGEE+ArialNarrow,#222,124,161,213,223,9286,5,P,Document;H4
