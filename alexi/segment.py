@@ -38,6 +38,17 @@ def sign(x: Union[int | float]) -> int:
     return 1
 
 
+def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    """Traits de structure logique pour entrainement d'un modèle."""
+    for word in page:
+        elements = set(word.get("tagstack", "Span").split(";"))
+        features = [
+            "toc=%d" % ("TOCI" in elements),
+            "mctag=%s" % word.get("mctag", "P"),
+        ]
+        yield features
+
+
 def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
@@ -94,6 +105,7 @@ def textplus_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             "endpunc=%s" % bool(ENDPUNC.match(text)),
             "multipunc=%s" % bool(MULTIPUNC.match(text)),
             "numeric=%s" % text.isnumeric(),
+            "rgb=%s" % word.get("rgb", "#000"),
             "bold=%s" % ("bold" in fontname.lower()),
             "italic=%s" % ("italic" in fontname.lower()),
             "head:table=%s" % ("table" in firstline),
@@ -108,6 +120,15 @@ def textplus_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
 
 def textpluslayout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     return (tpf + lf for tpf, lf in zip(textplus_features(page), layout_features(page)))
+
+
+def textpluslayoutplusstructure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    return (
+        tpf + lf + sf
+        for tpf, lf, sf in zip(
+            textplus_features(page), layout_features(page), structure_features(page)
+        )
+    )
 
 
 def text_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
@@ -151,9 +172,11 @@ def literal(page: Sequence[T_obj]) -> Iterator[list[str]]:
 FEATURES: dict[str, FeatureFunc] = {
     "literal": literal,
     "text": text_features,
-    "textplus": textplus_features,
+    "text+": textplus_features,
     "layout": layout_features,
-    "textpluslayout": textpluslayout_features,
+    "text+layout": textpluslayout_features,
+    "structure": structure_features,
+    "text+layout+structure": textpluslayoutplusstructure_features,
 }
 
 
