@@ -4,16 +4,16 @@ import argparse
 import csv
 import itertools
 import logging
-import numpy as np
 import os
 from pathlib import Path
 from typing import Iterable, Iterator
 
 import joblib  # type: ignore
+import numpy as np
 import sklearn_crfsuite as crfsuite  # type: ignore
+from sklearn.metrics import make_scorer  # type: ignore
+from sklearn.model_selection import KFold, cross_validate  # type: ignore
 from sklearn_crfsuite import metrics
-from sklearn.model_selection import cross_validate, KFold
-from sklearn.metrics import make_scorer
 
 from alexi.segment import load, page2features, page2labels, split_pages
 
@@ -74,7 +74,7 @@ def run_cv(args: argparse.Namespace, params: dict, X, y):
         args.cross_validation_folds = os.cpu_count()
         LOGGER.debug("Using 1 fold per CPU")
     LOGGER.info("Running cross-validation in %d folds", args.cross_validation_folds)
-    counts = {}
+    counts: dict[str, int] = {}
     for c in itertools.chain.from_iterable(y):
         if c.startswith("B-"):
             count = counts.setdefault(c, 0)
