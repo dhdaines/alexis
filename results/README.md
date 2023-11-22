@@ -1,0 +1,5 @@
+- vsl: original "visual+structural_literal" features
+- text5: 5-gram text+font features
+- textplus5: 5-gram text+font features
+- layout5: 5-gram layout features
+- textpluslayout5: 5-gram text+font+layout features
