@@ -6,7 +6,7 @@ from alexi.analyse import Analyseur
 from alexi.format import format_html, format_text
 
 DATADIR = Path(__file__).parent / "data"
-TRAINDIR = Path(__file__).parent.parent / "data" / "train"
+TRAINDIR = Path(__file__).parent.parent / "data"
 
 
 def test_format_html():

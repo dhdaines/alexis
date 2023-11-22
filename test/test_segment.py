@@ -17,7 +17,7 @@ def test_segment():
                 del word["segment"]
                 writer.writerow(word)
             testfh.seek(0, 0)
-            seg = Segmenteur()
+            seg = Segmenteur(DATADIR / "model.gz")
             reader = csv.DictReader(testfh)
             words = list(seg(reader))
     assert len(words) > 0

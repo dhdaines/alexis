@@ -3,8 +3,9 @@
 import argparse
 import csv
 from pathlib import Path
+
+from alexi.analyse import Bloc, group_iob
 from alexi.segment import Bullet
-from alexi.analyse import group_iob, Bloc
 
 
 def make_argparse() -> argparse.ArgumentParser:
@@ -13,7 +14,7 @@ def make_argparse() -> argparse.ArgumentParser:
     return parser
 
 
-def check_bloc(bloc: Bloc, lineno: int) -> None:
+def check_bloc(bloc: Bloc, lineno: int) -> list[str]:
     prev_bio = "O"
     prev_segment = ""
     errors = []
