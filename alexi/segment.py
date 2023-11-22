@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterable, Iterator, Optional, Union, Sequence
 import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
+from alexi.format import line_breaks
 from alexi.types import T_obj
 
 FEATNAMES = [name for name in FIELDNAMES if name not in ("segment", "sequence")]
@@ -40,9 +41,34 @@ def sign(x: Union[int | float]) -> int:
 def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
-    for word in page:
-        features = []
-        yield features
+    lines = list(line_breaks(page))
+    prev_line_features = {}
+    for line in lines:
+        page_height = int(line[0]["page_height"])
+        line_features = {
+            "height": max(int(word["bottom"]) - int(word["top"]) for word in line),
+            "left": int(line[0]["x0"]),
+            "right": int(line[-1]["x1"]),
+            "top": min(int(word["top"]) for word in line),
+            "bottom": max(int(word["bottom"]) for word in line),
+        }
+        for idx, word in enumerate(line):
+            features = [
+                "first=%d" % (idx == 0),
+                "last=%d" % (idx == len(line) - 1),
+                "height=%d" % line_features["height"],
+                "left=%d" % line_features["left"],
+                "top=%d" % line_features["top"],
+                "bottom=%d" % (page_height - line_features["bottom"]),
+                "gap=%d" % (line_features["top"] - prev_line_features.get("bottom", 0)),
+                "indent=%d"
+                % (
+                    line_features["left"]
+                    - prev_line_features.get("left", line_features["left"])
+                ),
+            ]
+            yield features
+        prev_line_features = line_features
 
 
 PUNC = re.compile(r"""^[\.,;:!-—'"“”‘’]+$""")
@@ -78,6 +104,10 @@ def textplus_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             if pattern.value.match(word["text"]):
                 features.append("bullet=%s" % pattern.name)
         yield features
+
+
+def textpluslayout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    return (tpf + lf for tpf, lf in zip(textplus_features(page), layout_features(page)))
 
 
 def text_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
@@ -122,6 +152,8 @@ FEATURES: dict[str, FeatureFunc] = {
     "literal": literal,
     "text": text_features,
     "textplus": textplus_features,
+    "layout": layout_features,
+    "textpluslayout": textpluslayout_features,
 }
 
 
