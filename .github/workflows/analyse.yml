@@ -46,7 +46,7 @@ jobs:
         done
     - name: Extract
       run: |
-        alexi -v extract download/*.pdf
+        alexi -v extract -m download/index.json download/*.pdf
     - name: Index
       run: |
         alexi -v index export

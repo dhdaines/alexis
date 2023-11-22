@@ -51,6 +51,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         action="store_true",
     )
     parser.add_argument(
+        "-m",
+        "--metadata",
+        help="Fichier JSON avec metadonnées des documents",
+        type=Path,
+    )
+    parser.add_argument(
         "docs", help="Documents en PDF ou CSV pré-annoté", type=Path, nargs="+"
     )
     return parser
@@ -331,7 +337,8 @@ def extract_html(args, path, iob, conv):
 def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("<ul>\n")
     outfh.write(
-        f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a></li>\n'
+        f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a>\n'
+        f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)</li>\n'
     )
     top = Path(doc.fileid)
     d = deque((el, top, 1) for el in doc.structure.sub)
@@ -358,10 +365,12 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
         if el.sub:
             outfh.write(f'<li class="node"><details><summary>{eltitre}</summary><ul>\n')
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
-            outfh.write(f'<li class="text">{link}</li>\n')
+            pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
+            outfh.write(f'<li class="text">{link} ({pdflink})</li>\n')
         else:
             link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
-            outfh.write(f'<li class="leaf">{link}</li>\n')
+            pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
+            outfh.write(f'<li class="leaf">{link} ({pdflink})</li>\n')
         d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
     while prev_level > 1:
@@ -404,6 +413,10 @@ def make_doc_tree(docs: list[Document], outdir: Path):
 def main(args):
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
+    metadata = {}
+    if args.metadata:
+        with open(args.metadata, "rt") as infh:
+            metadata = json.load(infh)
     docs = []
     for path in args.docs:
         conv = None
@@ -430,12 +443,18 @@ def main(args):
                 iob = list(extracteur(crf(feats)))
 
         pdf_path = path.with_suffix(".pdf")
+        pdf_url = metadata.get(
+            pdf_path.name,
+            f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}",
+        )
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
         if args.serafim:
             extract_serafim(args, path, iob, conv)
         else:
-            docs.append(extract_html(args, path, iob, conv))
+            doc = extract_html(args, path, iob, conv)
+            doc.pdfurl = pdf_url
+            docs.append(doc)
     if not args.serafim:
         make_doc_tree(docs, args.outdir)
 
