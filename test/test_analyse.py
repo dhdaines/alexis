@@ -6,7 +6,7 @@ from alexi.convert import Converteur
 from alexi.format import format_xml
 
 DATADIR = Path(__file__).parent / "data"
-TRAINDIR = Path(__file__).parent.parent / "data" / "train"
+TRAINDIR = Path(__file__).parent.parent / "data"
 
 IOBTEST = [
     "<Titre>Titre incomplet</Titre>",
