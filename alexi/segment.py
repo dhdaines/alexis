@@ -7,7 +7,7 @@ import re
 from enum import Enum
 from os import PathLike
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Optional, Union, Sequence
+from typing import Any, Callable, Iterable, Iterator, Sequence, Union
 
 import joblib  # type: ignore
 
