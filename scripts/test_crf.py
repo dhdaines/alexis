@@ -20,8 +20,8 @@ def make_argparse():
 
 def test(
     crf: crfsuite.CRF,
-    test_set: Iterable[dict],
-    features="vsl",
+    test_set: Iterable[list[dict]],
+    features="text+layout+structure",
     labels="literal",
     n=1,
 ):

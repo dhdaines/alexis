@@ -4,30 +4,31 @@ import csv
 import itertools
 import re
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator, Sequence
 
 import joblib  # type: ignore
 
 from alexi.analyse import group_iob
 from alexi.convert import FIELDNAMES, Converteur
-from alexi.segment import Segmenteur, page2features, page2labels, split_pages
+from alexi.segment import Segmenteur, T_obj, page2features, page2labels, split_pages
 
 FEATNAMES = [name for name in FIELDNAMES if name != "sequence"]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crfseq.joblib.gz"
 NUMDASH = re.compile(r"[\d-]+")
 
 
-def features(_, word):
-    features = ["bias"]
-    features.append("lower=%s" % word["text"].lower())
-    features.append("reg=%s" % bool(word["text"].lower() == "règlement"))
-    features.append("n=%s" % bool(word["text"][0] in "Nn"))
-    features.append("alpha=%s" % bool(word["text"].isalpha()))
-    features.append("numdash=%s" % bool(NUMDASH.match(word["text"])))
-    features.append("bold=%s" % bool("bold" in word["fontname"].lower()))
-    features.append("tag=%s" % word["segment"].partition("-")[2])
-    features.append("size=%d" % (int(word["bottom"]) - int(word["top"])))
-    return features
+def features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    for word in page:
+        features = ["bias"]
+        features.append("lower=%s" % word["text"].lower())
+        features.append("reg=%s" % bool(word["text"].lower() == "règlement"))
+        features.append("n=%s" % bool(word["text"][0] in "Nn"))
+        features.append("alpha=%s" % bool(word["text"].isalpha()))
+        features.append("numdash=%s" % bool(NUMDASH.match(word["text"])))
+        features.append("bold=%s" % bool("bold" in word["fontname"].lower()))
+        features.append("tag=%s" % word["segment"].partition("-")[2])
+        features.append("size=%d" % (int(word["bottom"]) - int(word["top"])))
+        yield features
 
 
 def labels(_, word):

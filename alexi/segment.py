@@ -18,7 +18,7 @@ from alexi.types import T_obj
 FEATNAMES = [name for name in FIELDNAMES if name not in ("segment", "sequence")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
-FeatureFunc = Callable[[int, dict], list[str]]
+FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
 
 
 class Bullet(Enum):
@@ -53,7 +53,7 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
     lines = list(line_breaks(page))
-    prev_line_features = {}
+    prev_line_features: dict[str, int] = {}
     for line in lines:
         page_height = int(line[0]["page_height"])
         line_features = {
