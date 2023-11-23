@@ -53,8 +53,10 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
     lines = list(line_breaks(page))
+    # Estimate the baseline left margin as mode of x0
+    margin = sorted(int(line[0]["x0"]) for line in lines)[0]
     prev_line_features: dict[str, int] = {}
-    for line in lines:
+    for lidx, line in enumerate(lines):
         page_height = int(line[0]["page_height"])
         page_width = int(line[0]["page_width"])
         line_features = {
@@ -65,20 +67,24 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             "bottom": max(int(word["bottom"]) for word in line),
         }
         for idx, word in enumerate(line):
+            indent = line_features["left"] - prev_line_features.get(
+                "left", line_features["left"]
+            )
+            gap = line_features["top"] - prev_line_features.get("bottom", 0)
             features = [
-                "first=%d" % (idx == 0),
-                "last=%d" % (idx == len(line) - 1),
+                "lineno=%d" % lidx,
+                # "firstline=%s" % (lidx == 0),
+                # "lastline=%s" % (lidx == len(lines) - 1),
+                "first=%s" % (idx == 0),
+                "last=%s" % (idx == len(line) - 1),
                 "height=%d" % line_features["height"],
                 "left=%d" % line_features["left"],
+                # "margin=%s" % (line_features["left"] == margin),
                 "right=%d" % (page_width - line_features["right"]),
                 "top=%d" % line_features["top"],
                 "bottom=%d" % (page_height - line_features["bottom"]),
-                "gap=%d" % (line_features["top"] - prev_line_features.get("bottom", 0)),
-                "indent=%d"
-                % (
-                    line_features["left"]
-                    - prev_line_features.get("left", line_features["left"])
-                ),
+                "gap=%d" % gap,
+                "indent=%d" % indent,
             ]
             yield features
         prev_line_features = line_features
@@ -186,7 +192,7 @@ def page2features(
     page: Sequence[T_obj], feature_func: Union[str, FeatureFunc] = literal, n: int = 1
 ):
     if isinstance(feature_func, str):
-        feature_func_func = FEATURES.get(feature_func, literal)
+        feature_func_func = FEATURES[feature_func]
     else:
         feature_func_func = feature_func
     features = list(feature_func_func(page))
