@@ -42,9 +42,14 @@ def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     """Traits de structure logique pour entrainement d'un modèle."""
     for word in page:
         elements = set(word.get("tagstack", "Span").split(";"))
+        header = False
+        for el in elements:
+            if el and el[0] == "H":
+                header = True
         features = [
             "toc=%d" % ("TOCI" in elements),
             "mctag=%s" % word.get("mctag", "P"),
+            "header=%s" % header,
         ]
         yield features
 
