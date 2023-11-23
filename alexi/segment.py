@@ -67,12 +67,13 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             features = [
                 "first=%d" % (idx == 0),
                 "last=%d" % (idx == len(line) - 1),
-                "height=%d" % line_features["height"],
-                "left=%d" % line_features["left"],
-                "top=%d" % line_features["top"],
-                "bottom=%d" % (page_height - line_features["bottom"]),
-                "gap=%d" % (line_features["top"] - prev_line_features.get("bottom", 0)),
-                "indent=%d"
+                "line:height=%d" % line_features["height"],
+                "line:left=%d" % line_features["left"],
+                "line:top=%d" % line_features["top"],
+                "line:bottom=%d" % (page_height - line_features["bottom"]),
+                "line:gap=%d"
+                % (line_features["top"] - prev_line_features.get("bottom", 0)),
+                "line:indent=%d"
                 % (
                     line_features["left"]
                     - prev_line_features.get("left", line_features["left"])
@@ -190,7 +191,9 @@ def page2features(
     features = list(feature_func_func(page))
 
     def adjacent(features, label):
-        return (":".join((label, feature)) for feature in features)
+        return (
+            ":".join((label, feature)) for feature in features if ":" not in feature
+        )
 
     ngram_features = [iter(f) for f in features]
     for m in range(1, n):
