@@ -7,17 +7,18 @@ import re
 from enum import Enum
 from os import PathLike
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Optional, Union
+from typing import Any, Callable, Iterable, Iterator, Sequence, Union
 
 import joblib  # type: ignore
 
 from alexi.convert import FIELDNAMES
+from alexi.format import line_breaks
 from alexi.types import T_obj
 
 FEATNAMES = [name for name in FIELDNAMES if name not in ("segment", "sequence")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
-FeatureFunc = Callable[[int, dict], list[str]]
+FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
 
 
 class Bullet(Enum):
@@ -37,254 +38,159 @@ def sign(x: Union[int | float]) -> int:
     return 1
 
 
-def make_visual_structural_literal() -> FeatureFunc:
-    prev_word: Optional[T_obj] = None
-    prev_line_height = 1.0
-    prev_line_start = 0.0
-
-    def visual_one(idx: int, word: T_obj) -> list[str]:
-        nonlocal prev_word, prev_line_height, prev_line_start
-        if idx == 0:  # page break
-            prev_word = None
-            prev_line_start = float(word["x0"])
-            prev_line_height = 1  # arbitrary
-        ph = float(word["page_height"])
-        pw = float(word["page_width"])
-        height = float(word["bottom"]) - float(word["top"])
-        bullet = None
-        for pattern in Bullet:
-            if pattern.value.match(word["text"]):
-                bullet = pattern.name
-                break
+def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    """Traits de structure logique pour entrainement d'un modèle."""
+    for word in page:
+        elements = set(word.get("tagstack", "Span").split(";"))
         features = [
-            "bias",
-            "lower:" + word["text"].lower(),
-            "x0:%.1f" % (float(word["x0"]) / pw),
-            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
-            "top:%.1f" % (float(word["top"]) / ph),
-            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
-            "height:%.1f" % (height / 10),
-            "bold:%s" % str("bold" in word["fontname"].lower()),
-            "italic:%s" % str("italic" in word["fontname"].lower()),
-            "bullet:%s" % bullet,
+            "toc=%d" % ("TOCI" in elements),
+            "mctag=%s" % word.get("mctag", "P"),
         ]
-        newline = False
-        linedelta = 0.0
-        dx = 1.0
-        dy = 0.0
-        dh = 0.0
-        prev_height = 1.0
-        if prev_word is not None:
-            height = float(word["bottom"]) - float(word["top"])
-            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
-            dx = float(word["x0"]) - float(prev_word["x0"])
-            dy = float(word["top"]) - float(prev_word["top"])
-            dh = height - prev_height
-            if dx < 0 and dy >= prev_height:
-                prev_line_height = prev_height
-                newline = True
-                linedelta = float(word["x0"]) - prev_line_start
-                prev_line_start = float(word["x0"])
-        yhdelta = dy / prev_line_height
-        features.extend(
-            [
-                "xdsign:" + str(sign(dx)),
-                "ydsign:" + str(sign(dy)),
-                "hdsign:" + str(sign(dh)),
-                "xdelta:%.1f" % (dx / pw),
-                "ydelta:%.1f" % (dy / ph),
-                "hdelta:%.1f" % (dh / prev_height),
-                "newline:%s" % str(newline),
-                "linedelta:%.1f" % (linedelta / pw),
-                "yhdelta:%d" % round(min(yhdelta, 5.0)),
+        yield features
+
+
+def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    """Traits de mise en page pour entrainement d'un modèle."""
+    # Split page into lines
+    lines = list(line_breaks(page))
+    prev_line_features: dict[str, int] = {}
+    for line in lines:
+        page_height = int(line[0]["page_height"])
+        line_features = {
+            "height": max(int(word["bottom"]) - int(word["top"]) for word in line),
+            "left": int(line[0]["x0"]),
+            "right": int(line[-1]["x1"]),
+            "top": min(int(word["top"]) for word in line),
+            "bottom": max(int(word["bottom"]) for word in line),
+        }
+        for idx, word in enumerate(line):
+            features = [
+                "first=%d" % (idx == 0),
+                "last=%d" % (idx == len(line) - 1),
+                "height=%d" % line_features["height"],
+                "left=%d" % line_features["left"],
+                "top=%d" % line_features["top"],
+                "bottom=%d" % (page_height - line_features["bottom"]),
+                "gap=%d" % (line_features["top"] - prev_line_features.get("bottom", 0)),
+                "indent=%d"
+                % (
+                    line_features["left"]
+                    - prev_line_features.get("left", line_features["left"])
+                ),
             ]
-        )
-        prev_mcid = prev_word["mcid"] if prev_word is not None else ""
-        elements = set(word.get("tagstack", "").split(";"))
-        if word["mcid"] != prev_mcid:
-            features.append("newmcid")
-        mctag = word.get("mctag")
-        if mctag:
-            features.append("mctag:" + mctag)
-        if "Table" in elements:
-            features.append("table")
-        if "Figure" in elements:
-            features.append("figure")
-        if "TOCI" in elements:
-            features.append("toc")
-        prev_word = word
-        return features
-
-    return visual_one
+            yield features
+        prev_line_features = line_features
 
 
-def make_visual_literal() -> FeatureFunc:
-    prev_word = None
-    prev_line_height = 1.0
-    prev_line_start = 0.0
-
-    def visual_one(idx, word) -> list[str]:
-        nonlocal prev_word, prev_line_height, prev_line_start
-        if idx == 0:  # page break
-            prev_word = None
-            prev_line_start = float(word["x0"])
-            prev_line_height = 1  # arbitrary
-        ph = float(word["page_height"])
-        pw = float(word["page_width"])
-        height = float(word["bottom"]) - float(word["top"])
-        bullet = None
-        for pattern in Bullet:
-            if pattern.value.match(word["text"]):
-                bullet = pattern.name
-                break
-        features = [
-            "bias",
-            "lower:" + word["text"].lower(),
-            "x0:%.1f" % (float(word["x0"]) / pw),
-            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
-            "top:%.1f" % (float(word["top"]) / ph),
-            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
-            "height:%.1f" % (height / 10),
-            "bold:%s" % str("bold" in word["fontname"].lower()),
-            "italic:%s" % str("italic" in word["fontname"].lower()),
-            "bullet:%s" % bullet,
-            "page_number:%d" % int(word["page"]),
-        ]
-        newline = False
-        linedelta = 0.0
-        dx = 1
-        dy = 0
-        dh = 0
-        prev_height = 1
-        if prev_word is not None:
-            height = float(word["bottom"]) - float(word["top"])
-            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
-            dx = float(word["x0"]) - float(prev_word["x0"])
-            dy = float(word["top"]) - float(prev_word["top"])
-            dh = height - prev_height
-            if dx < 0 and dy >= prev_height:
-                prev_line_height = prev_height
-                newline = True
-                linedelta = float(word["x0"]) - prev_line_start
-                prev_line_start = float(word["x0"])
-        yhdelta = dy / prev_line_height
-        features.extend(
-            [
-                "xdsign:" + str(sign(dx)),
-                "ydsign:" + str(sign(dy)),
-                "hdsign:" + str(sign(dh)),
-                "xdelta:%.1f" % (dx / pw),
-                "ydelta:%.1f" % (dy / ph),
-                "hdelta:%.1f" % (dh / prev_height),
-                "newline:%s" % str(newline),
-                "linedelta:%.1f" % (linedelta / pw),
-                "yhdelta:%d" % round(min(yhdelta, 5.0)),
-            ]
-        )
-        prev_word = word
-        return features
-
-    return visual_one
+PUNC = re.compile(r"""^[\.,;:!-—'"“”‘’]+$""")
+ENDPUNC = re.compile(r""".*[\.,;:!-—'"“”‘’]$""")
+MULTIPUNC = re.compile(r"""^[\.,;:!-—'"“”‘’]{4,}$""")
 
 
-def make_delta() -> FeatureFunc:
-    prev_word = None
-
-    def delta_one(idx, word):
-        nonlocal prev_word
-        if idx == 0:  # page break
-            prev_word = None
-        features = quantized(idx, word)
-        ph = float(word["page_height"])
-        pw = float(word["page_width"])
-        if prev_word is None:
-            dx = 1
-            dy = 0
-            dh = 0
-            prev_height = 1
-        else:
-            height = float(word["bottom"]) - float(word["top"])
-            prev_height = float(prev_word["bottom"]) - float(prev_word["top"])
-            dx = float(word["x0"]) - float(prev_word["x0"])
-            dy = float(word["top"]) - float(prev_word["top"])
-            dh = height - prev_height
-        features.extend(
-            [
-                "xdsign:" + str(sign(dx)),
-                "ydsign:" + str(sign(dy)),
-                "hdsign:" + str(sign(dh)),
-                "xdelta:%.1f" % (dx / pw),
-                "ydelta:%.1f" % (dy / ph),
-                "hdelta:%.1f" % (dh / prev_height),
-            ]
-        )
-        prev_word = word
-        return features
-
-    return delta_one
-
-
-def quantized(_, word):
-    features = pruned(_, word)
-    ph = float(word["page_height"])
-    pw = float(word["page_width"])
-    height = float(word["bottom"]) - float(word["top"])
-    features.extend(
-        [
-            "x0:%.1f" % (float(word["x0"]) / pw),
-            "x1:%.1f" % ((pw - float(word["x1"])) / pw),
-            "top:%.1f" % (float(word["top"]) / ph),
-            "bottom:%.1f" % ((ph - float(word["bottom"])) / ph),
-            "height:%.1f" % (height / 10),
-        ]
+def textplus_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    """Traits textuelles pour entrainement d'un modèle."""
+    # Première ligne de la page est très importante (souvent un en-tête)
+    firstline = set(
+        word["text"].lower()
+        for word in (next(itertools.groupby(page, operator.itemgetter("top")))[1])
     )
-    return features
+    for word in page:
+        text: str = word["text"]
+        fontname = word["fontname"]
+        features = [
+            "lower=%s" % text.lower(),
+            "uppercase=%s" % text.isupper(),
+            "title=%s" % text.istitle(),
+            "punc=%s" % bool(PUNC.match(text)),
+            "endpunc=%s" % bool(ENDPUNC.match(text)),
+            "multipunc=%s" % bool(MULTIPUNC.match(text)),
+            "numeric=%s" % text.isnumeric(),
+            "rgb=%s" % word.get("rgb", "#000"),
+            "bold=%s" % ("bold" in fontname.lower()),
+            "italic=%s" % ("italic" in fontname.lower()),
+            "head:table=%s" % ("table" in firstline),
+            "head:chapitre=%s" % ("chapitre" in firstline),
+            "head:annexe=%s" % ("annexe" in firstline),
+        ]
+        for pattern in Bullet:
+            if pattern.value.match(word["text"]):
+                features.append("bullet=%s" % pattern.name)
+        yield features
 
 
-def pruned(_, word):
-    bullet = ""
-    for pattern in Bullet:
-        if pattern.value.match(word["text"]):
-            bullet = pattern.name
-    features = [
-        "bias",
-        "lower:" + word["text"].lower(),
-        "mctag:" + word.get("mctag", ""),
-        "tableau:" + str(word.get("tableau") not in ("", None)),
-        "bullet:" + bullet,
-    ]
-    return features
+def textpluslayout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    return (tpf + lf for tpf, lf in zip(textplus_features(page), layout_features(page)))
 
 
-def literal(_, word):
-    features = ["bias"]
-    for key in FEATNAMES:
-        feat = word.get(key)
-        if feat is None:
-            feat = ""
-        features.append("=".join((key, str(feat))))
-    return features
+def textpluslayoutplusstructure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    return (
+        tpf + lf + sf
+        for tpf, lf, sf in zip(
+            textplus_features(page), layout_features(page), structure_features(page)
+        )
+    )
+
+
+def text_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    """Traits textuelles pour entrainement d'un modèle."""
+    # Première ligne de la page est très importante (souvent un en-tête)
+    firstline = set(
+        word["text"].lower()
+        for word in (next(itertools.groupby(page, operator.itemgetter("top")))[1])
+    )
+    for word in page:
+        text: str = word["text"]
+        features = [
+            "lower=%s" % text.lower(),
+            "uppercase=%s" % text.isupper(),
+            "title=%s" % text.istitle(),
+            "punc=%s" % bool(PUNC.match(text)),
+            "endpunc=%s" % bool(ENDPUNC.match(text)),
+            "multipunc=%s" % bool(MULTIPUNC.match(text)),
+            "numeric=%s" % text.isnumeric(),
+            "head:table=%s" % ("table" in firstline),
+            "head:chapitre=%s" % ("chapitre" in firstline),
+            "head:annexe=%s" % ("annexe" in firstline),
+        ]
+        for pattern in Bullet:
+            if pattern.value.match(word["text"]):
+                features.append("bullet=%s" % pattern.name)
+        yield features
+
+
+def literal(page: Sequence[T_obj]) -> Iterator[list[str]]:
+    for word in page:
+        features = []
+        for key in FEATNAMES:
+            feat = word.get(key)
+            if feat is None:
+                feat = ""
+            features.append("=".join((key, str(feat))))
+        yield features
 
 
 FEATURES: dict[str, FeatureFunc] = {
     "literal": literal,
-    "pruned": pruned,
-    "quantized": quantized,
-    "delta": make_delta(),
-    "vsl": make_visual_structural_literal(),
-    "vl": make_visual_literal(),
+    "text": text_features,
+    "text+": textplus_features,
+    "layout": layout_features,
+    "text+layout": textpluslayout_features,
+    "structure": structure_features,
+    "text+layout+structure": textpluslayoutplusstructure_features,
 }
 
 
-def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int = 1):
+def page2features(
+    page: Sequence[T_obj], feature_func: Union[str, FeatureFunc] = literal, n: int = 1
+):
     if isinstance(feature_func, str):
         feature_func_func = FEATURES.get(feature_func, literal)
     else:
         feature_func_func = feature_func
-    features = [feature_func_func(i, w) for i, w in enumerate(page)]
+    features = list(feature_func_func(page))
 
     def adjacent(features, label):
-        return (":".join((label, feature)) for feature in features if feature != "bias")
+        return (":".join((label, feature)) for feature in features)
 
     ngram_features = [iter(f) for f in features]
     for m in range(1, n):
@@ -296,7 +202,7 @@ def page2features(page, feature_func: Union[str, FeatureFunc] = literal, n: int 
             ngram_features[idx] = itertools.chain(
                 ngram_features[idx], adjacent(features[idx - 1], f"-{m}")
             )
-    return [list(f) for f in ngram_features]
+    return [["bias", *f] for f in ngram_features]
 
 
 def bonly(_, word):

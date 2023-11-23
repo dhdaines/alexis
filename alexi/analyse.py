@@ -83,12 +83,14 @@ class Document:
 
     unknown_id: int = 0
     fileid: str
+    pdfurl: str
     meta: dict[str, str]
     paliers: dict[str, list[Element]]
     contenu: list[Bloc]
 
     def __init__(self, fileid: str, numero: str = "", titre: str = "Document") -> None:
         self.fileid = fileid
+        self.pdfurl = f"{fileid}.pdf"
         self.paliers = {}
         self.meta = {}
         self.contenu = []
