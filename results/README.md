@@ -1,7 +1,7 @@
 - vsl: original "visual+structural_literal" features
-- text2: 5-gram text+font features
-- text+2: 5-gram text+font features
-- layout2: 5-gram layout features
-- text+layout2: 5-gram text+font+layout features
-- structure2: 5-gram text+font+layout features
-- text+layout+structure2: 5-gram text+font+layout+structure features
+- text: 5-gram text+font features
+- text+: 5-gram text+font features
+- layout: 5-gram layout features
+- text+layout: 5-gram text+font+layout features
+- structure: 5-gram text+font+layout features
+- text+layout+structure: 5-gram text+font+layout+structure features
