@@ -56,6 +56,7 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     prev_line_features: dict[str, int] = {}
     for line in lines:
         page_height = int(line[0]["page_height"])
+        page_width = int(line[0]["page_width"])
         line_features = {
             "height": max(int(word["bottom"]) - int(word["top"]) for word in line),
             "left": int(line[0]["x0"]),
@@ -69,6 +70,7 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
                 "last=%d" % (idx == len(line) - 1),
                 "height=%d" % line_features["height"],
                 "left=%d" % line_features["left"],
+                "right=%d" % (page_width - line_features["right"]),
                 "top=%d" % line_features["top"],
                 "bottom=%d" % (page_height - line_features["bottom"]),
                 "gap=%d" % (line_features["top"] - prev_line_features.get("bottom", 0)),
