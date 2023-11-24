@@ -5,7 +5,8 @@ Description des traits importants d'un modèle.
 """
 import argparse
 from pathlib import Path
-import eli5
+
+import eli5  # type: ignore
 
 from alexi.segment import Segmenteur
 
