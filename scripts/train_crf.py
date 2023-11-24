@@ -35,7 +35,7 @@ def make_argparse():
     )
     parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
     parser.add_argument(
-        "--c1", default=0.2, type=float, help="Coefficient de regularisation L1"
+        "--c1", default=0.25, type=float, help="Coefficient de regularisation L1"
     )
     parser.add_argument(
         "--c2", default=0.01, type=float, help="Coefficient de regularisation L2"

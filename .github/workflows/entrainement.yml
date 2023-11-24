@@ -1,0 +1,31 @@
+name: Entraînement et évaluation des modèles CRF
+
+on:
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Install
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install -e .
+    - name: Cross-validate
+      run: |
+        sh results/run.sh
+    - name: Upload results
+      uses: actions/upload-artifact@v3
+      with:
+        name: results
+        path: results/*.csv
+    - name: Train
+      run: |
+        sh scripts/retrain.sh
+    - name: Upload models
+      uses: actions/upload-artifact@v3
+      with:
+        name: models
+        path: alexi/models/
