@@ -42,9 +42,14 @@ def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     """Traits de structure logique pour entrainement d'un modèle."""
     for word in page:
         elements = set(word.get("tagstack", "Span").split(";"))
+        header = False
+        for el in elements:
+            if el and el[0] == "H":
+                header = True
         features = [
             "toc=%d" % ("TOCI" in elements),
             "mctag=%s" % word.get("mctag", "P"),
+            "header=%s" % header,
         ]
         yield features
 
@@ -67,12 +72,13 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             features = [
                 "first=%d" % (idx == 0),
                 "last=%d" % (idx == len(line) - 1),
-                "height=%d" % line_features["height"],
-                "left=%d" % line_features["left"],
-                "top=%d" % line_features["top"],
-                "bottom=%d" % (page_height - line_features["bottom"]),
-                "gap=%d" % (line_features["top"] - prev_line_features.get("bottom", 0)),
-                "indent=%d"
+                "line:height=%d" % line_features["height"],
+                "line:left=%d" % line_features["left"],
+                "line:top=%d" % line_features["top"],
+                "line:bottom=%d" % (page_height - line_features["bottom"]),
+                "line:gap=%d"
+                % (line_features["top"] - prev_line_features.get("bottom", 0)),
+                "line:indent=%d"
                 % (
                     line_features["left"]
                     - prev_line_features.get("left", line_features["left"])
@@ -184,13 +190,15 @@ def page2features(
     page: Sequence[T_obj], feature_func: Union[str, FeatureFunc] = literal, n: int = 1
 ):
     if isinstance(feature_func, str):
-        feature_func_func = FEATURES.get(feature_func, literal)
+        feature_func_func = FEATURES[feature_func]
     else:
         feature_func_func = feature_func
     features = list(feature_func_func(page))
 
     def adjacent(features, label):
-        return (":".join((label, feature)) for feature in features)
+        return (
+            ":".join((label, feature)) for feature in features if ":" not in feature
+        )
 
     ngram_features = [iter(f) for f in features]
     for m in range(1, n):
