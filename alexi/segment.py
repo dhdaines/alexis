@@ -190,7 +190,7 @@ def page2features(
     page: Sequence[T_obj], feature_func: Union[str, FeatureFunc] = literal, n: int = 1
 ):
     if isinstance(feature_func, str):
-        feature_func_func = FEATURES.get(feature_func, literal)
+        feature_func_func = FEATURES[feature_func]
     else:
         feature_func_func = feature_func
     features = list(feature_func_func(page))
