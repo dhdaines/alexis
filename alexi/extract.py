@@ -264,6 +264,25 @@ def save_images_from_pdf(blocs: list[Bloc], conv: Converteur, docdir: Path):
             img.save(docdir / bloc.img)
 
 
+def make_redirect(path: Path, target: Path):
+    """Creer une redirection HTML."""
+    path.mkdir(exist_ok=True)
+    with open(path / "index.html", "wt") as outfh:
+        outfh.write(
+            f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta http-equiv="refresh" content="0;URL='../{target}/" />
+    <title></title>
+</head>
+<body>
+    <p>La version actuelle du règlement {path.name} se trouve à {target}.</p>
+</body>
+</html>
+"""
+        )
+
+
 def extract_html(args, path, iob, conv):
     docdir = args.outdir / path.stem
     imgdir = args.outdir / path.stem / "img"
@@ -279,11 +298,6 @@ def extract_html(args, path, iob, conv):
     LOGGER.info("Analyse de la structure de %s", path)
     doc = analyseur()
 
-    if doc.numero and doc.numero != path.stem:
-        LOGGER.info("Lien %s => %s", doc.numero, path.stem)
-        numero_link = Path(args.outdir / doc.numero)
-        numero_link.unlink(missing_ok=True)
-        numero_link.symlink_to(path.stem)
     # Do articles/annexes at top level
     seen_paliers = set()
     doc_titre = doc.titre if doc.titre != "Document" else path.stem
