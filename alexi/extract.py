@@ -116,6 +116,9 @@ STYLE_CSS = """html, body {
     background: #2d3e50;
     color: #eee;
 }
+.initial {
+    color: #aaa;
+}
 #body {
     overflow-y: scroll;
     padding: 2px;
@@ -401,7 +404,10 @@ def make_doc_tree(docs: list[Document], outdir: Path):
   </head>
   <body>
     <div class="container">
-    <h1 id="header">ALEXI</h1>
+    <h1 id="header">ALEXI<span class="nomobile">:
+        <span class="initial">EX</span>tracteur
+        d’<span class="initial">I</span>nformation
+    </h1>
     <ul id="body">
 """
     )
