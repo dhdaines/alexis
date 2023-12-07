@@ -19,16 +19,17 @@ CHARMAP = charset_table_to_dict(default_charset)
 ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
 
 
-def add_from_dir(writer: IndexWriter, document: str, docdir: Path) -> None:
-    LOGGER.info("Indexing %s", docdir)
+def add_from_dir(writer: IndexWriter, document: str, docdir: Path) -> dict:
     with open(docdir / "index.json") as infh:
         element = json.load(infh)
         titre = f'{element["type"]} {element["numero"]}: {element["titre"]}'
         page = element.get("page", 1)
+    LOGGER.info("Indexing %s: %s", docdir, element["titre"])
     with open(docdir / "index.md") as infh:
         writer.add_document(
             document=document, page=page, titre=titre, contenu=infh.read()
         )
+    return element
 
 
 def index(indir: Path, outdir: Path) -> None:
@@ -44,12 +45,15 @@ def index(indir: Path, outdir: Path) -> None:
     for docdir in indir.iterdir():
         if not docdir.is_dir():
             continue
+        if not (docdir / "index.json").exists():
+            continue
         document = docdir.with_suffix(".pdf").name
         add_from_dir(writer, document, docdir)
         for subdir in docdir.iterdir():
             if not docdir.is_dir():
                 continue
-            for dirpath, dirnames, filenames in os.walk(subdir):
-                if "index.json" in filenames:
-                    add_from_dir(writer, document, Path(dirpath))
+            for dirpath, dirnames, filenames in os.walk(subdir, topdown=True):
+                if "index.json" not in filenames:
+                    continue
+                add_from_dir(writer, document, Path(dirpath))
     writer.commit()
