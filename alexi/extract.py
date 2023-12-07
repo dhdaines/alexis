@@ -10,9 +10,10 @@ import json
 import logging
 import operator
 import os
+import re
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, TextIO
+from typing import Any, Iterable, TextIO, Optional
 
 from alexi.analyse import Analyseur, Document, Element
 from alexi.convert import Converteur
@@ -430,6 +431,41 @@ def make_doc_tree(docs: list[Document], outdir: Path):
         outfh.write(STYLE_CSS)
 
 
+def extract_zonage(doc: Document, path: Path):
+    mz: Optional[Element] = None
+    for c in doc.paliers["Chapitre"]:
+        if "milieux et zones" in c.titre.lower():
+            LOGGER.info("Extraction de milieux et zones")
+            mz = c
+            break
+    if mz is None:
+        LOGGER.info("Chapitre milieux et zones non trouvé")
+        return
+    top = Path(doc.fileid) / "Chapitre" / mz.numero
+    metadata = {
+        "categorie_milieu": {},
+        "milieu": {},
+    }
+    for sec in mz.sub:
+        if "dispositions" in sec.titre.lower():
+            continue
+        secdir = top / sec.type / sec.numero
+        if m := re.match(r"\s*(\S+)\s*[-–—]\s*(.*)", sec.titre):
+            metadata["categorie_milieu"][m.group(1)] = {
+                "titre": m.group(2),
+                "url": str(secdir),
+            }
+        for subsec in sec.sub:
+            subsecdir = secdir / subsec.type / subsec.numero
+            if m := re.match(r"\s*(\S+)\s+(.*)", subsec.titre):
+                metadata["milieu"][m.group(1)] = {
+                    "titre": m.group(2),
+                    "url": str(subsecdir),
+                }
+    with open(path, "wt") as outfh:
+        json.dump(metadata, outfh, indent=2, ensure_ascii=False)
+
+
 def main(args):
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
@@ -475,6 +511,8 @@ def main(args):
             doc = extract_html(args, path, iob, conv)
             doc.pdfurl = pdf_url
             docs.append(doc)
+            if "zonage" in doc.titre.lower():
+                extract_zonage(doc, args.outdir / "zonage.json")
     if not args.serafim:
         make_doc_tree(docs, args.outdir)
 
