@@ -13,7 +13,7 @@ import os
 import re
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, TextIO, Optional
+from typing import Any, Iterable, Optional, TextIO
 
 from alexi.analyse import Analyseur, Document, Element
 from alexi.convert import Converteur
@@ -442,7 +442,7 @@ def extract_zonage(doc: Document, path: Path):
         LOGGER.info("Chapitre milieux et zones non trouvé")
         return
     top = Path(doc.fileid) / "Chapitre" / mz.numero
-    metadata = {
+    metadata: dict[str, dict[str, dict[str, str]]] = {
         "categorie_milieu": {},
         "milieu": {},
     }
