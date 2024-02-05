@@ -17,7 +17,7 @@ jobs:
       run: |
         sh results/run.sh
     - name: Upload results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: results
         path: results/*.csv
@@ -25,7 +25,7 @@ jobs:
       run: |
         sh scripts/retrain.sh
     - name: Upload models
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: models
         path: alexi/models/
