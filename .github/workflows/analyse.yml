@@ -47,14 +47,6 @@ jobs:
     - name: Extract
       run: |
         alexi -v extract -m download/index.json download/*.pdf
-    - name: Index
-      run: |
-        alexi -v index export
-    - name: Upload index
-      uses: actions/upload-artifact@v3
-      with:
-        name: index
-        path: indexdir/
     - name: Setup Pages
       uses: actions/configure-pages@v4
     - name: Upload artifact
