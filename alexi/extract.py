@@ -433,6 +433,9 @@ def make_doc_tree(docs: list[Document], outdir: Path):
 
 def extract_zonage(doc: Document, path: Path):
     mz: Optional[Element] = None
+    if "Chapitre" not in doc.paliers:
+        LOGGER.warning("Aucun chapitre présent dans %s", path)
+        return
     for c in doc.paliers["Chapitre"]:
         if "milieux et zones" in c.titre.lower():
             LOGGER.info("Extraction de milieux et zones")
@@ -457,7 +460,7 @@ def extract_zonage(doc: Document, path: Path):
             }
         for subsec in sec.sub:
             subsecdir = secdir / subsec.type / subsec.numero
-            if m := re.match(r"\s*(\S+)\s+(.*)", subsec.titre):
+            if m := re.match(r"\s*(\S+)[-–—\s]+(.*)", subsec.titre):
                 metadata["milieu"][m.group(1)] = {
                     "titre": m.group(2),
                     "url": str(subsecdir),
