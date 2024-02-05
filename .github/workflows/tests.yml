@@ -68,4 +68,4 @@ jobs:
         python -m coverage html
 
     - name: Upload code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
