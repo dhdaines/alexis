@@ -400,7 +400,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
 def make_doc_tree(docs: list[Document], outdir: Path):
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
-        + """    <title>ALEXI</title>
+        + """    <title><span class="inital">AL</span>EXI</title>
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
