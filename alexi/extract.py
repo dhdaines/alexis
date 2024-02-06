@@ -343,7 +343,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
             else:
                 eltitre = f"{el.type} {el.numero}"
         while level < prev_level:
-            outfh.write("</ul></li>\n")
+            outfh.write("</ul></details></li>\n")
             prev_level -= 1
         if el.sub:
             outfh.write(
@@ -359,7 +359,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
         d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
     while prev_level > 1:
-        outfh.write("</ul></li>\n")
+        outfh.write("</ul></details></li>\n")
         prev_level -= 1
     outfh.write("</ul>\n")
 
@@ -392,7 +392,7 @@ def make_doc_tree(docs: list[Document], outdir: Path):
             outfh.write('<li class="Document"><details>\n')
             outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
             make_doc_subtree(doc, outfh)
-            outfh.write("</li>\n")
+            outfh.write("</details></li>\n")
         outfh.write(HTML_FOOTER)
     with open(outdir / "style.css", "wt") as outfh:
         outfh.write(STYLE_CSS)
