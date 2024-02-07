@@ -6,7 +6,6 @@ import argparse
 import logging
 import os
 import re
-
 from pathlib import Path
 
 LOGGER = logging.getLogger("link")
