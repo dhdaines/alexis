@@ -1,4 +1,4 @@
-name: Téléchargement, analyse et indexation des règlements d'urbanisme
+name: Téléchargement et analyse des règlements d'urbanisme
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
       run: |
         alexi -v download --exclude=Plan --exclude=/derogation \
                  --exclude='\d-[aA]dopt' --exclude='Z-\d' \
-                 --exclude=Reso
+                 --exclude='-[rR]eso'
         for d in download/*.pdf; do
             bn=$(basename $d .pdf)
             for dd in data/train data/dev data/test; do
