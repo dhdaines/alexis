@@ -347,7 +347,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
             prev_level -= 1
         if el.sub:
             outfh.write(
-                f'<li class="{el.type}"><details><summary>{eltitre}</summary><ul>\n'
+                f'<li class="{el.type} node"><details><summary>{eltitre}</summary><ul>\n'
             )
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
             pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
@@ -389,7 +389,7 @@ def make_doc_tree(docs: list[Document], outdir: Path):
         LOGGER.info("Génération de %s", outdir / "index.html")
         outfh.write(HTML_HEADER)
         for doc in docs:
-            outfh.write('<li class="Document"><details>\n')
+            outfh.write('<li class="Document node"><details>\n')
             outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
             make_doc_subtree(doc, outfh)
             outfh.write("</details></li>\n")
