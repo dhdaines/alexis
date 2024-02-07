@@ -448,6 +448,10 @@ def main(args):
             metadata = json.load(infh)
     docs = []
     for path in args.docs:
+        pdf_path = path.with_suffix(".pdf")
+        if metadata and pdf_path.name not in metadata:
+            LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
+            continue
         conv = None
         if path.suffix == ".csv":
             LOGGER.info("Lecture de %s", path)
@@ -471,7 +475,6 @@ def main(args):
                     crf = Segmenteur(args.segment_model)
                 iob = list(extracteur(crf(feats)))
 
-        pdf_path = path.with_suffix(".pdf")
         pdf_url = metadata.get(
             pdf_path.name,
             f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}",
