@@ -128,7 +128,10 @@ li.leaf {
 
 
 def extract_element(
-    doc: Document, el: Element, outdir: Path, imgdir: Path, fragment=True
+    doc: Document,
+    el: Element,
+    outdir: Path,
+    imgdir: Path,
 ):
     """Extract the various constituents, referencing images in the
     generated image directory."""
@@ -158,7 +161,7 @@ def extract_element(
     LOGGER.info("%s %s", outdir, el.titre)
     with open(outdir / "index.html", "wt") as outfh:
         outfh.write(HTML_HEADER)
-        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=fragment))
+        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=True))
         outfh.write(HTML_FOOTER)
 
 
@@ -313,7 +316,7 @@ def extract_html(args, path, iob, conv):
             (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
         )
     # And do a full extraction (which might crash your browser)
-    extract_element(doc, doc.structure, docdir, imgdir, fragment=False)
+    extract_element(doc, doc.structure, docdir, imgdir)
     return doc
 
 
