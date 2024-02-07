@@ -47,6 +47,9 @@ jobs:
     - name: Extract
       run: |
         alexi -v extract -m download/index.json download/*.pdf
+    - name: Link
+      run: |
+        alexi -v link
     - name: Setup Pages
       uses: actions/configure-pages@v4
     - name: Upload artifact
