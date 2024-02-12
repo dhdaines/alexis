@@ -54,7 +54,7 @@ Par exemple, si l'on veut corriger l'extraction de la page 1 du
 règlement 1314-2023-DEM, on peut d'abord extraire les données et une
 visualisation de la segmentation et classification avec:
 
-    alexi annotate --page 1\
+    alexi annotate --pages 1 \
         download/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
 
 Par défaut, cela créera des fichiers dans le même repertoire que
