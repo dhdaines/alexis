@@ -40,6 +40,74 @@ cette série d'étapes:
    défaut.  Encore il est possible de fournir l'option `--outdir` pour
    modifier cela.
 
+Correction des structures extraites
+-----------------------------------
+
+Il arrive parfois (ou souvent) qu'ALEXI n'interprète pas correctement
+le formatage d'un PDF.  Pour le moment la manière de corriger consiste
+à sortir les traits distinctifs utilisés par le classificateur en
+format CSV, corriger un exemplaire du texte non pris en charge (ne
+serait-ce qu'une seule page), et l'ajouter à l'entrainement du modèle.
+La commande `alexi annotate` vise à faciliter ce processus.
+
+Par exemple, si l'on veut corriger l'extraction de la page 1 du
+règlement 1314-2023-DEM, on peut d'abord extraire les données et une
+visualisation de la segmentation et classification avec:
+
+    alexi annotate --page 1\
+        download/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
+
+Par défaut, cela créera des fichiers dans le même repertoire que
+`alexi extract`, alors
+`export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1`.  L'option
+`--outdir` peut être utilisée pour spécifier un autre repertoire de
+base.  Les fichiers générer sont:
+
+    page1.pdf  # PDF annoté avec la segmentation
+    page1.csv  # Traits distintcifs utilisés pour le modèle
+
+Avec un logiciel de feuilles de calcul dont LibreOffice ou Excel, on
+peut alors modifier `page1.csv` pour corriger la segmentation.  Par la
+suite la visualisation s'effectue avec:
+
+    alexi annotate export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1
+
+Une fois les erreurs corrigés, il suffit de copier
+`export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1/page1.csv` vers le
+repertoire `data` et réentrainer le modèle avec `scripts/retrain.sh`.
+
+Extraction de catégories pertinentes du zonage
+----------------------------------------------
+
+Quelques éléments du règlement de zonage ont droit à un traitement
+particulier d'ALEXI pour faciliter la génération d'hyperliens internes
+ainsi que fournir des informations à des applications externes dont
+ZONALDA et SÈRAFIM.  Ces informations se retrouvent dans le fichier
+`zonage.json` dans le repertoire `export`.  Actuellement pris en
+charge sont:
+
+- Les catégories de milieux (ex. "T2 OCCUPATION DE LA FORÊT")
+- Les types de milieux (ex. "T2.1 AGROFORESTIER")
+- Les catégories d'usages (ex. "H HABITATION")
+- Les classes d'usages (ex. "H-01 Habitation unifamiliale")
+
+À l'avenir il pourrait être utile d'extraire aussi les exceptions
+spécifiques a des zones individuelle pour les référencer.
+
+Extraction d'hyperliens
+-----------------------
+
+Un ensemble limité d'hyperliens internes et externes est pris en
+charge par ALEXI, spécifiquement:
+
+- Des liens vers d'autres articles du même règlement
+- Des liens vers d'autres chapitres ou annexes du même règlement
+- Des liens vers les catégories et types de milieu et usages
+- Des liens vers des articles de la loi sur l'aménagement et
+  l'urbanisme, par exemple
+  https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1#se:148_0_1
+
+
 Génération d'un index
 ---------------------
 
