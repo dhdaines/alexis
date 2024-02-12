@@ -22,7 +22,7 @@ FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
 
 
 class Bullet(Enum):
-    NUMERIC = re.compile(r"^(\d+)[\)\.°]$")
+    NUMERIC = re.compile(r"^(\d+)[\)\.°-]$")
     LOWER = re.compile(r"^([a-z])[\)\.]$")
     UPPER = re.compile(r"^([A-Z])[\)\.]$")
     ROMAN = re.compile(r"^([xiv]+)[\)\.]$", re.IGNORECASE)
