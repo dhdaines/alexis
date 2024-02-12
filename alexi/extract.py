@@ -1,10 +1,9 @@
 """
-Convertir les règlements en HTML, texte, et/ou JSON structuré.
+Convertir les règlements en HTML
 """
 
 import argparse
 import csv
-import dataclasses
 import itertools
 import json
 import logging
@@ -17,7 +16,7 @@ from typing import Any, Iterable, Optional, TextIO
 
 from alexi.analyse import Analyseur, Document, Element
 from alexi.convert import Converteur
-from alexi.format import format_dict, format_html, format_text
+from alexi.format import format_html
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Extracteur
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
@@ -46,12 +45,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--label-model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
     )
     parser.add_argument(
-        "-s",
-        "--serafim",
-        help="Générer le format JSON attendu par SÈRAFIM",
-        action="store_true",
-    )
-    parser.add_argument(
         "-m",
         "--metadata",
         help="Fichier JSON avec metadonnées des documents",
@@ -66,30 +59,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 def read_csv(path: Path) -> list[dict[str, Any]]:
     with open(path, "rt") as infh:
         return list(csv.DictReader(infh))
-
-
-def extract_serafim(args, path, iob, conv):
-    docdir = args.outdir / "data"
-    imgdir = args.outdir / "public" / "img" / path.stem
-    LOGGER.info("Génération de fichiers SÈRAFIM sous %s", docdir)
-    docdir.mkdir(parents=True, exist_ok=True)
-    analyseur = Analyseur(path.stem, iob)
-    if not args.no_images:
-        LOGGER.info("Extraction d'images sous %s", imgdir)
-        imgdir.mkdir(parents=True, exist_ok=True)
-    if conv and not args.no_images:
-        LOGGER.info("Extraction d'images de %s", path)
-        images = conv.extract_images()
-        analyseur.add_images(images)
-        save_images_from_pdf(analyseur.blocs, conv, imgdir)
-    LOGGER.info("Analyse de la structure de %s", path)
-    doc = analyseur()
-    with open(docdir / f"{path.stem}.json", "wt") as outfh:
-        LOGGER.info("Génération de %s/%s.json", docdir, path.stem)
-        docdict = format_dict(doc, imgdir=path.stem)
-        pdf_path = path.with_suffix(".pdf")
-        docdict["fichier"] = pdf_path.name
-        json.dump(docdict, outfh, indent=2, ensure_ascii=False)
 
 
 HTML_GLOBAL_HEADER = """<!DOCTYPE html>
@@ -159,7 +128,10 @@ li.leaf {
 
 
 def extract_element(
-    doc: Document, el: Element, outdir: Path, imgdir: Path, fragment=True
+    doc: Document,
+    el: Element,
+    outdir: Path,
+    imgdir: Path,
 ):
     """Extract the various constituents, referencing images in the
     generated image directory."""
@@ -189,12 +161,8 @@ def extract_element(
     LOGGER.info("%s %s", outdir, el.titre)
     with open(outdir / "index.html", "wt") as outfh:
         outfh.write(HTML_HEADER)
-        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=fragment))
+        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=True))
         outfh.write(HTML_FOOTER)
-    with open(outdir / "index.md", "wt") as outfh:
-        outfh.write(format_text(doc, element=el))
-    with open(outdir / "index.json", "wt") as outfh:
-        json.dump(dataclasses.asdict(el), outfh)
 
 
 def make_index_html(
@@ -348,7 +316,7 @@ def extract_html(args, path, iob, conv):
             (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
         )
     # And do a full extraction (which might crash your browser)
-    extract_element(doc, doc.structure, docdir, imgdir, fragment=False)
+    extract_element(doc, doc.structure, docdir, imgdir)
     return doc
 
 
@@ -378,21 +346,23 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
             else:
                 eltitre = f"{el.type} {el.numero}"
         while level < prev_level:
-            outfh.write("</ul></li>\n")
+            outfh.write("</ul></details></li>\n")
             prev_level -= 1
         if el.sub:
-            outfh.write(f'<li class="node"><details><summary>{eltitre}</summary><ul>\n')
+            outfh.write(
+                f'<li class="{el.type} node"><details><summary>{eltitre}</summary><ul>\n'
+            )
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
             pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
             outfh.write(f'<li class="text">{link} ({pdflink})</li>\n')
         else:
             link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
             pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
-            outfh.write(f'<li class="leaf">{link} ({pdflink})</li>\n')
+            outfh.write(f'<li class="{el.type} leaf">{link} ({pdflink})</li>\n')
         d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
     while prev_level > 1:
-        outfh.write("</ul></li>\n")
+        outfh.write("</ul></details></li>\n")
         prev_level -= 1
     outfh.write("</ul>\n")
 
@@ -422,10 +392,10 @@ def make_doc_tree(docs: list[Document], outdir: Path):
         LOGGER.info("Génération de %s", outdir / "index.html")
         outfh.write(HTML_HEADER)
         for doc in docs:
-            outfh.write('<li class="node"><details>\n')
+            outfh.write('<li class="Document node"><details>\n')
             outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
             make_doc_subtree(doc, outfh)
-            outfh.write("</li>\n")
+            outfh.write("</details></li>\n")
         outfh.write(HTML_FOOTER)
     with open(outdir / "style.css", "wt") as outfh:
         outfh.write(STYLE_CSS)
@@ -478,6 +448,10 @@ def main(args):
             metadata = json.load(infh)
     docs = []
     for path in args.docs:
+        pdf_path = path.with_suffix(".pdf")
+        if metadata and pdf_path.name not in metadata:
+            LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
+            continue
         conv = None
         if path.suffix == ".csv":
             LOGGER.info("Lecture de %s", path)
@@ -501,23 +475,18 @@ def main(args):
                     crf = Segmenteur(args.segment_model)
                 iob = list(extracteur(crf(feats)))
 
-        pdf_path = path.with_suffix(".pdf")
         pdf_url = metadata.get(
             pdf_path.name,
             f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}",
         )
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
-        if args.serafim:
-            extract_serafim(args, path, iob, conv)
-        else:
-            doc = extract_html(args, path, iob, conv)
-            doc.pdfurl = pdf_url
-            docs.append(doc)
-            if "zonage" in doc.titre.lower():
-                extract_zonage(doc, args.outdir / "zonage.json")
-    if not args.serafim:
-        make_doc_tree(docs, args.outdir)
+        doc = extract_html(args, path, iob, conv)
+        doc.pdfurl = pdf_url
+        docs.append(doc)
+        if "zonage" in doc.titre.lower():
+            extract_zonage(doc, args.outdir / "zonage.json")
+    make_doc_tree(docs, args.outdir)
 
 
 if __name__ == "__main__":

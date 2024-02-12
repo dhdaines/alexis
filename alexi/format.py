@@ -117,7 +117,9 @@ def format_html(
         sp = " " * indent
         tag = TAG[el.type]
         header = HEADER[el.type]
-        lines = [f'{off}<{tag} class="{el.type}">']
+        lines = []
+        if tag != "body":
+            lines.append(f'{off}<{tag} class="{el.type}">')
         if el.numero and offset:
             lines.append(
                 f'{off}{sp}<a class="anchor" name="{el.type}/{el.numero}"></a>'
@@ -147,7 +149,8 @@ def format_html(
                 if html:
                     lines.append(off + sp + html)
                 idx += 1
-        lines.append(off + f"</{tag}>")
+        if tag != "body":
+            lines.append(off + f"</{tag}>")
         return lines
 
     if element is None:
@@ -161,8 +164,9 @@ def format_html(
 <html>
   <head>
     <title>{doc.titre}</title>
-  </head>"""
-        doc_footer = "</html>"
+  </head>
+  <body>"""
+        doc_footer = "</body></html>"
         return "\n".join((doc_header, doc_body, doc_footer))
 
 
