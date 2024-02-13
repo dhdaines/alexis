@@ -26,7 +26,6 @@ def features(page: Sequence[T_obj]) -> Iterator[list[str]]:
         features.append("alpha=%s" % bool(word["text"].isalpha()))
         features.append("numdash=%s" % bool(NUMDASH.match(word["text"])))
         features.append("bold=%s" % bool("bold" in word["fontname"].lower()))
-        features.append("tag=%s" % word["segment"].partition("-")[2])
         features.append("size=%d" % (int(word["bottom"]) - int(word["top"])))
         yield features
 

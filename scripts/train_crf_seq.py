@@ -1,7 +1,6 @@
 """Entrainer un CRF pour segmentation/identification"""
 
 import argparse
-import itertools
 from pathlib import Path
 
 import joblib  # type: ignore
@@ -14,9 +13,6 @@ def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--niter", default=100, type=int, help="Nombre d'iterations d'entrainement"
-    )
-    parser.add_argument(
-        "--train-dev", action="store_true", help="Ajouter dev set au train set"
     )
     parser.add_argument(
         "--c1", default=0.5, type=float, help="Coefficient de regularisation L1"
@@ -57,11 +53,8 @@ def train(
 def main():
     parser = make_argparse()
     args = parser.parse_args()
-    train_set = load(Path("data/train").glob("*.csv"))
-    dev_set = load(Path("data/dev").glob("*.csv"))
-    if args.train_dev:
-        train_set = itertools.chain(train_set, dev_set)
-        dev_set = None
+    train_set = load(Path("data").glob("*.csv"))
+    dev_set = None
     crf = train(
         train_set,
         dev_set,
