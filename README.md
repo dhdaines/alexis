@@ -67,8 +67,15 @@ base.  Les fichiers générer sont:
     page1.csv  # Traits distintcifs utilisés pour le modèle
 
 Avec un logiciel de feuilles de calcul dont LibreOffice ou Excel, on
-peut alors modifier `page1.csv` pour corriger la segmentation.  Par la
-suite la visualisation s'effectue avec:
+peut alors modifier `page1.csv` pour corriger la segmentation.  Il est
+*très important* de spécifier ces paramètres lorsqu'on ouvre et
+sauvegarde le fichier CSV:
+
+- La colonne "text" doit avoir le type "Texte" (et pas "Standard")
+- Le seul séparateur de colonne devrait être la virgule (pas de
+  point-virgule, tab, etc)
+
+Par la suite la visualisation s'effectue avec:
 
     alexi annotate export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1
 
@@ -106,6 +113,7 @@ charge par ALEXI, spécifiquement:
 - Des liens vers des articles de la loi sur l'aménagement et
   l'urbanisme, par exemple
   https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1#se:148_0_1
+
 
 
 Génération d'un index
