@@ -9,19 +9,18 @@ import json
 import logging
 import operator
 import os
-import re
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, Optional, TextIO
+from typing import Any, Iterable, TextIO
 
-from alexi.analyse import Analyseur, Document, Element
+from alexi.analyse import Analyseur, Bloc, Document, Element
+from alexi.analyse import extract_zonage, extract_links
 from alexi.convert import Converteur
 from alexi.format import format_html
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Extracteur
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
-from alexi.types import Bloc
 
 LOGGER = logging.getLogger("extract")
 
@@ -268,8 +267,12 @@ def extract_html(args, path, iob, conv):
         analyseur.add_images(images)
         save_images_from_pdf(analyseur.blocs, conv, imgdir)
     LOGGER.info("Analyse de la structure de %s", path)
-    doc = analyseur()
+    return analyseur()
 
+
+def output_html(args, path, doc):
+    docdir = args.outdir / path.stem
+    imgdir = args.outdir / path.stem / "img"
     # Do articles/annexes at top level
     seen_paliers = set()
     doc_titre = doc.titre if doc.titre != "Document" else path.stem
@@ -391,6 +394,7 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
     <h1 id="header"><span class="initial">AL</span>EXI<span class="nomobile">:
         <span class="initial">EX</span>tracteur
         d’<span class="initial">I</span>nformation
+        </span>
     </h1>
     <ul id="body">
 """
@@ -424,49 +428,7 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
     return metadata
 
 
-def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
-    """
-    Extraire les éléments du zonage d'un règlement et générer des
-    metadonnées pour l'identification des hyperliens et la
-    présentation dans ZONALDA.
-    """
-    mz: Optional[Element] = None
-    if "Chapitre" not in doc.paliers:
-        LOGGER.warning("Aucun chapitre présent dans %s", doc.fileid)
-        return
-    for c in doc.paliers["Chapitre"]:
-        if "milieux et zones" in c.titre.lower():
-            LOGGER.info("Extraction de milieux et zones")
-            mz = c
-            break
-    if mz is None:
-        LOGGER.info("Chapitre milieux et zones non trouvé")
-        return
-    top = Path(doc.fileid) / "Chapitre" / mz.numero
-    metadata: dict[str, dict[str, dict[str, str]]] = {
-        "categorie_milieu": {},
-        "milieu": {},
-    }
-    for sec in mz.sub:
-        if "dispositions" in sec.titre.lower():
-            continue
-        secdir = top / sec.type / sec.numero
-        if m := re.match(r"\s*(\S+)\s*[-–—]\s*(.*)", sec.titre):
-            metadata["categorie_milieu"][m.group(1)] = {
-                "titre": m.group(2),
-                "url": str(secdir),
-            }
-        for subsec in sec.sub:
-            subsecdir = secdir / subsec.type / subsec.numero
-            if m := re.match(r"\s*(\S+)[-–—\s]+(.*)", subsec.titre):
-                metadata["milieu"][m.group(1)] = {
-                    "titre": m.group(2),
-                    "url": str(subsecdir),
-                }
-    return metadata
-
-
-def main(args):
+def main(args) -> None:
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
     metadata = {}
@@ -512,7 +474,13 @@ def main(args):
         docs.append(doc)
         if "zonage" in doc.titre.lower() and "zonage" not in metadata:
             metadata["zonage"] = extract_zonage(doc)
+    # Create the full tree first to gather information for linking
     metadata["doc"] = make_doc_tree(docs, args.outdir)
+    # Detect and resolve links in the text
+    extract_links(docs, metadata)
+    # Now finally output the text itself
+    for doc in docs:
+        output_html(args, path, doc)
     with open(args.outdir / "index.json", "wt") as outfh:
         LOGGER.info("Génération de %s", args.outdir / "index.json")
         json.dump(metadata, outfh, indent=2, ensure_ascii=False)

@@ -8,11 +8,57 @@ import operator
 import re
 from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional
+from pathlib import Path
 
-from .convert import merge_overlaps
-from .types import Bloc, T_obj
+from pdfplumber.utils.geometry import T_bbox, merge_bboxes, calculate_area
+
+from .types import T_obj
 
 LOGGER = logging.getLogger("analyse")
+
+EXTENSION = "jpg"  # Ou png, si désiré (FIXME: webm...)
+
+
+@dataclass
+class Bloc:
+    """Élément de présentation (bloc de texte ou image)"""
+
+    type: str
+    contenu: list[T_obj]
+    _bbox: Optional[T_bbox] = None
+    _page_number: Optional[int] = None
+
+    def __hash__(self) -> int:
+        if self._bbox:
+            return hash((self.type, self._bbox, self._page_number))
+        else:
+            return hash((self.type, self.texte))
+
+    @property
+    def texte(self) -> str:
+        """Représentation textuel du bloc."""
+        return " ".join(x["text"] for x in self.contenu)
+
+    @property
+    def page_number(self) -> int:
+        """Numéro de page de ce bloc."""
+        if self._page_number is not None:
+            return self._page_number
+        return int(self.contenu[0]["page"])
+
+    @property
+    def bbox(self) -> T_bbox:
+        if self._bbox is not None:
+            return self._bbox
+        return merge_bboxes(
+            (int(word["x0"]), int(word["top"]), int(word["x1"]), int(word["bottom"]))
+            for word in self.contenu
+        )
+
+    @property
+    def img(self) -> str:
+        bbox = ",".join(str(round(x)) for x in self.bbox)
+        return f"page{self.page_number}-{bbox}.{EXTENSION}"
 
 
 def group_iob(words: Iterable[T_obj], key: str = "segment") -> Iterator[Bloc]:
@@ -172,6 +218,72 @@ class Document:
         return self.structure.numero
 
 
+def bbox_overlaps(obox: T_bbox, bbox: T_bbox) -> bool:
+    """Déterminer si deux BBox ont une intersection."""
+    ox0, otop, ox1, obottom = obox
+    x0, top, x1, bottom = bbox
+    return ox0 < x1 and ox1 > x0 and otop < bottom and obottom > top
+
+
+def merge_overlaps(images: Iterable[Bloc]) -> list[Bloc]:
+    """Fusionner des blocs qui se touchent en préservant l'ordre"""
+    # FIXME: preserving order maybe not necessary :)
+    ordered_images = list(enumerate(images))
+    ordered_images.sort(key=lambda x: -calculate_area(x[1].bbox))
+    while True:
+        nimg = len(ordered_images)
+        new_ordered_images = []
+        overlapping = {}
+        for idx, image in ordered_images:
+            for ydx, other in ordered_images:
+                if other is image:
+                    continue
+                if bbox_overlaps(image.bbox, other.bbox):
+                    overlapping[ydx] = other
+            if overlapping:
+                big_box = merge_bboxes(
+                    (image.bbox, *(other.bbox for other in overlapping.values()))
+                )
+                LOGGER.info(
+                    "image %s overlaps %s merged to %s"
+                    % (
+                        image.bbox,
+                        [other.bbox for other in overlapping.values()],
+                        big_box,
+                    )
+                )
+                bloc_types = set(
+                    bloc.type
+                    for bloc in itertools.chain((image,), overlapping.values())
+                )
+                image_type = "Tableau" if "Tableau" in bloc_types else "Figure"
+                new_image = Bloc(
+                    type=image_type,
+                    contenu=list(
+                        itertools.chain(
+                            image.contenu,
+                            *(other.contenu for other in overlapping.values()),
+                        )
+                    ),
+                    _bbox=big_box,
+                    _page_number=image._page_number,
+                )
+                for oidx, image in ordered_images:
+                    if oidx == idx:
+                        new_ordered_images.append((idx, new_image))
+                    elif oidx in overlapping:
+                        pass
+                    else:
+                        new_ordered_images.append((oidx, image))
+                break
+        if overlapping:
+            ordered_images = new_ordered_images
+        if len(ordered_images) == nimg:
+            break
+    ordered_images.sort()
+    return [img for _, img in ordered_images]
+
+
 class Analyseur:
     """Analyse d'un document étiqueté en IOB."""
 
@@ -244,3 +356,59 @@ class Analyseur:
             for bloc in blocs:
                 doc.add_bloc(bloc)
         return doc
+
+
+def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
+    """
+    Extraire les éléments du zonage d'un règlement et générer des
+    metadonnées pour l'identification des hyperliens et la
+    présentation dans ZONALDA.
+    """
+    mz: Optional[Element] = None
+    if "Chapitre" not in doc.paliers:
+        LOGGER.warning("Aucun chapitre présent dans %s", doc.fileid)
+        return
+    for c in doc.paliers["Chapitre"]:
+        if "milieux et zones" in c.titre.lower():
+            LOGGER.info("Extraction de milieux et zones")
+            mz = c
+            break
+    if mz is None:
+        LOGGER.info("Chapitre milieux et zones non trouvé")
+        return
+    top = Path(doc.fileid) / "Chapitre" / mz.numero
+    metadata: dict[str, dict[str, dict[str, str]]] = {
+        "categorie_milieu": {},
+        "milieu": {},
+    }
+    for sec in mz.sub:
+        if "dispositions" in sec.titre.lower():
+            continue
+        secdir = top / sec.type / sec.numero
+        if m := re.match(r"\s*(\S+)\s*[-–—]\s*(.*)", sec.titre):
+            metadata["categorie_milieu"][m.group(1)] = {
+                "titre": m.group(2),
+                "url": str(secdir),
+            }
+        for subsec in sec.sub:
+            subsecdir = secdir / subsec.type / subsec.numero
+            if m := re.match(r"\s*(\S+)[-–—\s]+(.*)", subsec.titre):
+                metadata["milieu"][m.group(1)] = {
+                    "titre": m.group(2),
+                    "url": str(subsecdir),
+                }
+    return metadata
+
+
+REF_RE = re.compile(
+    r"\b(article|chapitre|section|sous-section|annexe)\s+([\d\.]+)", re.IGNORECASE
+)
+
+
+def extract_links(docs: list[Document], metadata: dict) -> None:
+    """
+    Créer des hyperliens dans le texte des documents.
+    """
+    for d in docs:
+        for c in d.contenu:
+            pass

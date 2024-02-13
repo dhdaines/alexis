@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any, Iterable, TextIO
 
 from . import download, extract, link
-from .analyse import Analyseur, Bloc
-from .convert import FIELDNAMES, Converteur, merge_overlaps
+from .analyse import Analyseur, Bloc, merge_overlaps
+from .convert import FIELDNAMES, Converteur
 from .format import format_html
 from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
