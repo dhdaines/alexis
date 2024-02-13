@@ -4,6 +4,7 @@ from typing import Any, Optional
 from pdfplumber.utils.geometry import T_bbox, merge_bboxes
 
 T_obj = dict[str, Any]
+EXTENSION = "jpg"  # Ou png, si désiré (FIXME: webm...)
 
 
 @dataclass
@@ -45,4 +46,4 @@ class Bloc:
     @property
     def img(self) -> str:
         bbox = ",".join(str(round(x)) for x in self.bbox)
-        return f"page{self.page_number}-{bbox}.png"
+        return f"page{self.page_number}-{bbox}.{EXTENSION}"
