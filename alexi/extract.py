@@ -324,8 +324,10 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("<ul>\n")
     outfh.write(
         f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a>\n'
-        f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)</li>\n'
     )
+    if doc.pdfurl is not None:
+        outfh.write(f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)')
+    outfh.write("</li>\n")
     top = Path(doc.fileid)
     d = deque((el, top, 1) for el in doc.structure.sub)
     prev_level = 1
@@ -353,12 +355,20 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
                 f'<li class="{el.type} node"><details><summary>{eltitre}</summary><ul>\n'
             )
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
-            pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
-            outfh.write(f'<li class="text">{link} ({pdflink})</li>\n')
+            pdflink = ""
+            if doc.pdfurl is not None:
+                pdflink = (
+                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
+                )
+            outfh.write(f'<li class="text">{link}{pdflink}</li>\n')
         else:
             link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
-            pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
-            outfh.write(f'<li class="{el.type} leaf">{link} ({pdflink})</li>\n')
+            pdflink = ""
+            if doc.pdfurl is not None:
+                pdflink = (
+                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
+                )
+            outfh.write(f'<li class="{el.type} leaf">{link}{pdflink}</li>\n')
         d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
     while prev_level > 1:
@@ -475,14 +485,17 @@ def main(args):
                     crf = Segmenteur(args.segment_model)
                 iob = list(extracteur(crf(feats)))
 
-        pdf_url = metadata.get(
+        pdf_data = metadata.get(
             pdf_path.name,
-            f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}",
+            {
+                "url": f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}"
+            },
         )
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
         doc = extract_html(args, path, iob, conv)
-        doc.pdfurl = pdf_url
+        if "url" in pdf_data:
+            doc.pdfurl = pdf_data["url"]
         docs.append(doc)
         if "zonage" in doc.titre.lower():
             extract_zonage(doc, args.outdir / "zonage.json")
