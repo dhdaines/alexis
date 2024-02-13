@@ -485,17 +485,12 @@ def main(args):
                     crf = Segmenteur(args.segment_model)
                 iob = list(extracteur(crf(feats)))
 
-        pdf_data = metadata.get(
-            pdf_path.name,
-            {
-                "url": f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}"
-            },
-        )
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
         doc = extract_html(args, path, iob, conv)
-        if "url" in pdf_data:
-            doc.pdfurl = pdf_data["url"]
+        if metadata:
+            pdf_data = metadata.get(pdf_path.name, {})
+            doc.pdfurl = pdf_data.get("url", None)
         docs.append(doc)
         if "zonage" in doc.titre.lower():
             extract_zonage(doc, args.outdir / "zonage.json")
