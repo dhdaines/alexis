@@ -1,4 +1,4 @@
-.PHONY: venv tests check-black check-flake lint format examples
+.PHONY: venv tests check-black check-flake lint format train
 PACKAGE := alexi
 PYTHON := venv/bin/python
 PIP = venv/bin/pip
@@ -31,5 +31,15 @@ format:
 	${PYTHON} -m black ${PACKAGE} test
 	${PYTHON} -m isort --profile black ${PACKAGE} test
 
-build:
-	${PYTHON} -m build
+train:
+	${PYTHON} scripts/train_crf.py \
+		--features text+layout \
+		--outfile alexi/models/crf.vl.joblib.gz \
+		data/*.csv
+	${PYTHON} scripts/train_crf.py \
+		--features text+layout+structure \
+		--outfile alexi/models/crf.joblib.gz \
+		data/*.csv
+	${PYTHON} scripts/train_crf_seq.py \
+		--outfile alexi/models/crfseq.joblib.gz \
+		data/*.csv

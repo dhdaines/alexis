@@ -12,6 +12,9 @@ from alexi.label import load, make_data
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "csvs", nargs="+", help="Fichiers CSV d'entrainement", type=Path
+    )
+    parser.add_argument(
         "--niter", default=100, type=int, help="Nombre d'iterations d'entrainement"
     )
     parser.add_argument(
@@ -53,11 +56,10 @@ def train(
 def main():
     parser = make_argparse()
     args = parser.parse_args()
-    train_set = load(Path("data").glob("*.csv"))
-    dev_set = None
+    train_set = load(args.csvs)
     crf = train(
         train_set,
-        dev_set,
+        dev_set=None,
         niter=args.niter,
         c1=args.c1,
         c2=args.c2,
