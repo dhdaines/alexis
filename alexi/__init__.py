@@ -18,7 +18,7 @@ from typing import Any, Iterable, TextIO
 from . import download, extract, link
 from .analyse import Analyseur, Bloc
 from .convert import FIELDNAMES, Converteur, merge_overlaps
-from .format import format_dict, format_html, format_xml
+from .format import format_html
 from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from .label import Extracteur
@@ -79,13 +79,6 @@ def label_main(args: argparse.Namespace):
     write_csv(crf(reader), sys.stdout)
 
 
-def xml_main(args: argparse.Namespace):
-    """Convertir un CSV segmenté et étiquetté en XML"""
-    reader = csv.DictReader(args.csv)
-    analyseur = Analyseur(args.csv.name, reader)
-    print(format_xml(analyseur()))
-
-
 def html_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en HTML"""
     reader = csv.DictReader(args.csv)
@@ -99,19 +92,6 @@ def html_main(args: argparse.Namespace):
     else:
         doc = analyseur()
         print(format_html(doc))
-
-
-def json_main(args: argparse.Namespace):
-    """Convertir un CSV segmenté et étiquetté en JSON"""
-    iob = csv.DictReader(args.csv)
-    analyseur = Analyseur(args.csv.name, iob)
-    if args.images:
-        with open(args.images / "images.json", "rt") as infh:
-            images = [Bloc(**image_dict) for image_dict in json.load(infh)]
-            doc = analyseur(images)
-    else:
-        doc = analyseur()
-    print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
 
 
 def index_main(args: argparse.Namespace):
@@ -177,13 +157,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     label.set_defaults(func=label_main)
 
-    xml = subp.add_parser(
-        "xml",
-        help="Extraire la structure en format XML en partant du CSV étiquetté",
-    )
-    xml.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
-    xml.set_defaults(func=xml_main)
-
     html = subp.add_parser(
         "html",
         help="Extraire la structure en format HTML en partant du CSV étiquetté",
@@ -193,18 +166,6 @@ def make_argparse() -> argparse.ArgumentParser:
         "--images", help="Répertoire avec des images des tableaux", type=Path
     )
     html.set_defaults(func=html_main)
-
-    jsonf = subp.add_parser(
-        "json",
-        help="Extraire la structure en format JSON en partant du CSV étiquetté",
-    )
-    jsonf.add_argument(
-        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
-    )
-    jsonf.add_argument(
-        "--images", help="Répertoire contenant les images des tableaux", type=Path
-    )
-    jsonf.set_defaults(func=json_main)
 
     extract_command = subp.add_parser(
         "extract",

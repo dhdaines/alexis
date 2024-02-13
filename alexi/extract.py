@@ -321,6 +321,9 @@ def extract_html(args, path, iob, conv):
 
 
 def make_doc_subtree(doc: Document, outfh: TextIO):
+    """
+    Générer HTML pour les contenus d'un document.
+    """
     outfh.write("<ul>\n")
     outfh.write(
         f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a>\n'
@@ -377,7 +380,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("</ul>\n")
 
 
-def make_doc_tree(docs: list[Document], outdir: Path):
+def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
         + """    <title>ALEXI</title>
@@ -397,6 +400,7 @@ def make_doc_tree(docs: list[Document], outdir: Path):
   </body>
 </html>
 """
+    metadata = {}
     docs.sort(key=operator.attrgetter("numero"))
     with open(outdir / "index.html", "wt") as outfh:
         LOGGER.info("Génération de %s", outdir / "index.html")
@@ -406,15 +410,29 @@ def make_doc_tree(docs: list[Document], outdir: Path):
             outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
             make_doc_subtree(doc, outfh)
             outfh.write("</details></li>\n")
+            doc_metadata = {
+                "numero": doc.numero,
+                "titre": doc.titre,
+            }
+            if doc.pdfurl is not None:
+                doc_metadata["pdf"] = doc.pdfurl
+            metadata[doc.fileid] = doc_metadata
         outfh.write(HTML_FOOTER)
     with open(outdir / "style.css", "wt") as outfh:
+        LOGGER.info("Génération de %s", outdir / "style.css")
         outfh.write(STYLE_CSS)
+    return metadata
 
 
-def extract_zonage(doc: Document, path: Path):
+def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
+    """
+    Extraire les éléments du zonage d'un règlement et générer des
+    metadonnées pour l'identification des hyperliens et la
+    présentation dans ZONALDA.
+    """
     mz: Optional[Element] = None
     if "Chapitre" not in doc.paliers:
-        LOGGER.warning("Aucun chapitre présent dans %s", path)
+        LOGGER.warning("Aucun chapitre présent dans %s", doc.fileid)
         return
     for c in doc.paliers["Chapitre"]:
         if "milieux et zones" in c.titre.lower():
@@ -445,21 +463,22 @@ def extract_zonage(doc: Document, path: Path):
                     "titre": m.group(2),
                     "url": str(subsecdir),
                 }
-    with open(path, "wt") as outfh:
-        json.dump(metadata, outfh, indent=2, ensure_ascii=False)
+    return metadata
 
 
 def main(args):
     extracteur = Extracteur()
     args.outdir.mkdir(parents=True, exist_ok=True)
     metadata = {}
+    pdfdata = {}
     if args.metadata:
         with open(args.metadata, "rt") as infh:
-            metadata = json.load(infh)
+            pdfdata = json.load(infh)
+    metadata["pdfs"] = pdfdata
     docs = []
     for path in args.docs:
         pdf_path = path.with_suffix(".pdf")
-        if metadata and pdf_path.name not in metadata:
+        if pdfdata and pdf_path.name not in pdfdata:
             LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
             continue
         conv = None
@@ -488,13 +507,15 @@ def main(args):
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
         doc = extract_html(args, path, iob, conv)
-        if metadata:
-            pdf_data = metadata.get(pdf_path.name, {})
-            doc.pdfurl = pdf_data.get("url", None)
+        if pdfdata:
+            doc.pdfurl = pdfdata.get(pdf_path.name, {}).get("url", None)
         docs.append(doc)
-        if "zonage" in doc.titre.lower():
-            extract_zonage(doc, args.outdir / "zonage.json")
-    make_doc_tree(docs, args.outdir)
+        if "zonage" in doc.titre.lower() and "zonage" not in metadata:
+            metadata["zonage"] = extract_zonage(doc)
+    metadata["doc"] = make_doc_tree(docs, args.outdir)
+    with open(args.outdir / "index.json", "wt") as outfh:
+        LOGGER.info("Génération de %s", args.outdir / "index.json")
+        json.dump(metadata, outfh, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":
