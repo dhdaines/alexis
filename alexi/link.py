@@ -6,13 +6,15 @@ import logging
 import re
 from typing import Optional
 
+from .analyse import PALIERS
+
 LOGGER = logging.getLogger("link")
 LQ_RE = re.compile(r"\(R?LRQ[^\)]+(?P<lq>[A-Z]- ?[\d\.]+)\)")
 SEC_RE = re.compile(
     r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)"
 )
 REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
-DOT_RE = re.compile(r"\.")
+PALIER_IDX = {palier: idx for idx, palier in enumerate(PALIERS)}
 
 
 class Resolver:
@@ -35,14 +37,19 @@ class Resolver:
                 return None
         secpath = []
         for m in SEC_RE.finditer(text):
-            sectype = m.group("sec")
+            sectype = m.group("sec").title().replace("-", "")
             num = m.group("num")
-            secpath.append((sectype, num))
+            secpath.append((sectype.title(), num))
         if secpath:
-            # FIXME
-            return None
+            secpath.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
+            return (
+                docpath
+                + "/"
+                + "/".join(f"{p.title()}/{n}" for p, n in secpath)
+                + "/index.html"
+            )
         else:
-            return f"index.html#{numero}"
+            return f"index.html#{docpath}"
 
     def resolve_external(self, text: str) -> Optional[str]:
         """
@@ -59,7 +66,7 @@ class Resolver:
             sectype = m.group("sec")
             num = m.group("num")
             if sectype == "article":
-                num = DOT_RE.sub("_", num)
+                num = num.replace(".", "_")
                 url += f"#se:{num}"
                 break
         return url

@@ -414,7 +414,7 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
             # Make fragment links to this ID expand the document (as
             # we usually do not want to link to the full text)
             outfh.write(
-                f'<summary id="{doc.numero}">{doc.numero}: {doc.titre}</summary>\n'
+                f'<summary id="{doc.fileid}">{doc.numero}: {doc.titre}</summary>\n'
             )
             make_doc_subtree(doc, outfh)
             outfh.write("</details></li>\n")

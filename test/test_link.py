@@ -79,11 +79,20 @@ METADATA = {
 BYLAWS = [
     (
         "Règlement de zonage 1314-2021-Z",
-        "index.html#1314-2021-Z",
+        "index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
         "Règlement sur les permis et certificats 1314-2021-PC",
-        "index.html#1314-2021-PC",
+        "index.html#Rgl-1314-2021-PC-version-en-vigueur-20231013",
+    ),
+    (
+        "chapitre 5 du Règlement de zonage 1314-2021-Z",
+        "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/index.html",
+    ),
+    # NOTE: sous-section not expected to work yet
+    (
+        "section 3 du chapitre 5 du Règlement de zonage 1314-2021-Z",
+        "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
     ),
 ]
 
