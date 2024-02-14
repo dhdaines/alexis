@@ -270,9 +270,9 @@ def extract_html(args, path, iob, conv):
     return analyseur()
 
 
-def output_html(args, path, doc):
-    docdir = args.outdir / path.stem
-    imgdir = args.outdir / path.stem / "img"
+def output_html(args, doc):
+    docdir = args.outdir / doc.fileid
+    imgdir = args.outdir / doc.fileid / "img"
     # Do articles/annexes at top level
     seen_paliers = set()
     doc_titre = doc.titre if doc.titre != "Document" else path.stem
@@ -411,7 +411,11 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
         outfh.write(HTML_HEADER)
         for doc in docs:
             outfh.write('<li class="Document node"><details>\n')
-            outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
+            # Make fragment links to this ID expand the document (as
+            # we usually do not want to link to the full text)
+            outfh.write(
+                f'<summary id="{doc.numero}">{doc.numero}: {doc.titre}</summary>\n'
+            )
             make_doc_subtree(doc, outfh)
             outfh.write("</details></li>\n")
             doc_metadata = {
@@ -480,7 +484,7 @@ def main(args) -> None:
     extract_links(docs, metadata)
     # Now finally output the text itself
     for doc in docs:
-        output_html(args, path, doc)
+        output_html(args, doc)
     with open(args.outdir / "index.json", "wt") as outfh:
         LOGGER.info("Génération de %s", args.outdir / "index.json")
         json.dump(metadata, outfh, indent=2, ensure_ascii=False)

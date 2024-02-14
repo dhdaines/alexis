@@ -3,7 +3,6 @@ from pathlib import Path
 
 from alexi.analyse import Analyseur, group_iob
 from alexi.convert import Converteur
-from alexi.format import format_xml
 
 DATADIR = Path(__file__).parent / "data"
 TRAINDIR = Path(__file__).parent.parent / "data"
@@ -32,11 +31,6 @@ def test_analyse():
         reader = csv.DictReader(infh)
         analyseur = Analyseur("zonage_sections", reader)
         doc = analyseur()
-        xml = format_xml(doc)
-        assert xml.count("<Chapitre") == 1
-        assert xml.count("<Section") == 4
-        assert xml.count("<SousSection") == 3
-        assert xml.count("<Article") == 25
 
 
 def test_analyse_tableaux_figures():

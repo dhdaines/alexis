@@ -400,69 +400,10 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
     return metadata
 
 
-LOI_REF = r"loi[^\(]+\(R?LRQ[^\)]+(?P<lq>[A-Z]- ?[\d\.]+)\)"
-REF_RE = re.compile(
-    r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)"
-    r"(?P<ext> (?:"
-    r"du règlement (?P<reg>[\d\.A-Z-]+)"
-    r"|(?P<loi>de la " + LOI_REF + ")"
-    r"|(?P<civil>du code civil)"
-    r"))?",
-    re.IGNORECASE,
-)
-REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
-LOI_RE = re.compile(LOI_REF, re.IGNORECASE)
-
-
-def resolve_external(m: re.Match) -> Optional[str]:
-    """
-    Resoudre quelques types de liens externes (vers la LAU par exemple)
-    """
-    if m.group("reg"):
-        LOGGER.info("Règlement %s", m.group("reg"))
-    elif m.group("loi"):
-        section = re.sub(r"\.", "_", m.group("num"))
-        loi = re.sub(r"\s+", "", m.group("lq"))
-        LOGGER.info("Loi %s section %s", loi, section)
-        return f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/{loi}#se:{section}"
-    elif m.group("civil"):
-        section = re.sub(r"\.", "_", m.group(2))
-        LOGGER.info("Code civil section %s", section)
-        return (
-            f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/CCQ-1991#se:{section}"
-        )
-
-
 def extract_links(docs: list[Document], metadata: dict) -> None:
     """
     Créer des hyperliens dans le texte des documents.
     """
     for d in docs:
         for idx, c in enumerate(d.contenu):
-            # Identify links first
-            links = []
-            for m in REF_RE.finditer(c.texte):
-                # Now try to resolve them
-                if m.group("ext"):
-                    lien = resolve_external(m)
-                    LOGGER.info("URL: %s", lien)
-                    links.append((m.start(), m.end(), lien))
-                else:
-                    LOGGER.info("Lien interne: %s", m.group(0))
-                    links.append((m.start(), m.end(), None))
-            for m in itertools.chain(
-                REG_RE.finditer(c.texte), LOI_RE.finditer(c.texte)
-            ):
-                seen = False
-                for start, end, href in links:
-                    if m.start() < end and m.end() > start:
-                        seen = True
-                if seen:
-                    continue
-                if "lq" in m.groupdict():
-                    loi = re.sub(r"\s+", "", m.group("lq"))
-                    lien = f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/{loi}"
-                    LOGGER.info("URL: %s", lien)
-                    links.append((m.start(), m.end(), lien))
-                elif "reg" in m.groupdict():
-                    LOGGER.info("Reglement: %s", m.group("reg"))
+            pass

@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
-from . import download, extract, link
+from . import download, extract
 from .analyse import Analyseur, Bloc, merge_overlaps
 from .convert import FIELDNAMES, Converteur
 from .format import format_html
@@ -173,13 +173,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     extract.add_arguments(extract_command)
     extract_command.set_defaults(func=extract.main)
-
-    link_command = subp.add_parser(
-        "link",
-        help="Ajouter des hyperliens aux documents HTML",
-    )
-    link.add_arguments(link_command)
-    link_command.set_defaults(func=link.main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
