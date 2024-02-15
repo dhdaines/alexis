@@ -103,6 +103,13 @@ class Element:
     sub: list["Element"] = field(default_factory=list)
     page: int = 1
 
+    # NOTE: pydantic would do this automatically, seems dataclasses don't
+    @classmethod
+    def fromdict(self, **kwargs) -> "Element":
+        el = Element(**kwargs)
+        el.sub = [Element.fromdict(**subel) for subel in el.sub]
+        return el
+
 
 ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"
 DOTSPACEDASH = r"(?:\.|\s*[:—–-]| )"
@@ -124,6 +131,7 @@ NUMRE = re.compile(
 NUMENDRE = re.compile(rf".*\b{NUM}{DOTSPACEDASH}\s*$")
 
 
+@dataclass(init=False)
 class Document:
     """Document avec blocs de texte et structure."""
 
@@ -141,6 +149,17 @@ class Document:
         self.contenu = []
         doc = Element(type="Document", titre=titre, numero=numero)
         self.paliers.setdefault("Document", []).append(doc)
+
+    @classmethod
+    def fromdict(self, data: dict) -> "Document":
+        doc = Document(data["fileid"])
+        doc.paliers = {
+            key: [Element.fromdict(**el) for el in value]
+            for key, value in data["paliers"].items()
+        }
+        doc.meta = data["meta"]
+        doc.contenu = [Bloc(**value) for value in data["contenu"]]
+        return doc
 
     def extract_numero(self, titre: str) -> tuple[str, str]:
         """Extraire le numero d'un article/chapitre/section/annexe, si possible."""

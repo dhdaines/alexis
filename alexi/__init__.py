@@ -94,6 +94,19 @@ def html_main(args: argparse.Namespace):
         print(format_html(doc))
 
 
+def json_main(args: argparse.Namespace):
+    """Convertir un CSV segmenté et étiquetté en JSON"""
+    iob = csv.DictReader(args.csv)
+    analyseur = Analyseur(args.csv.name, iob)
+    if args.images:
+        with open(args.images / "images.json", "rt") as infh:
+            images = [Bloc(**image_dict) for image_dict in json.load(infh)]
+            doc = analyseur(images)
+    else:
+        doc = analyseur()
+    print(json.dumps(dataclasses.asdict(doc), indent=2, ensure_ascii=False))
+
+
 def index_main(args: argparse.Namespace):
     """Construire un index sur des fichiers JSON"""
     index(args.indir, args.outdir)
@@ -166,6 +179,18 @@ def make_argparse() -> argparse.ArgumentParser:
         "--images", help="Répertoire avec des images des tableaux", type=Path
     )
     html.set_defaults(func=html_main)
+
+    jsonf = subp.add_parser(
+        "json",
+        help="Extraire la structure en format JSON en partant du CSV étiquetté",
+    )
+    jsonf.add_argument(
+        "csv", help="Fichier CSV à traiter", type=argparse.FileType("rt")
+    )
+    jsonf.add_argument(
+        "--images", help="Répertoire contenant les images des tableaux", type=Path
+    )
+    jsonf.set_defaults(func=json_main)
 
     extract_command = subp.add_parser(
         "extract",
