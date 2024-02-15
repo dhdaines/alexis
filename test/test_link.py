@@ -1,7 +1,11 @@
+import json
 import pytest
+from pathlib import Path
 
+from alexi.analyse import Document
 from alexi.link import Resolver
 
+DATADIR = Path(__file__).parent / "data"
 LAWS = [
     (
         "Loi sur l’aménagement et l’urbanisme (LRQ, chapitre A-19.1)",
@@ -94,10 +98,69 @@ BYLAWS = [
         "section 3 du chapitre 5 du Règlement de zonage 1314-2021-Z",
         "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
     ),
+    # TODO: links to milieux, usages, etc
 ]
 
 
 @pytest.mark.parametrize("test_input,expected", BYLAWS)
 def test_bylaws(test_input, expected):
     r = Resolver(METADATA)
-    assert r.resolve_internal(test_input) == expected
+    assert r.resolve_internal(test_input, []) == expected
+
+
+INTERNALS = [
+    (
+        "article 5",
+        "../5",
+        "Article/6",
+    ),
+    (
+        "chapitre 2",
+        "../../Chapitre/2",
+        "Article/6",
+    ),
+    (
+        "section 2 du chapitre 3",
+        "../../Chapitre/3/Section/2",
+        "Article/6",
+    ),
+    (
+        "section 3",
+        "../3",
+        "Chapitre/3/Section/2",
+    ),
+    (
+        "chapitre 1",
+        "../../../1",
+        "Chapitre/3/Section/2",
+    ),
+    (
+        "section 1",
+        "Section/1",
+        "Chapitre/3",
+    ),
+    (
+        "article 7",
+        "../../../../Article/7",
+        "Chapitre/3/Section/2",
+    ),
+    (
+        "section 1",
+        "../../Chapitre/3/Section/1",
+        "Article/69",  # Is in Chapitre 3 Section 2
+    ),
+    (
+        "section 3 du présent chapitre",
+        "../../Chapitre/1/Section/3",
+        "Article/1",  # Is in Chapitre 1 Section 1
+    ),
+]
+
+with open(DATADIR / "lotissement.json", "rt") as infh:
+    LOTISSEMENT = Document.fromdict(json.load(infh))
+
+
+@pytest.mark.parametrize("test_input,expected,sourcepath", INTERNALS)
+def test_internal_links(test_input, expected, sourcepath):
+    r = Resolver(METADATA)
+    assert r.resolve_internal(test_input, sourcepath, LOTISSEMENT) == expected
