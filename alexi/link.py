@@ -42,7 +42,9 @@ def locate_article(numero: str, doc: Document) -> list[str]:
     return []
 
 
-def qualify_destination(dest: list[str], src: list[str], doc: Document) -> list[str]:
+def qualify_destination(
+    dest: list[str], src: list[str], doc: Optional[Document]
+) -> list[str]:
     """
     Rajouter des prefix manquants pour un lien relatif.
     """

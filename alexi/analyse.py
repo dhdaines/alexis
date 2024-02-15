@@ -7,7 +7,7 @@ import logging
 import operator
 import re
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, Optional
+from typing import Iterable, Iterator, Optional, NamedTuple
 from pathlib import Path
 
 from pdfplumber.utils.geometry import T_bbox, merge_bboxes, calculate_area
@@ -19,12 +19,21 @@ LOGGER = logging.getLogger("analyse")
 EXTENSION = "jpg"  # Ou png, si désiré (FIXME: webm...)
 
 
+class Hyperlien(NamedTuple):
+    """Hyperlien dans un bloc de texte."""
+
+    href: str
+    start: int
+    end: int
+
+
 @dataclass
 class Bloc:
     """Élément de présentation (bloc de texte ou image)"""
 
     type: str
     contenu: list[T_obj]
+    liens: Optional[list[Hyperlien]] = None
     _bbox: Optional[T_bbox] = None
     _page_number: Optional[int] = None
 

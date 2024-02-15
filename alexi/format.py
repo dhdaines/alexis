@@ -4,6 +4,7 @@ Formatter la structure extraite d'un PDF
 
 import itertools
 import logging
+from os import PathLike
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
 
@@ -62,26 +63,33 @@ BLOC = {
 }
 
 
-def format_html(
-    doc: Document,
-    indent: int = 2,
-    element: Optional[Element] = None,
-    imgdir: str = ".",
-    fragment: bool = True,
-) -> str:
-    """Représentation HTML5 du document."""
-    imgpath = Path(imgdir)
+class HtmlFormatter:
+    def __init__(self, imgdir: PathLike = "."):
+        self.imgpath = Path(imgdir)
 
-    def bloc_html(bloc: Bloc) -> str:
+    def bloc_html(self, bloc: Bloc) -> str:
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
         elif tag == "img":
-            return f'<img alt="{bloc.texte}" src="{imgpath / bloc.img}"><br>'
+            return f'<img alt="{bloc.texte}" src="{self.imgpath / bloc.img}"><br>'
+        elif bloc.liens:
+            text = bloc.texte
+            start = 0
+            chunks = []
+            for link in bloc.liens:
+                chunks.append(text[start : link.start])
+                chunks.append(f'<a href="{link.href}">{text[link.start:link.end]}</a>')
+                start = link.end
+            chunks.append(text[start:])
+            html = "".join(chunks)
+            return f"<{tag}>{html}</{tag}>"
         else:
             return f"<{tag}>{bloc.texte}</{tag}>"
 
-    def element_html(el: Element, indent: int = 2, offset: int = 0) -> list[str]:
+    def element_html(
+        self, doc: Document, el: Element, indent: int = 2, offset: int = 0
+    ) -> list[str]:
         off = " " * offset
         sp = " " * indent
         tag = TAG[el.type]
@@ -109,12 +117,12 @@ def format_html(
         sub = el.sub[subidx] if subidx < len(el.sub) else None
         while idx < fin:
             if sub is not None and idx == sub.debut:
-                lines.extend(element_html(sub, indent, offset + indent))
+                lines.extend(self.element_html(doc, sub, indent, offset + indent))
                 idx = len(doc.contenu) if sub.fin == -1 else sub.fin
                 subidx += 1
                 sub = el.sub[subidx] if subidx < len(el.sub) else None
             else:
-                html = bloc_html(doc.contenu[idx])
+                html = self.bloc_html(doc.contenu[idx])
                 if html:
                     lines.append(off + sp + html)
                 idx += 1
@@ -122,18 +130,37 @@ def format_html(
             lines.append(off + f"</{tag}>")
         return lines
 
-    if element is None:
-        doc_body = "\n".join(element_html(doc.structure, indent))
-    else:
-        doc_body = "\n".join(element_html(element, indent))
-    if fragment:
-        return doc_body
-    else:
-        doc_header = f"""<!DOCTYPE html>
-<html>
-  <head>
-    <title>{doc.titre}</title>
-  </head>
-  <body>"""
-        doc_footer = "</body></html>"
-        return "\n".join((doc_header, doc_body, doc_footer))
+    def __call__(
+        self,
+        doc: Document,
+        indent: int = 2,
+        element: Optional[Element] = None,
+        fragment: bool = True,
+    ) -> str:
+        """Représentation HTML5 du document."""
+
+        if element is None:
+            doc_body = "\n".join(self.element_html(doc, doc.structure, indent))
+        else:
+            doc_body = "\n".join(self.element_html(doc, element, indent))
+        if fragment:
+            return doc_body
+        else:
+            doc_header = f"""<!DOCTYPE html>
+    <html>
+      <head>
+        <title>{doc.titre}</title>
+      </head>
+      <body>"""
+            doc_footer = "</body></html>"
+            return "\n".join((doc_header, doc_body, doc_footer))
+
+
+def format_html(
+    doc: Document,
+    indent: int = 2,
+    element: Optional[Element] = None,
+    imgdir: str = ".",
+    fragment: bool = True,
+) -> str:
+    return HtmlFormatter(imgdir)(doc, indent, element, fragment)
