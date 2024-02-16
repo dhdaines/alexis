@@ -525,6 +525,7 @@ class Extracteur:
             if el is None:
                 path = path.parent.parent
                 continue
+            LOGGER.info("Structure: %s %s", el.type, el.numero)
             if el.type in ("Article", "Annexe"):
                 continue
             path = path / el.type / el.numero
@@ -532,7 +533,15 @@ class Extracteur:
             if el.sub:
                 self.output_sub_index(doc, el, path)
                 d.appendleft(None)
-                d.extendleft(reversed(el.sub))
+                LOGGER.info(
+                    "Subordonnees: %s",
+                    ",".join("%s %s" % (sel.type, sel.numero) for sel in el.sub),
+                )
+                for sel in reversed(el.sub):
+                    d.appendleft(sel)
+                    if sel.type == el.type:
+                        LOGGER.warning("Found %s inside %s", path.parent, el.type)
+                        d.appendleft(None)
         return doc
 
 
