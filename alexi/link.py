@@ -158,6 +158,7 @@ class Resolver:
         """
         Resoudre quelques types de liens externes (vers la LAU par exemple)
         """
+        text = re.sub(r"\s+", " ", text).strip()
         if m := LQ_RE.search(text):
             lq = m.group("lq").strip()
             if m := RQ_RE.match(lq):

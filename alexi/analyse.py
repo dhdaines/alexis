@@ -80,7 +80,15 @@ MTYPE = r"[\dA-Z]+\.\d"
 MTYPES = rf"{MTYPE}(?:(?:,|\s+(?:et|ou))\s+{MTYPE})*"
 RLRQ = r"(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+"
 REGNUM = rf"(?:(?:SQ-)?\d[\d\.A-Z-]+|\({RLRQ}\))"
-REGLEMENT = rf"règlement\s+(?:{REGNUM}|(?:de|sur|concernant).*?{REGNUM})"
+REGLEMENT = rf"""
+règlement\s+
+(?:
+   {REGNUM}
+  |(?:de|sur|concernant).*?{REGNUM}
+  |de\s+zonage
+  |de\s+lotissement
+  |sur\s+les\s+permis\s+et\s+les\s+certificats
+)"""
 LOI = rf"""
 (?:code\s+civil
   |(?:loi|code)\s+.*?\({RLRQ}\)
