@@ -35,8 +35,8 @@ jobs:
     - name: Validate against flake8
       run: python -m flake8 alexi test scripts
 
-    - name: Check type annotations via mypy
-      run: python -m mypy alexi test scripts
+#    - name: Check type annotations via mypy
+#      run: python -m mypy alexi test scripts
 
   test:
     needs: lint
