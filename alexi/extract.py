@@ -11,16 +11,18 @@ import operator
 import os
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, TextIO
+from typing import Any, Iterable, TextIO, Optional
 
 from alexi.analyse import Analyseur, Bloc, Document, Element
 from alexi.analyse import extract_zonage
 from alexi.convert import Converteur
-from alexi.format import format_html
+from alexi.format import HtmlFormatter
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
-from alexi.label import Extracteur
+from alexi.label import Identificateur
+from alexi.link import Resolver
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
+from alexi.types import T_obj
 
 LOGGER = logging.getLogger("extract")
 
@@ -129,11 +131,14 @@ li.leaf {
 def extract_element(
     doc: Document,
     el: Element,
-    outdir: Path,
+    docdir: Path,
+    path: Path,
     imgdir: Path,
+    resolver: Resolver,
 ):
     """Extract the various constituents, referencing images in the
     generated image directory."""
+    outdir = docdir / path
     # Can't use Path.relative_to until 3.12 :(
     rel_imgdir = os.path.relpath(imgdir, outdir)
     rel_style = os.path.relpath(imgdir.parent.parent / "style.css", outdir)
@@ -158,9 +163,10 @@ def extract_element(
 """
     outdir.mkdir(parents=True, exist_ok=True)
     LOGGER.info("%s %s", outdir, el.titre)
+    formatter = HtmlFormatter(rel_imgdir)
     with open(outdir / "index.html", "wt") as outfh:
         outfh.write(HTML_HEADER)
-        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=True))
+        outfh.write(formatter(doc, element=el, fragment=True))
         outfh.write(HTML_FOOTER)
 
 
@@ -252,75 +258,6 @@ def make_redirect(path: Path, target: Path):
 </html>
 """
         )
-
-
-def extract_html(args, path, iob, conv):
-    docdir = args.outdir / path.stem
-    imgdir = args.outdir / path.stem / "img"
-    LOGGER.info("Génération de pages HTML sous %s", docdir)
-    docdir.mkdir(parents=True, exist_ok=True)
-    analyseur = Analyseur(path.stem, iob)
-    if conv and not args.no_images:
-        LOGGER.info("Extraction d'images sous %s", imgdir)
-        imgdir.mkdir(parents=True, exist_ok=True)
-        images = conv.extract_images()
-        analyseur.add_images(images)
-        save_images_from_pdf(analyseur.blocs, conv, imgdir)
-    LOGGER.info("Analyse de la structure de %s", path)
-    return analyseur()
-
-
-def output_html(args, doc):
-    docdir = args.outdir / doc.fileid
-    imgdir = args.outdir / doc.fileid / "img"
-    # Do articles/annexes at top level
-    seen_paliers = set()
-    doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
-    for palier in ("Article", "Annexe"):
-        if palier not in doc.paliers:
-            continue
-        seen_paliers.add(palier)
-        if not doc.paliers[palier]:
-            continue
-        # These go in the top level
-        for idx, el in enumerate(doc.paliers[palier]):
-            extract_element(doc, el, docdir / palier / el.numero, imgdir)
-        make_index_html(
-            args.outdir, docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier]
-        )
-
-    # Now do the rest of the Document hierarchy if it exists
-    def make_sub_index(el: Element, path: Path, titre: str):
-        subtypes = list(el.sub)
-        subtypes.sort(key=operator.attrgetter("type"))
-        for subtype, elements in itertools.groupby(
-            subtypes, operator.attrgetter("type")
-        ):
-            if subtype not in seen_paliers:
-                make_index_html(
-                    args.outdir, path / subtype, f"{titre}: {subtype}s", elements
-                )
-
-    top = Path(docdir)
-    # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
-    if doc.structure.sub:
-        make_sub_index(doc.structure, docdir, doc_titre)
-    # Extract content and create index.html for descendants of all elements
-    d = deque((el, top) for el in doc.structure.sub)
-    while d:
-        el, parent = d.popleft()
-        if el.type in seen_paliers:
-            continue
-        extract_element(doc, el, parent / el.type / el.numero, imgdir)
-        if not el.sub:
-            continue
-        make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
-        d.extendleft(
-            (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
-        )
-    # And do a full extraction (which might crash your browser)
-    extract_element(doc, doc.structure, docdir, imgdir)
-    return doc
 
 
 def make_doc_subtree(doc: Document, outfh: TextIO):
@@ -432,57 +369,151 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
     return metadata
 
 
-def main(args) -> None:
-    extracteur = Extracteur()
-    args.outdir.mkdir(parents=True, exist_ok=True)
-    metadata = {}
-    pdfdata = {}
-    if args.metadata:
-        with open(args.metadata, "rt") as infh:
-            pdfdata = json.load(infh)
-    metadata["pdfs"] = pdfdata
-    docs = []
-    for path in args.docs:
+class Extracteur:
+    def __init__(
+        self,
+        outdir: Path,
+        metadata: Path,
+        segment_model: Optional[Path] = None,
+        no_csv=False,
+        no_images=False,
+    ):
+        self.outdir = outdir
+        self.crf_s = Identificateur()
+        if segment_model is not None:
+            self.crf = Segmenteur(segment_model)
+            self.crf_n = None
+        else:
+            self.crf = Segmenteur(DEFAULT_SEGMENT_MODEL)
+            self.crf_n = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
+        if metadata:
+            with open(metadata, "rt") as infh:
+                self.pdfdata = json.load(infh)
+        else:
+            self.pdfdata = {}
+        self.metadata = {"pdfs": self.pdfdata}
+        self.no_csv = no_csv
+        self.no_images = no_images
+        outdir.mkdir(parents=True, exist_ok=True)
+
+    def __call__(self, path: Path):
         pdf_path = path.with_suffix(".pdf")
-        if pdfdata and pdf_path.name not in pdfdata:
+        if self.pdfdata and pdf_path.name not in self.pdfdata:
             LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
-            continue
+            return
         conv = None
         if path.suffix == ".csv":
             LOGGER.info("Lecture de %s", path)
             iob = list(read_csv(path))
         elif path.suffix == ".pdf":
             csvpath = path.with_suffix(".csv")
-            if not args.no_csv and csvpath.exists():
+            if not self.no_csv and csvpath.exists():
                 LOGGER.info("Lecture de %s", csvpath)
                 iob = list(read_csv(csvpath))
             else:
                 LOGGER.info("Conversion, segmentation et classification de %s", path)
                 conv = Converteur(path)
                 feats = conv.extract_words()
-                if args.segment_model is None:
-                    if conv.tree is None:
-                        LOGGER.warning("Structure logique absente: %s", path)
-                        crf = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
-                    else:
-                        crf = Segmenteur(DEFAULT_SEGMENT_MODEL)
-                else:
-                    crf = Segmenteur(args.segment_model)
-                iob = list(extracteur(crf(feats)))
-
+                crf = self.crf
+                if conv.tree is None:
+                    LOGGER.warning("Structure logique absente: %s", path)
+                    if self.crf_n is not None:
+                        crf = self.crf_n
+                iob = list(self.crf_s(crf(feats)))
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
-        doc = extract_html(args, path, iob, conv)
-        if pdfdata:
-            doc.pdfurl = pdfdata.get(pdf_path.name, {}).get("url", None)
-        docs.append(doc)
-        if "zonage" in doc.titre.lower() and "zonage" not in metadata:
-            metadata["zonage"] = extract_zonage(doc)
+        doc = self.analyse(iob, conv, path.stem)
+        if self.pdfdata:
+            doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)
+        if "zonage" in doc.titre.lower() and "zonage" not in self.metadata:
+            self.metadata["zonage"] = extract_zonage(doc)
+        return doc
+
+    def analyse(self, iob: Iterable[T_obj], conv: Converteur, fileid):
+        docdir = self.outdir / fileid
+        imgdir = self.outdir / fileid / "img"
+        LOGGER.info("Génération de pages HTML sous %s", docdir)
+        docdir.mkdir(parents=True, exist_ok=True)
+        analyseur = Analyseur(fileid, iob)
+        if conv and not self.no_images:
+            LOGGER.info("Extraction d'images sous %s", imgdir)
+            imgdir.mkdir(parents=True, exist_ok=True)
+            images = conv.extract_images()
+            analyseur.add_images(images)
+            save_images_from_pdf(analyseur.blocs, conv, imgdir)
+        LOGGER.info("Analyse de la structure de %s", fileid)
+        return analyseur()
+
+
+def output_html(args, doc, resolver):
+    docdir = args.outdir / doc.fileid
+    imgdir = args.outdir / doc.fileid / "img"
+    # Do articles/annexes at top level
+    seen_paliers = set()
+    doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
+    for palier in ("Article", "Annexe"):
+        if palier not in doc.paliers:
+            continue
+        seen_paliers.add(palier)
+        if not doc.paliers[palier]:
+            continue
+        # These go in the top level
+        for idx, el in enumerate(doc.paliers[palier]):
+            extract_element(doc, el, docdir, Path(palier) / el.numero, imgdir, resolver)
+        make_index_html(
+            args.outdir, docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier]
+        )
+
+    # Now do the rest of the Document hierarchy if it exists
+    def make_sub_index(el: Element, path: Path, titre: str):
+        subtypes = list(el.sub)
+        subtypes.sort(key=operator.attrgetter("type"))
+        for subtype, elements in itertools.groupby(
+            subtypes, operator.attrgetter("type")
+        ):
+            if subtype not in seen_paliers:
+                make_index_html(
+                    args.outdir,
+                    docdir / path / subtype,
+                    f"{titre}: {subtype}s",
+                    elements,
+                )
+
+    # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
+    if doc.structure.sub:
+        make_sub_index(doc.structure, docdir, doc_titre)
+    # Extract content and create index.html for descendants of all elements
+    d = deque((el, Path(".")) for el in doc.structure.sub)
+    while d:
+        el, parent = d.popleft()
+        if el.type in seen_paliers:
+            continue
+        extract_element(doc, el, docdir, parent / el.type / el.numero, imgdir, resolver)
+        if not el.sub:
+            continue
+        make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
+        d.extendleft(
+            (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
+        )
+    # And do a full extraction (which might crash your browser)
+    extract_element(doc, doc.structure, docdir, ".", imgdir, resolver)
+    return doc
+
+
+def main(args) -> None:
+    extracteur = Extracteur(
+        args.outdir, args.metadata, args.segment_model, args.no_csv, args.no_images
+    )
+    docs = []
+    for path in args.docs:
+        docs.append(extracteur(path))
     # Create the full tree first to gather information for linking
+    metadata = extracteur.metadata
     metadata["doc"] = make_doc_tree(docs, args.outdir)
     # Now finally output the text itself (resolving links detected by analysis)
+    resolver = Resolver(metadata)
     for doc in docs:
-        output_html(args, doc)
+        output_html(args, doc, resolver)
     with open(args.outdir / "index.json", "wt") as outfh:
         LOGGER.info("Génération de %s", args.outdir / "index.json")
         json.dump(metadata, outfh, indent=2, ensure_ascii=False)

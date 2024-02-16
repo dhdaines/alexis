@@ -21,7 +21,7 @@ from .convert import FIELDNAMES, Converteur
 from .format import format_html
 from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
-from .label import Extracteur
+from .label import Identificateur
 from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
@@ -74,7 +74,7 @@ def segment_main(args: argparse.Namespace):
 
 def label_main(args: argparse.Namespace):
     """Étiquetter un CSV"""
-    crf = Extracteur(args.model)
+    crf = Identificateur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
 
