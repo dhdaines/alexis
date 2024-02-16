@@ -12,8 +12,11 @@ from typing import Optional
 from .analyse import PALIERS, Document
 
 LOGGER = logging.getLogger("link")
+
+# FIXME: Synchronize with analyse regexps
 LQ_RE = re.compile(
-    r"\(\s*(?:R?L\.?R\.?Q\.?|c\.),?(?:\s*(?:c(?:\.|\s+)|chapitre\s+))?(?P<lq>[^\)]+)\)"
+    r"\(\s*(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,"
+    r"?(?:\s*(?:c(?:\.|\s+)|chapitre\s+))?(?P<lq>[^\)]+)\)"
 )
 RQ_RE = re.compile(r"(?P<lq>.*?),\s*r.\s*(?P<rq>.*)")
 SEC_RE = re.compile(

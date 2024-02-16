@@ -41,6 +41,14 @@ LAWS = [
         "Règlement sur les normes d’intervention dans les forêts du domaine public (c. F-4.1, r. 7)",
         "https://www.legisquebec.gouv.qc.ca/fr/document/rc/F-4.1,%20r.%207%20",
     ),
+    (
+        "Code de la sécurité routière (L.R.Q., c. C-24.2)",
+        "https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-24.2",
+    ),
+    (
+        "Règlement sur la signalisation routière (R.R.Q., c. C-24, r.28)",
+        "https://www.legisquebec.gouv.qc.ca/fr/document/rc/C-24,%20r.%2028%20",
+    ),
 ]
 
 

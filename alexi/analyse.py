@@ -74,17 +74,16 @@ class Bloc:
 # should be done with the sequence CRF
 SECTION = r"\b(?:article|chapitre|section|sous-section|annexe)s?"
 NUMERO = r"[\d\.XIV]+"
-NUMEROS = rf"{NUMERO}(?:(?:,|\s+et)\s+{NUMERO})*"
+NUMEROS = rf"{NUMERO}(?:(?:,|\s+(?:et|ou))\s+{NUMERO})*"
 MILIEU = r"\btypes?\s+des?\s+milieux?"
 MTYPE = r"[\dA-Z]+\.\d"
-MTYPES = rf"{MTYPE}(?:(?:,|\s+et)\s+{MTYPE})*"
-REGNUM = (
-    r"(?:(?:SQ-)?\d[\d\.A-Z-]+|\((?:c\.|(?:R\.\s*)?L\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+\))"
-)
+MTYPES = rf"{MTYPE}(?:(?:,|\s+(?:et|ou))\s+{MTYPE})*"
+RLRQ = r"(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+"
+REGNUM = rf"(?:(?:SQ-)?\d[\d\.A-Z-]+|\({RLRQ}\))"
 REGLEMENT = rf"règlement\s+(?:{REGNUM}|(?:de|sur|concernant).*?{REGNUM})"
-LOI = r"""
+LOI = rf"""
 (?:code\s+civil
-  |loi\s+.*?\((?:R?L\.?R\.?Q\.?|c\.),?[^\)]+\)
+  |(?:loi|code)\s+.*?\({RLRQ}\)
   |loi\s+sur\s+l['’]aménagement\s+et\s+l['’]urbanisme
   |loi\s+sur\s+les\s+cités\s+et\s+villes
 )"""
