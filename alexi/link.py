@@ -80,9 +80,9 @@ def _resolve_internal(
 
 class Resolver:
     def __init__(self, metadata: Optional[dict] = None):
-        self.metadata = {"doc": {}} if metadata is None else metadata
+        self.metadata = {"docs": {}} if metadata is None else metadata
         self.docpath = {}
-        for docpath, info in self.metadata["doc"].items():
+        for docpath, info in self.metadata["docs"].items():
             self.docpath[info["numero"]] = docpath
 
     def resolve_absolute_internal(self, numero: str, secpath: str) -> Optional[str]:

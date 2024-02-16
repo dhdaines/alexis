@@ -68,7 +68,7 @@ METADATA = {
             },
         },
     },
-    "doc": {
+    "docs": {
         "Rgl-1314-2021-PC-version-en-vigueur-20231013": {
             "numero": "1314-2021-PC",
             "titre": "Règlement sur les permis et certificats ",

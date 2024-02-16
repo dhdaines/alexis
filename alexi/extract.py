@@ -452,6 +452,7 @@ class Extracteur:
     def output_doctree(self, docs: list[Document]):
         """Générer la page HTML principale et créer l'index de documents."""
         self.metadata["docs"] = make_doc_tree(docs, self.outdir)
+        self.resolver = Resolver(self.metadata)
 
     def output_html(self, doc: Document):
         docdir = self.outdir / doc.fileid
