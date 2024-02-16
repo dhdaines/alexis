@@ -428,10 +428,39 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
     return metadata
 
 
-def extract_links(docs: list[Document], metadata: dict) -> None:
+# For the moment we will simply use regular expressions but this
+# should be done with the sequence CRF
+SECTION = r"\b(?:article|chapitre|section|sous-section|annexe)s?"
+NUMERO = r"[\d\.XIV]+"
+NUMEROS = f"{NUMERO}(?:(?:,| et) {NUMERO})*"
+MILIEU = r"\btypes? des? milieux?"
+MTYPE = r"[\dA-Z]+\.\d"
+MTYPES = f"{MTYPE}(?:(?:,| et) {MTYPE})*"
+REGLEMENT = r"règlement.*?(?:SQ-)?\d[\d\.A-Z-]+"
+LOI = r"(?:code civil|loi sur .*?\(R?LRQ[^\)]+\))"
+DU = r"(?:du|de l['’]|de la)"
+MATCHER = re.compile(
+    f"(?:"
+    f"(?:({SECTION} {NUMEROS})( {DU} {SECTION} {NUMERO})*"
+    f"|({MILIEU} {MTYPES}))"
+    f"(?: {DU} (?:{REGLEMENT}|{LOI}))?"
+    f"|{REGLEMENT}|{LOI})",
+    re.IGNORECASE,
+)
+
+
+def match_links(text: str):
     """
-    Créer des hyperliens dans le texte des documents.
+    Identifier des hyperliens potentiels dans un texte.
     """
-    for d in docs:
-        for idx, c in enumerate(d.contenu):
+    for m in MATCHER.finditer(text):
+        yield Hyperlien(m.group(), m.start(), m.end())
+
+
+def extract_links(doc: Document, metadata: dict) -> None:
+    """
+    Identifier des hyperliens potentiels dans le texte d'un document.
+    """
+    for idx, c in enumerate(doc.contenu):
+        for m in match_links(c.texte):
             pass

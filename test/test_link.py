@@ -1,11 +1,13 @@
+import csv
 import json
 import pytest
 from pathlib import Path
 
-from alexi.analyse import Document
+from alexi.analyse import Analyseur, Document, match_links, extract_links
 from alexi.link import Resolver
 
 DATADIR = Path(__file__).parent / "data"
+TRAINDIR = Path(__file__).parent.parent / "data"
 LAWS = [
     (
         "Loi sur l’aménagement et l’urbanisme (LRQ, chapitre A-19.1)",
@@ -164,3 +166,54 @@ with open(DATADIR / "lotissement.json", "rt") as infh:
 def test_internal_links(test_input, expected, sourcepath):
     r = Resolver(METADATA)
     assert r.resolve_internal(test_input, sourcepath, LOTISSEMENT) == expected
+
+
+@pytest.mark.parametrize("test_input,expected", LAWS)
+def test_match_laws(test_input, expected):
+    """Verifier qu'on peut reconnaitre les lois"""
+    links = list(match_links(test_input))
+    assert links
+    assert links[0].start <= 2  # l'
+    assert links[0].end == len(test_input)
+
+
+@pytest.mark.parametrize("test_input,expected", BYLAWS)
+def test_match_bylaws(test_input, expected):
+    """Verifier qu'on peut reconnaitre les reglements"""
+    links = list(match_links(test_input))
+    assert links
+    assert links[0].start <= 2  # l'
+    assert links[0].end == len(test_input)
+
+
+@pytest.mark.parametrize("test_input,expected,_", INTERNALS)
+def test_match_internals(test_input, expected, _):
+    """Verifier qu'on peut reconnaitre les sections"""
+    links = list(match_links(test_input))
+    assert links
+    assert links[0].start <= 2  # l'
+    if "présent" not in test_input:
+        assert links[0].end == len(test_input)
+
+
+MULTIPLES = [
+    "articles 227, 229 et 231 de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
+    "articles 148.0.8 et 148.0.9 de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
+    "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du Règlement de zonage 1314-2021-Z",
+]
+
+
+@pytest.mark.parametrize("text", MULTIPLES)
+def test_match_multiples(text):
+    """Verifier qu'on peut reconnaitre les sections multiples"""
+    links = list(match_links(text))
+    assert links
+    assert links[0].start <= 2  # l'
+
+
+def test_extract_links():
+    with open(TRAINDIR / "demolition_articles.csv", "rt") as infh:
+        reader = csv.DictReader(infh)
+        analyseur = Analyseur("demolition_articles", reader)
+        doc = analyseur()
+        extract_links(doc, METADATA)
