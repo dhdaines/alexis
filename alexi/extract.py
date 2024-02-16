@@ -134,7 +134,6 @@ def extract_element(
     docdir: Path,
     path: Path,
     imgdir: Path,
-    resolver: Resolver,
 ):
     """Extract the various constituents, referencing images in the
     generated image directory."""
@@ -429,7 +428,7 @@ class Extracteur:
             self.metadata["zonage"] = extract_zonage(doc)
         return doc
 
-    def analyse(self, iob: Iterable[T_obj], conv: Converteur, fileid):
+    def analyse(self, iob: Iterable[T_obj], conv: Converteur, fileid: str):
         docdir = self.outdir / fileid
         imgdir = self.outdir / fileid / "img"
         LOGGER.info("Génération de pages HTML sous %s", docdir)
@@ -444,60 +443,72 @@ class Extracteur:
         LOGGER.info("Analyse de la structure de %s", fileid)
         return analyseur()
 
+    def output_json(self):
+        """Sauvegarder les metadonnées"""
+        with open(self.outdir / "index.json", "wt") as outfh:
+            LOGGER.info("Génération de %s", self.outdir / "index.json")
+            json.dump(self.metadata, outfh, indent=2, ensure_ascii=False)
 
-def output_html(args, doc, resolver):
-    docdir = args.outdir / doc.fileid
-    imgdir = args.outdir / doc.fileid / "img"
-    # Do articles/annexes at top level
-    seen_paliers = set()
-    doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
-    for palier in ("Article", "Annexe"):
-        if palier not in doc.paliers:
-            continue
-        seen_paliers.add(palier)
-        if not doc.paliers[palier]:
-            continue
-        # These go in the top level
-        for idx, el in enumerate(doc.paliers[palier]):
-            extract_element(doc, el, docdir, Path(palier) / el.numero, imgdir, resolver)
-        make_index_html(
-            args.outdir, docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier]
-        )
+    def output_doctree(self, docs: list[Document]):
+        """Générer la page HTML principale et créer l'index de documents."""
+        self.metadata["docs"] = make_doc_tree(docs, self.outdir)
 
-    # Now do the rest of the Document hierarchy if it exists
-    def make_sub_index(el: Element, path: Path, titre: str):
-        subtypes = list(el.sub)
-        subtypes.sort(key=operator.attrgetter("type"))
-        for subtype, elements in itertools.groupby(
-            subtypes, operator.attrgetter("type")
-        ):
-            if subtype not in seen_paliers:
-                make_index_html(
-                    args.outdir,
-                    docdir / path / subtype,
-                    f"{titre}: {subtype}s",
-                    elements,
-                )
+    def output_html(self, doc: Document):
+        docdir = self.outdir / doc.fileid
+        imgdir = self.outdir / doc.fileid / "img"
+        # Do articles/annexes at top level
+        seen_paliers = set()
+        doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
+        for palier in ("Article", "Annexe"):
+            if palier not in doc.paliers:
+                continue
+            seen_paliers.add(palier)
+            if not doc.paliers[palier]:
+                continue
+            # These go in the top level
+            for idx, el in enumerate(doc.paliers[palier]):
+                extract_element(doc, el, docdir, Path(palier) / el.numero, imgdir)
+            make_index_html(
+                self.outdir,
+                docdir / palier,
+                f"{doc_titre}: {palier}s",
+                doc.paliers[palier],
+            )
 
-    # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
-    if doc.structure.sub:
-        make_sub_index(doc.structure, docdir, doc_titre)
-    # Extract content and create index.html for descendants of all elements
-    d = deque((el, Path(".")) for el in doc.structure.sub)
-    while d:
-        el, parent = d.popleft()
-        if el.type in seen_paliers:
-            continue
-        extract_element(doc, el, docdir, parent / el.type / el.numero, imgdir, resolver)
-        if not el.sub:
-            continue
-        make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
-        d.extendleft(
-            (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
-        )
-    # And do a full extraction (which might crash your browser)
-    extract_element(doc, doc.structure, docdir, ".", imgdir, resolver)
-    return doc
+        # Now do the rest of the Document hierarchy if it exists
+        def make_sub_index(el: Element, path: Path, titre: str):
+            subtypes = list(el.sub)
+            subtypes.sort(key=operator.attrgetter("type"))
+            for subtype, elements in itertools.groupby(
+                subtypes, operator.attrgetter("type")
+            ):
+                if subtype not in seen_paliers:
+                    make_index_html(
+                        self.outdir,
+                        docdir / path / subtype,
+                        f"{titre}: {subtype}s",
+                        elements,
+                    )
+
+        # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
+        if doc.structure.sub:
+            make_sub_index(doc.structure, docdir, doc_titre)
+        # Extract content and create index.html for descendants of all elements
+        d = deque((el, Path(".")) for el in doc.structure.sub)
+        while d:
+            el, parent = d.popleft()
+            if el.type in seen_paliers:
+                continue
+            extract_element(doc, el, docdir, parent / el.type / el.numero, imgdir)
+            if not el.sub:
+                continue
+            make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
+            d.extendleft(
+                (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
+            )
+        # And do a full extraction (which might crash your browser)
+        extract_element(doc, doc.structure, docdir, ".", imgdir)
+        return doc
 
 
 def main(args) -> None:
@@ -507,16 +518,10 @@ def main(args) -> None:
     docs = []
     for path in args.docs:
         docs.append(extracteur(path))
-    # Create the full tree first to gather information for linking
-    metadata = extracteur.metadata
-    metadata["doc"] = make_doc_tree(docs, args.outdir)
-    # Now finally output the text itself (resolving links detected by analysis)
-    resolver = Resolver(metadata)
+    extracteur.output_doctree(docs)
     for doc in docs:
-        output_html(args, doc, resolver)
-    with open(args.outdir / "index.json", "wt") as outfh:
-        LOGGER.info("Génération de %s", args.outdir / "index.json")
-        json.dump(metadata, outfh, indent=2, ensure_ascii=False)
+        extracteur.output_html(doc)
+    extracteur.output_json()
 
 
 if __name__ == "__main__":
