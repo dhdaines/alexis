@@ -499,7 +499,7 @@ class Extracteur:
 </html>
 """
         outdir.mkdir(parents=True, exist_ok=True)
-        LOGGER.info("%s/index.html: %s", outdir, el.titre)
+        LOGGER.info("Génération %s %s -> %s/index.html", el.type, el.numero, outdir)
         formatter = HtmlFormatter(
             doc=doc, imgdir=rel_imgdir, resolver=self.resolver, path=path
         )

@@ -113,6 +113,7 @@ class HtmlFormatter:
         tag = TAG[el.type]
         header = HEADER[el.type]
         lines = []
+        LOGGER.debug("%s%s %s: %d-%d", off, el.type, el.numero, el.debut, el.fin)
         if tag != "body":
             lines.append(f'{off}<{tag} class="{el.type}">')
         if el.numero and offset:
@@ -144,6 +145,7 @@ class HtmlFormatter:
                 if html:
                     lines.append(off + sp + html)
                 idx += 1
+            LOGGER.debug("%s%d", off, len(lines))
         if tag != "body":
             lines.append(off + f"</{tag}>")
         return lines
@@ -156,9 +158,11 @@ class HtmlFormatter:
         """Représentation HTML5 du document."""
 
         if element is None:
-            doc_body = "\n".join(self.element_html(self.doc.structure, self.indent))
+            lines = self.element_html(self.doc.structure, self.indent)
         else:
-            doc_body = "\n".join(self.element_html(element, self.indent))
+            lines = self.element_html(element, self.indent)
+        LOGGER.debug("%d lignes", len(lines))
+        doc_body = "\n".join(lines)
         if fragment:
             return doc_body
         else:

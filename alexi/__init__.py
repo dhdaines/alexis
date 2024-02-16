@@ -228,7 +228,10 @@ def make_argparse() -> argparse.ArgumentParser:
 def main():
     parser = make_argparse()
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING,
+        format="%(filename)s:%(lineno)d (%(funcName)s):%(message)s",
+    )
     args.func(args)
 
 
