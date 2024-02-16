@@ -79,7 +79,7 @@ MILIEU = r"\btypes?\s+des?\s+milieux?"
 MTYPE = r"[\dA-Z]+\.\d"
 MTYPES = rf"{MTYPE}(?:(?:,|\s+et)\s+{MTYPE})*"
 REGNUM = r"(?:(?:SQ-)?\d[\d\.A-Z-]+|\(L\.?R\.?Q\.?,?[^\)]+\))"
-REGLEMENT = rf"règlement\s+(?:{REGNUM}|(?:sur|concernant).*?{REGNUM})"
+REGLEMENT = rf"règlement\s+(?:{REGNUM}|(?:de|sur|concernant).*?{REGNUM})"
 LOI = r"""
 (?:code\s+civil
   |loi\s+.*?\((?:R?L\.?R\.?Q\.?|c\.),?[^\)]+\)
