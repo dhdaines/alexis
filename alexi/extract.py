@@ -526,10 +526,11 @@ class Extracteur:
             if el is None:
                 path = path.parent.parent
                 continue
-            if el.type not in ("Article", "Annexe"):
-                self.output_element(doc, path, el)
+            if el.type in ("Article", "Annexe"):
+                continue
+            path = path / el.type / el.numero
+            self.output_element(doc, path, el)
             if el.sub:
-                path = path / el.type / el.numero
                 self.output_sub_index(doc, el, path)
                 d.appendleft(None)
                 d.extendleft(reversed(el.sub))
