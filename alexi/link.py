@@ -143,7 +143,7 @@ class Resolver:
         for m in SEC_RE.finditer(text):
             sectype = m.group("sec").title().replace("-", "")
             num = m.group("num").strip(" .,;")
-            sections.append((sectype.title(), num))
+            sections.append((sectype, num))
         sections.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
         secpath = "/".join(itertools.chain.from_iterable(sections))
         if docpath:
