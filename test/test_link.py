@@ -84,20 +84,20 @@ METADATA = {
 BYLAWS = [
     (
         "Règlement de zonage 1314-2021-Z",
-        "index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
+        "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
         "Règlement sur les permis et certificats 1314-2021-PC",
-        "index.html#Rgl-1314-2021-PC-version-en-vigueur-20231013",
+        "../index.html#Rgl-1314-2021-PC-version-en-vigueur-20231013",
     ),
     (
         "chapitre 5 du Règlement de zonage 1314-2021-Z",
-        "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/index.html",
+        "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/index.html",
     ),
     # NOTE: sous-section not expected to work yet
     (
         "section 3 du chapitre 5 du Règlement de zonage 1314-2021-Z",
-        "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
+        "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
     ),
     # TODO: links to milieux, usages, etc
 ]
@@ -106,53 +106,53 @@ BYLAWS = [
 @pytest.mark.parametrize("test_input,expected", BYLAWS)
 def test_bylaws(test_input, expected):
     r = Resolver(METADATA)
-    assert r.resolve_internal(test_input, []) == expected
+    assert r.resolve_internal(test_input, ".") == expected
 
 
 INTERNALS = [
     (
         "article 5",
-        "../5",
+        "../5/index.html",
         "Article/6",
     ),
     (
         "chapitre 2",
-        "../../Chapitre/2",
+        "../../Chapitre/2/index.html",
         "Article/6",
     ),
     (
         "section 2 du chapitre 3",
-        "../../Chapitre/3/Section/2",
+        "../../Chapitre/3/Section/2/index.html",
         "Article/6",
     ),
     (
         "section 3",
-        "../3",
+        "../3/index.html",
         "Chapitre/3/Section/2",
     ),
     (
         "chapitre 1",
-        "../../../1",
+        "../../../1/index.html",
         "Chapitre/3/Section/2",
     ),
     (
         "section 1",
-        "Section/1",
+        "Section/1/index.html",
         "Chapitre/3",
     ),
     (
         "article 7",
-        "../../../../Article/7",
+        "../../../../Article/7/index.html",
         "Chapitre/3/Section/2",
     ),
     (
         "section 1",
-        "../../Chapitre/3/Section/1",
+        "../../Chapitre/3/Section/1/index.html",
         "Article/69",  # Is in Chapitre 3 Section 2
     ),
     (
         "section 3 du présent chapitre",
-        "../../Chapitre/1/Section/3",
+        "../../Chapitre/1/Section/3/index.html",
         "Article/1",  # Is in Chapitre 1 Section 1
     ),
 ]

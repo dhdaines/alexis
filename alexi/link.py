@@ -85,14 +85,24 @@ class Resolver:
         for docpath, info in self.metadata["docs"].items():
             self.docpath[info["numero"]] = docpath
 
-    def resolve_absolute_internal(self, numero: str, secpath: str) -> Optional[str]:
+    def __call__(
+        self, text: str, srcpath: str = "", doc: Optional[Document] = None
+    ) -> str:
+        url = self.resolve_external(text)
+        if url:
+            return url
+        return self.resolve_internal(text, srcpath, doc)
+
+    def resolve_absolute_internal(
+        self, numero: str, secpath: str, srcpath: str
+    ) -> Optional[str]:
         docpath = self.docpath.get(numero)
         if docpath is None:
             return None
         if secpath:
-            return f"{docpath}/{secpath}/index.html"
+            return os.path.relpath(f"../{docpath}/{secpath}/index.html", srcpath)
         else:
-            return f"index.html#{docpath}"
+            return os.path.relpath(f"../index.html#{docpath}", srcpath)
 
     def resolve_internal(
         self, text: str, srcpath: str, doc: Optional[Document] = None
@@ -102,7 +112,7 @@ class Resolver:
         """
         numero = None
         if m := REG_RE.search(text):
-            numero = m.group("reg")
+            numero = m.group("reg").strip(" .,;")
             if numero is None:
                 return None
         sections = []
@@ -113,8 +123,11 @@ class Resolver:
         sections.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
         secpath = "/".join(itertools.chain.from_iterable(sections))
         if numero:
-            return self.resolve_absolute_internal(numero, secpath)
-        return _resolve_internal(secpath, srcpath, doc)
+            return self.resolve_absolute_internal(numero, secpath, srcpath)
+        if not secpath:
+            return None
+        LOGGER.info("resolve %s -> %s", secpath, srcpath)
+        return "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
 
     def resolve_external(self, text: str) -> Optional[str]:
         """

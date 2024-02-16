@@ -54,7 +54,10 @@ def test_format_html_figures():
 
 
 LIPSUM = "<p>Lorem ipsum dolor sit amet"
-LIPSUM_HREF = '<p>Lorem <a href="https://example.com">ipsum</a> dolor <a href="https://vdsa.ca">sit</a> amet'
+LIPSUM_HREF = (
+    '<p>Lorem <a target="_blank" href="https://example.com">ipsum</a>'
+    ' dolor <a target="_blank" href="https://vdsa.ca">sit</a> amet'
+)
 
 
 def test_format_html_links():

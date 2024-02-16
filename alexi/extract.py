@@ -128,47 +128,6 @@ li.leaf {
 """
 
 
-def extract_element(
-    doc: Document,
-    el: Element,
-    docdir: Path,
-    path: Path,
-    imgdir: Path,
-):
-    """Extract the various constituents, referencing images in the
-    generated image directory."""
-    outdir = docdir / path
-    # Can't use Path.relative_to until 3.12 :(
-    rel_imgdir = os.path.relpath(imgdir, outdir)
-    rel_style = os.path.relpath(imgdir.parent.parent / "style.css", outdir)
-    doc_titre = el.titre
-    if doc.titre != "Document":
-        doc_titre = doc.titre
-        if doc.numero:
-            doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
-    HTML_HEADER = (
-        HTML_GLOBAL_HEADER
-        + f"""    <link rel="stylesheet" href="{rel_style}">
-    <title>{el.titre}</title>
-  </head>
-  <body>
-    <div class="container">
-    <h1 id="header">{doc_titre}</h1>
-    <div id="body">
-"""
-    )
-    HTML_FOOTER = """</div></div></body>
-</html>
-"""
-    outdir.mkdir(parents=True, exist_ok=True)
-    LOGGER.info("%s %s", outdir, el.titre)
-    formatter = HtmlFormatter(rel_imgdir)
-    with open(outdir / "index.html", "wt") as outfh:
-        outfh.write(HTML_HEADER)
-        outfh.write(formatter(doc, element=el, fragment=True))
-        outfh.write(HTML_FOOTER)
-
-
 def make_index_html(
     topdir: Path, docdir: Path, title: str, elements: Iterable[Element]
 ):
@@ -454,61 +413,126 @@ class Extracteur:
         self.metadata["docs"] = make_doc_tree(docs, self.outdir)
         self.resolver = Resolver(self.metadata)
 
-    def output_html(self, doc: Document):
-        docdir = self.outdir / doc.fileid
-        imgdir = self.outdir / doc.fileid / "img"
-        # Do articles/annexes at top level
-        seen_paliers = set()
+    def output_section_index(self, doc: Document, path: Path, elements: list[Element]):
+        """Générer l'index de textes à un palier (Article, Annexe, etc)"""
         doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
+        title = f"{doc_titre}: {path.name}s"
+        docdir = self.outdir / doc.fileid / path
+        style = os.path.relpath(self.outdir / "style.css", docdir)
+        HTML_HEADER = (
+            HTML_GLOBAL_HEADER
+            + f"""    <link rel="stylesheet" href="{style}">
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="container">
+    <h1 id="header">{title}</h1>
+    <ul id="body">\n"""
+        )
+        lines = []
+        off = "    "
+        sp = "  "
+        for el in elements:
+            lines.append(f"{off}{sp}<li>")
+            if el.numero[0] == "_":
+                titre = el.titre if el.titre else f"{el.type} (numéro inconnu)"
+            else:
+                lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
+                titre = el.titre if el.titre else f"{el.type} {el.numero}"
+            lines.append(
+                f'{off}{sp}{sp}<a href="{el.numero}/index.html" class="title">{titre}</a>'
+            )
+            lines.append(f"{off}{sp}</li>")
+        HTML_FOOTER = """</ul>
+    </div>
+  </body>
+ </html>
+    """
+        docdir.mkdir(parents=True, exist_ok=True)
+        with open(docdir / "index.html", "wt") as outfh:
+            LOGGER.info("Génération de %s", docdir / "index.html")
+            outfh.write(HTML_HEADER)
+            for line in lines:
+                print(line, file=outfh)
+            outfh.write(HTML_FOOTER)
+
+    def output_sub_index(self, doc: Document, el: Element, path: Path):
+        subtypes = list(el.sub)
+        gt = operator.attrgetter("type")
+        subtypes.sort(key=gt)
+        for subtype, elements in itertools.groupby(subtypes, gt):
+            if subtype not in ("Article", "Annexe"):
+                self.output_section_index(doc, path / subtype, elements)
+
+    def output_section(self, doc: Document, path: Path, elements: list[Element]):
+        if not elements:
+            return
+        self.output_section_index(doc, path, elements)
+        for el in elements:
+            self.output_element(doc, path / el.numero, el)
+
+    def output_element(self, doc: Document, path: Path, el: Element):
+        """Générer le HTML for un seul élément."""
+        docdir = self.outdir / doc.fileid
+        imgdir = docdir / "img"
+        outdir = docdir / path
+        # Can't use Path.relative_to until 3.12 :(
+        rel_imgdir = os.path.relpath(imgdir, outdir)
+        rel_style = os.path.relpath(self.outdir / "style.css", outdir)
+        doc_titre = el.titre
+        if doc.titre != "Document":
+            doc_titre = doc.titre
+            if doc.numero:
+                doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
+        HTML_HEADER = (
+            HTML_GLOBAL_HEADER
+            + f"""    <link rel="stylesheet" href="{rel_style}">
+    <title>{el.titre}</title>
+  </head>
+  <body>
+    <div class="container">
+    <h1 id="header">{doc_titre}</h1>
+    <div id="body">
+    """
+        )
+        HTML_FOOTER = """</div></div></body>
+</html>
+"""
+        outdir.mkdir(parents=True, exist_ok=True)
+        LOGGER.info("%s/index.html: %s", outdir, el.titre)
+        formatter = HtmlFormatter(
+            doc=doc, imgdir=rel_imgdir, resolver=self.resolver, path=path
+        )
+        with open(outdir / "index.html", "wt") as outfh:
+            outfh.write(HTML_HEADER)
+            outfh.write(formatter(element=el, fragment=True))
+            outfh.write(HTML_FOOTER)
+
+    def output_html(self, doc: Document):
+        # Do articles/annexes at top level (FIXME: parameterize this)
         for palier in ("Article", "Annexe"):
-            if palier not in doc.paliers:
-                continue
-            seen_paliers.add(palier)
-            if not doc.paliers[palier]:
-                continue
-            # These go in the top level
-            for idx, el in enumerate(doc.paliers[palier]):
-                extract_element(doc, el, docdir, Path(palier) / el.numero, imgdir)
-            make_index_html(
-                self.outdir,
-                docdir / palier,
-                f"{doc_titre}: {palier}s",
-                doc.paliers[palier],
-            )
+            self.output_section(doc, Path(palier), doc.paliers.get(palier, []))
 
-        # Now do the rest of the Document hierarchy if it exists
-        def make_sub_index(el: Element, path: Path, titre: str):
-            subtypes = list(el.sub)
-            subtypes.sort(key=operator.attrgetter("type"))
-            for subtype, elements in itertools.groupby(
-                subtypes, operator.attrgetter("type")
-            ):
-                if subtype not in seen_paliers:
-                    make_index_html(
-                        self.outdir,
-                        docdir / path / subtype,
-                        f"{titre}: {subtype}s",
-                        elements,
-                    )
-
-        # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
+        # Do the top directory with full text rather than an index
+        path = Path(".")
         if doc.structure.sub:
-            make_sub_index(doc.structure, docdir, doc_titre)
-        # Extract content and create index.html for descendants of all elements
-        d = deque((el, Path(".")) for el in doc.structure.sub)
+            self.output_sub_index(doc, doc.structure, path)
+        self.output_element(doc, path, doc.structure)
+
+        # Walk the structure of the document (FIXME: make a generator)
+        d = deque(doc.structure.sub)
         while d:
-            el, parent = d.popleft()
-            if el.type in seen_paliers:
+            el = d.popleft()
+            if el is None:
+                path = path.parent.parent
                 continue
-            extract_element(doc, el, docdir, parent / el.type / el.numero, imgdir)
-            if not el.sub:
-                continue
-            make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
-            d.extendleft(
-                (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
-            )
-        # And do a full extraction (which might crash your browser)
-        extract_element(doc, doc.structure, docdir, ".", imgdir)
+            if el.type not in ("Article", "Annexe"):
+                self.output_element(doc, path, el)
+            if el.sub:
+                path = path / el.type / el.numero
+                self.output_sub_index(doc, el, path)
+                d.appendleft(None)
+                d.extendleft(reversed(el.sub))
         return doc
 
 

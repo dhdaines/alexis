@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterator, Optional, Sequence
 
 from alexi.analyse import Bloc, Document, Element, T_obj
+from alexi.link import Resolver
 
 LOGGER = logging.getLogger("format")
 
@@ -64,8 +65,19 @@ BLOC = {
 
 
 class HtmlFormatter:
-    def __init__(self, imgdir: PathLike = "."):
+    def __init__(
+        self,
+        imgdir: PathLike = ".",
+        doc: Optional[Document] = None,
+        resolver: Optional[Resolver] = None,
+        path: Optional[Path] = None,
+        indent: int = 2,
+    ):
         self.imgpath = Path(imgdir)
+        self.resolver = resolver
+        self.path = path
+        self.doc = doc
+        self.indent = indent
 
     def bloc_html(self, bloc: Bloc) -> str:
         tag = BLOC[bloc.type]
@@ -79,12 +91,15 @@ class HtmlFormatter:
             chunks = []
             for link in bloc.liens:
                 chunks.append(text[start : link.start])
-                if link.href is None:
-                    chunks.append(text[link.start : link.end])
+                link_text = text[link.start : link.end]
+                href = link.href
+                if href is None and self.resolver:
+                    href = self.resolver(link_text, str(self.path), self.doc)
+                    LOGGER.info("%s:%s -> %s", link_text, self.path, href)
+                if href is None:
+                    chunks.append(link_text)
                 else:
-                    chunks.append(
-                        f'<a href="{link.href}">{text[link.start:link.end]}</a>'
-                    )
+                    chunks.append(f'<a target="_blank" href="{href}">{link_text}</a>')
                 start = link.end
             chunks.append(text[start:])
             html = "".join(chunks)
@@ -92,9 +107,7 @@ class HtmlFormatter:
         else:
             return f"<{tag}>{bloc.texte}</{tag}>"
 
-    def element_html(
-        self, doc: Document, el: Element, indent: int = 2, offset: int = 0
-    ) -> list[str]:
+    def element_html(self, el: Element, indent: int = 2, offset: int = 0) -> list[str]:
         off = " " * offset
         sp = " " * indent
         tag = TAG[el.type]
@@ -117,17 +130,17 @@ class HtmlFormatter:
             lines.append(f'{off}{sp}{sp}<span class="title">{el.titre}</span>')
             lines.append(f"{off}{sp}</{header}>")
         idx = el.debut
-        fin = len(doc.contenu) if el.fin == -1 else el.fin
+        fin = len(self.doc.contenu) if el.fin == -1 else el.fin
         subidx = 0
         sub = el.sub[subidx] if subidx < len(el.sub) else None
         while idx < fin:
             if sub is not None and idx == sub.debut:
-                lines.extend(self.element_html(doc, sub, indent, offset + indent))
-                idx = len(doc.contenu) if sub.fin == -1 else sub.fin
+                lines.extend(self.element_html(sub, indent, offset + indent))
+                idx = len(self.doc.contenu) if sub.fin == -1 else sub.fin
                 subidx += 1
                 sub = el.sub[subidx] if subidx < len(el.sub) else None
             else:
-                html = self.bloc_html(doc.contenu[idx])
+                html = self.bloc_html(self.doc.contenu[idx])
                 if html:
                     lines.append(off + sp + html)
                 idx += 1
@@ -137,24 +150,22 @@ class HtmlFormatter:
 
     def __call__(
         self,
-        doc: Document,
-        indent: int = 2,
         element: Optional[Element] = None,
         fragment: bool = True,
     ) -> str:
         """Représentation HTML5 du document."""
 
         if element is None:
-            doc_body = "\n".join(self.element_html(doc, doc.structure, indent))
+            doc_body = "\n".join(self.element_html(self.doc.structure, self.indent))
         else:
-            doc_body = "\n".join(self.element_html(doc, element, indent))
+            doc_body = "\n".join(self.element_html(element, self.indent))
         if fragment:
             return doc_body
         else:
             doc_header = f"""<!DOCTYPE html>
     <html>
       <head>
-        <title>{doc.titre}</title>
+        <title>{self.doc.titre}</title>
       </head>
       <body>"""
             doc_footer = "</body></html>"
@@ -168,4 +179,4 @@ def format_html(
     imgdir: str = ".",
     fragment: bool = True,
 ) -> str:
-    return HtmlFormatter(imgdir)(doc, indent, element, fragment)
+    return HtmlFormatter(imgdir, doc=doc, indent=indent)(element, fragment)
