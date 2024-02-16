@@ -354,11 +354,11 @@ class Extracteur:
         self.no_images = no_images
         outdir.mkdir(parents=True, exist_ok=True)
 
-    def __call__(self, path: Path):
+    def __call__(self, path: Path) -> Optional[Document]:
         pdf_path = path.with_suffix(".pdf")
         if self.pdfdata and pdf_path.name not in self.pdfdata:
             LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
-            return
+            return None
         conv = None
         if path.suffix == ".csv":
             LOGGER.info("Lecture de %s", path)
@@ -542,7 +542,9 @@ def main(args) -> None:
     )
     docs = []
     for path in args.docs:
-        docs.append(extracteur(path))
+        doc = extracteur(path)
+        if doc is not None:
+            docs.append(doc)
     extracteur.output_doctree(docs)
     for doc in docs:
         extracteur.output_html(doc)
