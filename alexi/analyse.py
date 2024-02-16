@@ -85,7 +85,7 @@ LOI = rf"""
 (?:code\s+civil
   |(?:loi|code)\s+.*?\({RLRQ}\)
   |loi\s+sur\s+l['’]aménagement\s+et\s+l['’]urbanisme
-  |loi sur la qualité de l['’]environnement
+  |loi\s+sur\s+la\s+qualité\s+de\s+l['’]environnement
   |loi\s+sur\s+les\s+cités\s+et\s+villes
 )"""
 DU = r"(?:du|de\s+l['’]|de\s+la)"
