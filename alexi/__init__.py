@@ -15,13 +15,13 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
-from . import download, extract, link
-from .analyse import Analyseur, Bloc
-from .convert import FIELDNAMES, Converteur, merge_overlaps
-from .format import format_dict, format_html, format_xml
+from . import download, extract
+from .analyse import Analyseur, Bloc, merge_overlaps
+from .convert import FIELDNAMES, Converteur
+from .format import format_html
 from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
-from .label import Extracteur
+from .label import Identificateur
 from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
@@ -74,16 +74,9 @@ def segment_main(args: argparse.Namespace):
 
 def label_main(args: argparse.Namespace):
     """Étiquetter un CSV"""
-    crf = Extracteur(args.model)
+    crf = Identificateur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
-
-
-def xml_main(args: argparse.Namespace):
-    """Convertir un CSV segmenté et étiquetté en XML"""
-    reader = csv.DictReader(args.csv)
-    analyseur = Analyseur(args.csv.name, reader)
-    print(format_xml(analyseur()))
 
 
 def html_main(args: argparse.Namespace):
@@ -111,7 +104,7 @@ def json_main(args: argparse.Namespace):
             doc = analyseur(images)
     else:
         doc = analyseur()
-    print(json.dumps(format_dict(doc), indent=2, ensure_ascii=False))
+    print(json.dumps(dataclasses.asdict(doc), indent=2, ensure_ascii=False))
 
 
 def index_main(args: argparse.Namespace):
@@ -177,13 +170,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     label.set_defaults(func=label_main)
 
-    xml = subp.add_parser(
-        "xml",
-        help="Extraire la structure en format XML en partant du CSV étiquetté",
-    )
-    xml.add_argument("csv", help="Fichier CSV à traiter", type=argparse.FileType("rt"))
-    xml.set_defaults(func=xml_main)
-
     html = subp.add_parser(
         "html",
         help="Extraire la structure en format HTML en partant du CSV étiquetté",
@@ -212,13 +198,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     extract.add_arguments(extract_command)
     extract_command.set_defaults(func=extract.main)
-
-    link_command = subp.add_parser(
-        "link",
-        help="Ajouter des hyperliens aux documents HTML",
-    )
-    link.add_arguments(link_command)
-    link_command.set_defaults(func=link.main)
 
     index = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
@@ -249,7 +228,10 @@ def make_argparse() -> argparse.ArgumentParser:
 def main():
     parser = make_argparse()
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING,
+        format="%(filename)s:%(lineno)d (%(funcName)s):%(message)s",
+    )
     args.func(args)
 
 

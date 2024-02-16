@@ -1,4 +1,4 @@
-"""Extraction de segments de textes avec CRF"""
+"""Identification de segments de textes avec CRF"""
 
 import csv
 import itertools
@@ -52,7 +52,7 @@ def make_data(dataset, n=2):
     )
 
 
-class Extracteur:
+class Identificateur:
     def __init__(self, model=DEFAULT_MODEL):
         self.crf = joblib.load(model)
 
@@ -91,7 +91,7 @@ def main():
     args = parser.parse_args()
     conv = Converteur(args.pdfpath)
     seg = Segmenteur()
-    ex = Extracteur()
+    ex = Identificateur()
     pages = conv.extract_words()
     segmented = seg(pages)
     tagged = ex(segmented)

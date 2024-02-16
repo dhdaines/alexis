@@ -4,12 +4,12 @@ Formatter la structure extraite d'un PDF
 
 import itertools
 import logging
-import re
-from collections import deque
+from os import PathLike
 from pathlib import Path
-from typing import Any, Iterator, Optional, Sequence
+from typing import Iterator, Optional, Sequence
 
 from alexi.analyse import Bloc, Document, Element, T_obj
+from alexi.link import Resolver
 
 LOGGER = logging.getLogger("format")
 
@@ -33,35 +33,6 @@ def line_breaks(paragraph: Sequence[T_obj]) -> Iterator[list[T_obj]]:
         line.append(word)
     if line:
         yield line
-
-
-def format_xml(doc: Document, indent: int = 2) -> str:
-    """Représentation structurel du document."""
-
-    def bloc_xml(bloc: Bloc) -> str:
-        return f"<{bloc.type}>{bloc.texte}</{bloc.type}>"
-
-    def element_xml(el: Element, indent: int = 2, offset: int = 0) -> list[str]:
-        spacing = " " * offset
-        lines = [spacing + f"<{el.type} titre='{el.titre}'>"]
-        idx = el.debut
-        fin = len(doc.contenu) if el.fin == -1 else el.fin
-        subidx = 0
-        sub = el.sub[subidx] if subidx < len(el.sub) else None
-        while idx < fin:
-            if sub is not None and idx == sub.debut:
-                lines.extend(element_xml(sub, indent, offset + indent))
-                idx = len(doc.contenu) if sub.fin == -1 else sub.fin
-                subidx += 1
-                sub = el.sub[subidx] if subidx < len(el.sub) else None
-            else:
-                subspacing = " " * (offset + indent)
-                lines.append(subspacing + bloc_xml(doc.contenu[idx]))
-                idx += 1
-        lines.append(spacing + f"</{el.type}>")
-        return lines
-
-    return "\n".join(element_xml(doc.structure, indent))
 
 
 TAG = {
@@ -93,31 +64,56 @@ BLOC = {
 }
 
 
-def format_html(
-    doc: Document,
-    indent: int = 2,
-    element: Optional[Element] = None,
-    imgdir: str = ".",
-    fragment: bool = True,
-) -> str:
-    """Représentation HTML5 du document."""
-    imgpath = Path(imgdir)
+class HtmlFormatter:
+    def __init__(
+        self,
+        imgdir: PathLike = ".",
+        doc: Optional[Document] = None,
+        resolver: Optional[Resolver] = None,
+        path: Optional[Path] = None,
+        indent: int = 2,
+    ):
+        self.imgpath = Path(imgdir)
+        self.resolver = resolver
+        self.path = path
+        self.doc = doc
+        self.indent = indent
 
-    def bloc_html(bloc: Bloc) -> str:
+    def bloc_html(self, bloc: Bloc) -> str:
         tag = BLOC[bloc.type]
         if tag == "":
             return ""
         elif tag == "img":
-            return f'<img alt="{bloc.texte}" src="{imgpath / bloc.img}"><br>'
+            return f'<img alt="{bloc.texte}" src="{self.imgpath / bloc.img}"><br>'
+        elif bloc.liens:
+            text = bloc.texte
+            start = 0
+            chunks = []
+            for link in bloc.liens:
+                chunks.append(text[start : link.start])
+                link_text = text[link.start : link.end]
+                href = link.href
+                if href is None and self.resolver:
+                    href = self.resolver(link_text, str(self.path), self.doc)
+                    LOGGER.info("%s:%s -> %s", link_text, self.path, href)
+                if href is None:
+                    chunks.append(link_text)
+                else:
+                    chunks.append(f'<a target="_blank" href="{href}">{link_text}</a>')
+                start = link.end
+            chunks.append(text[start:])
+            html = "".join(chunks)
+            return f"<{tag}>{html}</{tag}>"
         else:
             return f"<{tag}>{bloc.texte}</{tag}>"
 
-    def element_html(el: Element, indent: int = 2, offset: int = 0) -> list[str]:
+    def element_html(self, el: Element, indent: int = 2, offset: int = 0) -> list[str]:
         off = " " * offset
         sp = " " * indent
         tag = TAG[el.type]
         header = HEADER[el.type]
         lines = []
+        LOGGER.debug("%s%s %s: %d-%d", off, el.type, el.numero, el.debut, el.fin)
         if tag != "body":
             lines.append(f'{off}<{tag} class="{el.type}">')
         if el.numero and offset:
@@ -135,277 +131,56 @@ def format_html(
             lines.append(f'{off}{sp}{sp}<span class="title">{el.titre}</span>')
             lines.append(f"{off}{sp}</{header}>")
         idx = el.debut
-        fin = len(doc.contenu) if el.fin == -1 else el.fin
+        fin = len(self.doc.contenu) if el.fin == -1 else el.fin
         subidx = 0
         sub = el.sub[subidx] if subidx < len(el.sub) else None
         while idx < fin:
             if sub is not None and idx == sub.debut:
-                lines.extend(element_html(sub, indent, offset + indent))
-                idx = len(doc.contenu) if sub.fin == -1 else sub.fin
+                lines.extend(self.element_html(sub, indent, offset + indent))
+                idx = len(self.doc.contenu) if sub.fin == -1 else sub.fin
                 subidx += 1
                 sub = el.sub[subidx] if subidx < len(el.sub) else None
             else:
-                html = bloc_html(doc.contenu[idx])
+                html = self.bloc_html(self.doc.contenu[idx])
                 if html:
                     lines.append(off + sp + html)
                 idx += 1
+            LOGGER.debug("%s%d", off, len(lines))
         if tag != "body":
             lines.append(off + f"</{tag}>")
         return lines
 
-    if element is None:
-        doc_body = "\n".join(element_html(doc.structure, indent))
-    else:
-        doc_body = "\n".join(element_html(element, indent))
-    if fragment:
-        return doc_body
-    else:
-        doc_header = f"""<!DOCTYPE html>
-<html>
-  <head>
-    <title>{doc.titre}</title>
-  </head>
-  <body>"""
-        doc_footer = "</body></html>"
-        return "\n".join((doc_header, doc_body, doc_footer))
+    def __call__(
+        self,
+        element: Optional[Element] = None,
+        fragment: bool = True,
+    ) -> str:
+        """Représentation HTML5 du document."""
+
+        if element is None:
+            lines = self.element_html(self.doc.structure, self.indent)
+        else:
+            lines = self.element_html(element, self.indent)
+        LOGGER.debug("%d lignes", len(lines))
+        doc_body = "\n".join(lines)
+        if fragment:
+            return doc_body
+        else:
+            doc_header = f"""<!DOCTYPE html>
+    <html>
+      <head>
+        <title>{self.doc.titre}</title>
+      </head>
+      <body>"""
+            doc_footer = "</body></html>"
+            return "\n".join((doc_header, doc_body, doc_footer))
 
 
-MDHEADER = {
-    "Document": "#",
-    "Annexe": "#",
-    "Chapitre": "#",
-    "Section": "##",
-    "SousSection": "###",
-    "Article": "####",
-}
-
-
-def format_text(
+def format_html(
     doc: Document,
+    indent: int = 2,
     element: Optional[Element] = None,
+    imgdir: str = ".",
+    fragment: bool = True,
 ) -> str:
-    """Contenu textuel du document."""
-
-    def bloc_text(bloc: Bloc) -> str:
-        tag = BLOC[bloc.type]
-        if tag in ("", "img"):
-            return ""
-        return "\n".join(
-            " ".join(w["text"] for w in line) for line in line_breaks(bloc.contenu)
-        )
-
-    def element_text(el: Element) -> list[str]:
-        """Générer du texte (en fait du Markdown) d'un élément."""
-        header = MDHEADER[el.type]
-        lines = []
-        if el.titre:
-            lines.append(" ".join((header, el.titre)))
-            lines.append("")
-        idx = el.debut
-        fin = len(doc.contenu) if el.fin == -1 else el.fin
-        subidx = 0
-        sub = el.sub[subidx] if subidx < len(el.sub) else None
-        while idx < fin:
-            if sub is not None and idx == sub.debut:
-                lines.extend(element_text(sub))
-                idx = len(doc.contenu) if sub.fin == -1 else sub.fin
-                subidx += 1
-                sub = el.sub[subidx] if subidx < len(el.sub) else None
-            else:
-                txt = bloc_text(doc.contenu[idx])
-                if txt:
-                    lines.append(txt)
-                    lines.append("")
-                idx += 1
-        lines.append("")
-        return lines
-
-    if element is None:
-        element = doc.structure
-    return "\n".join(element_text(element))
-
-
-def format_dict(doc: Document, imgdir: str = ".") -> dict[str, Any]:  # noqa: C901
-    """Formatter un document en dictionnaire afin d'émettre un JSON pour
-    utilisation dans SÈRAFIM"""
-    # structure de base
-    doc_dict: dict[str, Any] = {
-        "fichier": None,
-        "titre": doc.meta.get("Titre"),
-        "numero": doc.meta.get("Numero"),
-        "chapitres": [],
-        "textes": [],
-        "dates": {
-            "adoption": None,
-        },
-    }
-    if doc_dict.get("numero") is None and doc_dict.get("titre") is not None:
-        tokens = doc_dict["titre"].split()
-        for t in tokens:
-            if re.match(r".*\d\d", t) and re.match(r"^[0-9A-Z-]+$", t):
-                LOGGER.info("Quelque chose qui ressemble à un numéro: %s", t)
-                doc_dict["numero"] = t
-
-    def bloc_dict(bloc: Bloc) -> dict:
-        tag = BLOC[bloc.type]
-        if tag == "":
-            return {}
-        elif tag == "img":
-            imgpath = "/".join((imgdir, bloc.img))
-            if bloc.type == "Tableau":
-                return {"texte": bloc.texte, "tableau": imgpath}
-            else:
-                return {"texte": bloc.texte, "figure": imgpath}
-        else:
-            return {"texte": bloc.texte}
-
-    # group together "contenu" as "texte" (they are not the same thing)
-    def make_texte(titre: str, contenus: Sequence[Bloc], page: int) -> dict:
-        contenu = []
-        for bloc in contenus:
-            bd = bloc_dict(bloc)
-            if bd:
-                contenu.append(bd)
-        if len(contenus) == 0:
-            pages = [page, page]
-        else:
-            pages = [int(contenus[0].page_number), int(contenus[-1].page_number)]
-        texte: dict[str, Any] = {
-            "titre": titre,
-            "pages": pages,
-            "contenu": contenu,
-        }
-        if m := re.match(r"(?:article )?(\d+)", titre, re.I):
-            texte["article"] = int(m.group(1))
-        return texte
-
-    # add front matter as a single texte
-    if not doc.structure.sub:
-        LOGGER.warning("Absence de structure dans le document!")
-        preambule = doc.contenu
-    else:
-        preambule = doc.contenu[0 : doc.structure.sub[0].debut]
-    pretexte = make_texte(doc.meta.get("Titre", "Préambule"), preambule, 1)
-    if pretexte:
-        doc_dict["textes"].append(pretexte)
-
-    # depth-first traverse adding leaf nodes as textes. total hack,
-    # not refactored, doomed to go away at some point
-    d = deque(doc.structure.sub)
-    chapitre: Optional[dict[str, Any]] = None
-    chapitre_idx = 0
-    section: Optional[dict[str, Any]] = None
-    section_idx = 0
-    sous_section: Optional[dict[str, Any]] = None
-    sous_section_idx = 0
-    while d:
-        el = d.popleft()
-        if el.sub:
-            if el.type == "Chapitre":
-                chapitre_idx += 1
-                if m := re.match(r"(?:chapitre )?(\d+|[XIV]+)", el.titre, re.I):
-                    chapitre_numero = m.group(1)
-                    el.titre = el.titre[m.end(1) :]
-                else:
-                    chapitre_numero = "%d" % chapitre_idx
-                first_page = int(doc.contenu[el.debut].page_number)
-                end = len(doc.contenu) if el.fin == -1 else el.fin
-                last_page = int(doc.contenu[end - 1].page_number)
-                if chapitre:
-                    chapitre["textes"][1] = len(doc_dict["textes"])
-                if section:
-                    section["textes"][1] = len(doc_dict["textes"])
-                if sous_section:
-                    sous_section["textes"][1] = len(doc_dict["textes"])
-                chapitre = {
-                    "numero": chapitre_numero,
-                    "titre": el.titre,
-                    "pages": [first_page, last_page],
-                    "textes": [len(doc_dict["textes"]), -1],
-                }
-                doc_dict["chapitres"].append(chapitre)
-                section_idx = 0
-                sous_section_idx = 0
-            elif el.type == "Section":
-                section_idx += 1
-                if m := re.match(r"(?:section )?(\d+|[XIV]+)", el.titre, re.I):
-                    section_numero = m.group(1)
-                    el.titre = el.titre[m.end(1) :]
-                else:
-                    section_numero = "%d" % section_idx
-                first_page = int(doc.contenu[el.debut].page_number)
-                end = len(doc.contenu) if el.fin == -1 else el.fin
-                last_page = int(doc.contenu[end - 1].page_number)
-                if section:
-                    section["textes"][1] = len(doc_dict["textes"])
-                if sous_section:
-                    sous_section["textes"][1] = len(doc_dict["textes"])
-                section = {
-                    "numero": section_numero,
-                    "titre": el.titre,
-                    "pages": [first_page, last_page],
-                    "textes": [len(doc_dict["textes"]), -1],
-                }
-                if chapitre:
-                    chapitre.setdefault("sections", []).append(section)
-            elif el.type == "SousSection":
-                sous_section_idx += 1
-                if m := re.match(r"(?:sous-section )?([\d\.]+)", el.titre, re.I):
-                    sous_section_numero = m.group(1)
-                    el.titre = el.titre[m.end(1) :]
-                else:
-                    sous_section_numero = "%d" % sous_section_idx
-                first_page = int(doc.contenu[el.debut].page_number)
-                end = len(doc.contenu) if el.fin == -1 else el.fin
-                last_page = int(doc.contenu[end - 1].page_number)
-                if sous_section:
-                    sous_section["textes"][1] = len(doc_dict["textes"])
-                sous_section = {
-                    "numero": sous_section_numero,
-                    "titre": el.titre,
-                    "pages": [first_page, last_page],
-                    "textes": [len(doc_dict["textes"]), -1],
-                }
-                if section:
-                    section.setdefault("sous_sections", []).append(sous_section)
-            d.extendleft(reversed(el.sub))
-        else:
-            if el.type == "Annexe":
-                if m := re.match(r"(?:annexe )?(\d+|[A-Z]\b)", el.titre, re.I):
-                    annexe = m.group(1)
-                    el.titre = el.titre[m.end(1) :]
-                else:
-                    annexe = "A"
-            start = el.debut
-            end = len(doc.contenu) if el.fin == -1 else el.fin
-            texte = make_texte(el.titre, doc.contenu[start:end], el.page)
-            if not texte:
-                continue
-            if el.type == "Annexe":
-                texte["annexe"] = annexe
-                if chapitre:
-                    chapitre["textes"][1] = len(doc_dict["textes"])
-                    chapitre = None
-                if section:
-                    section["textes"][1] = len(doc_dict["textes"])
-                    section = None
-                if sous_section:
-                    sous_section["textes"][1] = len(doc_dict["textes"])
-                    sous_section = None
-            else:
-                if chapitre:
-                    texte["chapitre"] = chapitre_idx - 1
-                if section:
-                    texte["section"] = section_idx - 1
-                if sous_section:
-                    texte["sous_section"] = sous_section_idx - 1
-                doc_dict["textes"].append(texte)
-    # FIXME: not actually correct, but we don't really care
-    if chapitre and chapitre["textes"][1] == -1:
-        chapitre["textes"][1] = len(doc_dict["textes"])
-    if section and section["textes"][1] == -1:
-        section["textes"][1] = len(doc_dict["textes"])
-    if sous_section and sous_section["textes"][1] == -1:
-        sous_section["textes"][1] = len(doc_dict["textes"])
-
-    return doc_dict
+    return HtmlFormatter(imgdir, doc=doc, indent=indent)(element, fragment)

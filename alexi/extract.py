@@ -9,19 +9,19 @@ import json
 import logging
 import operator
 import os
-import re
 from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Optional, TextIO
 
-from alexi.analyse import Analyseur, Document, Element
+from alexi.analyse import Analyseur, Bloc, Document, Element, extract_zonage
 from alexi.convert import Converteur
-from alexi.format import format_html
+from alexi.format import HtmlFormatter
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
-from alexi.label import Extracteur
+from alexi.label import Identificateur
+from alexi.link import Resolver
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
-from alexi.types import Bloc
+from alexi.types import T_obj
 
 LOGGER = logging.getLogger("extract")
 
@@ -127,44 +127,6 @@ li.leaf {
 """
 
 
-def extract_element(
-    doc: Document,
-    el: Element,
-    outdir: Path,
-    imgdir: Path,
-):
-    """Extract the various constituents, referencing images in the
-    generated image directory."""
-    # Can't use Path.relative_to until 3.12 :(
-    rel_imgdir = os.path.relpath(imgdir, outdir)
-    rel_style = os.path.relpath(imgdir.parent.parent / "style.css", outdir)
-    doc_titre = el.titre
-    if doc.titre != "Document":
-        doc_titre = doc.titre
-        if doc.numero:
-            doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
-    HTML_HEADER = (
-        HTML_GLOBAL_HEADER
-        + f"""    <link rel="stylesheet" href="{rel_style}">
-    <title>{el.titre}</title>
-  </head>
-  <body>
-    <div class="container">
-    <h1 id="header">{doc_titre}</h1>
-    <div id="body">
-"""
-    )
-    HTML_FOOTER = """</div></div></body>
-</html>
-"""
-    outdir.mkdir(parents=True, exist_ok=True)
-    LOGGER.info("%s %s", outdir, el.titre)
-    with open(outdir / "index.html", "wt") as outfh:
-        outfh.write(HTML_HEADER)
-        outfh.write(format_html(doc, element=el, imgdir=rel_imgdir, fragment=True))
-        outfh.write(HTML_FOOTER)
-
-
 def make_index_html(
     topdir: Path, docdir: Path, title: str, elements: Iterable[Element]
 ):
@@ -255,77 +217,17 @@ def make_redirect(path: Path, target: Path):
         )
 
 
-def extract_html(args, path, iob, conv):
-    docdir = args.outdir / path.stem
-    imgdir = args.outdir / path.stem / "img"
-    LOGGER.info("Génération de pages HTML sous %s", docdir)
-    docdir.mkdir(parents=True, exist_ok=True)
-    analyseur = Analyseur(path.stem, iob)
-    if conv and not args.no_images:
-        LOGGER.info("Extraction d'images sous %s", imgdir)
-        imgdir.mkdir(parents=True, exist_ok=True)
-        images = conv.extract_images()
-        analyseur.add_images(images)
-        save_images_from_pdf(analyseur.blocs, conv, imgdir)
-    LOGGER.info("Analyse de la structure de %s", path)
-    doc = analyseur()
-
-    # Do articles/annexes at top level
-    seen_paliers = set()
-    doc_titre = doc.titre if doc.titre != "Document" else path.stem
-    for palier in ("Article", "Annexe"):
-        if palier not in doc.paliers:
-            continue
-        seen_paliers.add(palier)
-        if not doc.paliers[palier]:
-            continue
-        # These go in the top level
-        for idx, el in enumerate(doc.paliers[palier]):
-            extract_element(doc, el, docdir / palier / el.numero, imgdir)
-        make_index_html(
-            args.outdir, docdir / palier, f"{doc_titre}: {palier}s", doc.paliers[palier]
-        )
-
-    # Now do the rest of the Document hierarchy if it exists
-    def make_sub_index(el: Element, path: Path, titre: str):
-        subtypes = list(el.sub)
-        subtypes.sort(key=operator.attrgetter("type"))
-        for subtype, elements in itertools.groupby(
-            subtypes, operator.attrgetter("type")
-        ):
-            if subtype not in seen_paliers:
-                make_index_html(
-                    args.outdir, path / subtype, f"{titre}: {subtype}s", elements
-                )
-
-    top = Path(docdir)
-    # Create index.html for immediate descendants (Chapitre, Article, Annexe, etc)
-    if doc.structure.sub:
-        make_sub_index(doc.structure, docdir, doc_titre)
-    # Extract content and create index.html for descendants of all elements
-    d = deque((el, top) for el in doc.structure.sub)
-    while d:
-        el, parent = d.popleft()
-        if el.type in seen_paliers:
-            continue
-        extract_element(doc, el, parent / el.type / el.numero, imgdir)
-        if not el.sub:
-            continue
-        make_sub_index(el, parent / el.type / el.numero, f"{el.type} {el.numero}")
-        d.extendleft(
-            (subel, parent / el.type / el.numero) for subel in reversed(el.sub)
-        )
-    # And do a full extraction (which might crash your browser)
-    extract_element(doc, doc.structure, docdir, imgdir)
-    return doc
-
-
 def make_doc_subtree(doc: Document, outfh: TextIO):
+    """
+    Générer HTML pour les contenus d'un document.
+    """
     outfh.write("<ul>\n")
     outfh.write(
         f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a>\n'
-        f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)</li>\n'
     )
+    if doc.pdfurl is not None:
+        outfh.write(f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)')
+    outfh.write("</li>\n")
     top = Path(doc.fileid)
     d = deque((el, top, 1) for el in doc.structure.sub)
     prev_level = 1
@@ -353,12 +255,20 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
                 f'<li class="{el.type} node"><details><summary>{eltitre}</summary><ul>\n'
             )
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
-            pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
-            outfh.write(f'<li class="text">{link} ({pdflink})</li>\n')
+            pdflink = ""
+            if doc.pdfurl is not None:
+                pdflink = (
+                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
+                )
+            outfh.write(f'<li class="text">{link}{pdflink}</li>\n')
         else:
             link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
-            pdflink = f'<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>'
-            outfh.write(f'<li class="{el.type} leaf">{link} ({pdflink})</li>\n')
+            pdflink = ""
+            if doc.pdfurl is not None:
+                pdflink = (
+                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
+                )
+            outfh.write(f'<li class="{el.type} leaf">{link}{pdflink}</li>\n')
         d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
     while prev_level > 1:
@@ -367,7 +277,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("</ul>\n")
 
 
-def make_doc_tree(docs: list[Document], outdir: Path):
+def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
         + """    <title>ALEXI</title>
@@ -378,6 +288,7 @@ def make_doc_tree(docs: list[Document], outdir: Path):
     <h1 id="header"><span class="initial">AL</span>EXI<span class="nomobile">:
         <span class="initial">EX</span>tracteur
         d’<span class="initial">I</span>nformation
+        </span>
     </h1>
     <ul id="body">
 """
@@ -387,106 +298,257 @@ def make_doc_tree(docs: list[Document], outdir: Path):
   </body>
 </html>
 """
+    metadata = {}
     docs.sort(key=operator.attrgetter("numero"))
     with open(outdir / "index.html", "wt") as outfh:
         LOGGER.info("Génération de %s", outdir / "index.html")
         outfh.write(HTML_HEADER)
         for doc in docs:
             outfh.write('<li class="Document node"><details>\n')
-            outfh.write(f"<summary>{doc.numero}: {doc.titre}</summary>\n")
+            # Make fragment links to this ID expand the document (as
+            # we usually do not want to link to the full text)
+            outfh.write(
+                f'<summary id="{doc.fileid}">{doc.numero}: {doc.titre}</summary>\n'
+            )
             make_doc_subtree(doc, outfh)
             outfh.write("</details></li>\n")
+            doc_metadata = {
+                "numero": doc.numero,
+                "titre": doc.titre,
+            }
+            if doc.pdfurl is not None:
+                doc_metadata["pdf"] = doc.pdfurl
+            metadata[doc.fileid] = doc_metadata
         outfh.write(HTML_FOOTER)
     with open(outdir / "style.css", "wt") as outfh:
+        LOGGER.info("Génération de %s", outdir / "style.css")
         outfh.write(STYLE_CSS)
+    return metadata
 
 
-def extract_zonage(doc: Document, path: Path):
-    mz: Optional[Element] = None
-    if "Chapitre" not in doc.paliers:
-        LOGGER.warning("Aucun chapitre présent dans %s", path)
-        return
-    for c in doc.paliers["Chapitre"]:
-        if "milieux et zones" in c.titre.lower():
-            LOGGER.info("Extraction de milieux et zones")
-            mz = c
-            break
-    if mz is None:
-        LOGGER.info("Chapitre milieux et zones non trouvé")
-        return
-    top = Path(doc.fileid) / "Chapitre" / mz.numero
-    metadata: dict[str, dict[str, dict[str, str]]] = {
-        "categorie_milieu": {},
-        "milieu": {},
-    }
-    for sec in mz.sub:
-        if "dispositions" in sec.titre.lower():
-            continue
-        secdir = top / sec.type / sec.numero
-        if m := re.match(r"\s*(\S+)\s*[-–—]\s*(.*)", sec.titre):
-            metadata["categorie_milieu"][m.group(1)] = {
-                "titre": m.group(2),
-                "url": str(secdir),
-            }
-        for subsec in sec.sub:
-            subsecdir = secdir / subsec.type / subsec.numero
-            if m := re.match(r"\s*(\S+)[-–—\s]+(.*)", subsec.titre):
-                metadata["milieu"][m.group(1)] = {
-                    "titre": m.group(2),
-                    "url": str(subsecdir),
-                }
-    with open(path, "wt") as outfh:
-        json.dump(metadata, outfh, indent=2, ensure_ascii=False)
+class Extracteur:
+    def __init__(
+        self,
+        outdir: Path,
+        metadata: Path,
+        segment_model: Optional[Path] = None,
+        no_csv=False,
+        no_images=False,
+    ):
+        self.outdir = outdir
+        self.crf_s = Identificateur()
+        if segment_model is not None:
+            self.crf = Segmenteur(segment_model)
+            self.crf_n = None
+        else:
+            self.crf = Segmenteur(DEFAULT_SEGMENT_MODEL)
+            self.crf_n = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
+        if metadata:
+            with open(metadata, "rt") as infh:
+                self.pdfdata = json.load(infh)
+        else:
+            self.pdfdata = {}
+        self.metadata = {"pdfs": self.pdfdata}
+        self.no_csv = no_csv
+        self.no_images = no_images
+        outdir.mkdir(parents=True, exist_ok=True)
 
-
-def main(args):
-    extracteur = Extracteur()
-    args.outdir.mkdir(parents=True, exist_ok=True)
-    metadata = {}
-    if args.metadata:
-        with open(args.metadata, "rt") as infh:
-            metadata = json.load(infh)
-    docs = []
-    for path in args.docs:
+    def __call__(self, path: Path) -> Optional[Document]:
         pdf_path = path.with_suffix(".pdf")
-        if metadata and pdf_path.name not in metadata:
+        if self.pdfdata and pdf_path.name not in self.pdfdata:
             LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
-            continue
+            return None
         conv = None
         if path.suffix == ".csv":
             LOGGER.info("Lecture de %s", path)
             iob = list(read_csv(path))
         elif path.suffix == ".pdf":
             csvpath = path.with_suffix(".csv")
-            if not args.no_csv and csvpath.exists():
+            if not self.no_csv and csvpath.exists():
                 LOGGER.info("Lecture de %s", csvpath)
                 iob = list(read_csv(csvpath))
             else:
                 LOGGER.info("Conversion, segmentation et classification de %s", path)
                 conv = Converteur(path)
                 feats = conv.extract_words()
-                if args.segment_model is None:
-                    if conv.tree is None:
-                        LOGGER.warning("Structure logique absente: %s", path)
-                        crf = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
-                    else:
-                        crf = Segmenteur(DEFAULT_SEGMENT_MODEL)
-                else:
-                    crf = Segmenteur(args.segment_model)
-                iob = list(extracteur(crf(feats)))
-
-        pdf_url = metadata.get(
-            pdf_path.name,
-            f"https://ville.sainte-adele.qc.ca/upload/documents/{pdf_path.name}",
-        )
+                crf = self.crf
+                if conv.tree is None:
+                    LOGGER.warning("Structure logique absente: %s", path)
+                    if self.crf_n is not None:
+                        crf = self.crf_n
+                iob = list(self.crf_s(crf(feats)))
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
-        doc = extract_html(args, path, iob, conv)
-        doc.pdfurl = pdf_url
-        docs.append(doc)
-        if "zonage" in doc.titre.lower():
-            extract_zonage(doc, args.outdir / "zonage.json")
-    make_doc_tree(docs, args.outdir)
+        doc = self.analyse(iob, conv, path.stem)
+        if self.pdfdata:
+            doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)
+        if "zonage" in doc.titre.lower() and "zonage" not in self.metadata:
+            self.metadata["zonage"] = extract_zonage(doc)
+        return doc
+
+    def analyse(self, iob: Iterable[T_obj], conv: Converteur, fileid: str):
+        docdir = self.outdir / fileid
+        imgdir = self.outdir / fileid / "img"
+        LOGGER.info("Génération de pages HTML sous %s", docdir)
+        docdir.mkdir(parents=True, exist_ok=True)
+        analyseur = Analyseur(fileid, iob)
+        if conv and not self.no_images:
+            LOGGER.info("Extraction d'images sous %s", imgdir)
+            imgdir.mkdir(parents=True, exist_ok=True)
+            images = conv.extract_images()
+            analyseur.add_images(images)
+            save_images_from_pdf(analyseur.blocs, conv, imgdir)
+        LOGGER.info("Analyse de la structure de %s", fileid)
+        return analyseur()
+
+    def output_json(self):
+        """Sauvegarder les metadonnées"""
+        with open(self.outdir / "index.json", "wt") as outfh:
+            LOGGER.info("Génération de %s", self.outdir / "index.json")
+            json.dump(self.metadata, outfh, indent=2, ensure_ascii=False)
+
+    def output_doctree(self, docs: list[Document]):
+        """Générer la page HTML principale et créer l'index de documents."""
+        self.metadata["docs"] = make_doc_tree(docs, self.outdir)
+        self.resolver = Resolver(self.metadata)
+
+    def output_section_index(self, doc: Document, path: Path, elements: list[Element]):
+        """Générer l'index de textes à un palier (Article, Annexe, etc)"""
+        doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
+        title = f"{doc_titre}: {path.name}s"
+        docdir = self.outdir / doc.fileid / path
+        style = os.path.relpath(self.outdir / "style.css", docdir)
+        HTML_HEADER = (
+            HTML_GLOBAL_HEADER
+            + f"""    <link rel="stylesheet" href="{style}">
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="container">
+    <h1 id="header">{title}</h1>
+    <ul id="body">\n"""
+        )
+        lines = []
+        off = "    "
+        sp = "  "
+        for el in elements:
+            lines.append(f"{off}{sp}<li>")
+            if el.numero[0] == "_":
+                titre = el.titre if el.titre else f"{el.type} (numéro inconnu)"
+            else:
+                lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
+                titre = el.titre if el.titre else f"{el.type} {el.numero}"
+            lines.append(
+                f'{off}{sp}{sp}<a href="{el.numero}/index.html" class="title">{titre}</a>'
+            )
+            lines.append(f"{off}{sp}</li>")
+        HTML_FOOTER = """</ul>
+    </div>
+  </body>
+ </html>
+    """
+        docdir.mkdir(parents=True, exist_ok=True)
+        with open(docdir / "index.html", "wt") as outfh:
+            LOGGER.info("Génération de %s", docdir / "index.html")
+            outfh.write(HTML_HEADER)
+            for line in lines:
+                print(line, file=outfh)
+            outfh.write(HTML_FOOTER)
+
+    def output_sub_index(self, doc: Document, el: Element, path: Path):
+        subtypes = list(el.sub)
+        gt = operator.attrgetter("type")
+        subtypes.sort(key=gt)
+        for subtype, elements in itertools.groupby(subtypes, gt):
+            if subtype not in ("Article", "Annexe"):
+                self.output_section_index(doc, path / subtype, elements)
+
+    def output_section(self, doc: Document, path: Path, elements: list[Element]):
+        if not elements:
+            return
+        self.output_section_index(doc, path, elements)
+        for el in elements:
+            self.output_element(doc, path / el.numero, el)
+
+    def output_element(self, doc: Document, path: Path, el: Element):
+        """Générer le HTML for un seul élément."""
+        docdir = self.outdir / doc.fileid
+        imgdir = docdir / "img"
+        outdir = docdir / path
+        # Can't use Path.relative_to until 3.12 :(
+        rel_imgdir = os.path.relpath(imgdir, outdir)
+        rel_style = os.path.relpath(self.outdir / "style.css", outdir)
+        doc_titre = el.titre
+        if doc.titre != "Document":
+            doc_titre = doc.titre
+            if doc.numero:
+                doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
+        HTML_HEADER = (
+            HTML_GLOBAL_HEADER
+            + f"""    <link rel="stylesheet" href="{rel_style}">
+    <title>{el.titre}</title>
+  </head>
+  <body>
+    <div class="container">
+    <h1 id="header">{doc_titre}</h1>
+    <div id="body">
+    """
+        )
+        HTML_FOOTER = """</div></div></body>
+</html>
+"""
+        outdir.mkdir(parents=True, exist_ok=True)
+        LOGGER.info("Génération %s %s -> %s/index.html", el.type, el.numero, outdir)
+        formatter = HtmlFormatter(
+            doc=doc, imgdir=rel_imgdir, resolver=self.resolver, path=path
+        )
+        with open(outdir / "index.html", "wt") as outfh:
+            outfh.write(HTML_HEADER)
+            outfh.write(formatter(element=el, fragment=True))
+            outfh.write(HTML_FOOTER)
+
+    def output_html(self, doc: Document):
+        # Do articles/annexes at top level (FIXME: parameterize this)
+        for palier in ("Article", "Annexe"):
+            self.output_section(doc, Path(palier), doc.paliers.get(palier, []))
+
+        # Do the top directory with full text rather than an index
+        path = Path(".")
+        if doc.structure.sub:
+            self.output_sub_index(doc, doc.structure, path)
+        self.output_element(doc, path, doc.structure)
+
+        # Walk the structure of the document (FIXME: make a generator)
+        d = deque(doc.structure.sub)
+        while d:
+            el = d.popleft()
+            if el is None:
+                path = path.parent.parent
+                continue
+            if el.type in ("Article", "Annexe"):
+                continue
+            path = path / el.type / el.numero
+            self.output_element(doc, path, el)
+            if el.sub:
+                self.output_sub_index(doc, el, path)
+                d.appendleft(None)
+                d.extendleft(reversed(el.sub))
+        return doc
+
+
+def main(args) -> None:
+    extracteur = Extracteur(
+        args.outdir, args.metadata, args.segment_model, args.no_csv, args.no_images
+    )
+    docs = []
+    for path in args.docs:
+        doc = extracteur(path)
+        if doc is not None:
+            docs.append(doc)
+    extracteur.output_doctree(docs)
+    for doc in docs:
+        extracteur.output_html(doc)
+    extracteur.output_json()
 
 
 if __name__ == "__main__":

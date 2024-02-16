@@ -89,12 +89,12 @@ def main(args: argparse.Namespace) -> None:
             url = p
         else:
             url = f"{u.scheme}://{u.netloc}{up.path}"
-        urls[Path(up.path).name] = url
+        urls[Path(up.path).name] = {"url": url}
     if not urls:
         LOGGER.error("Could not find any documents to download!")
         return
     for u in urls.values():
-        LOGGER.info("Downloading %s", u)
+        LOGGER.info("Downloading %s", u["url"])
     try:
         subprocess.run(
             [
@@ -104,7 +104,7 @@ def main(args: argparse.Namespace) -> None:
                 "--quiet",
                 "-P",
                 str(args.outdir),
-                *urls.values(),
+                *(u["url"] for u in urls.values()),
             ],
             check=True,
         )

@@ -1,102 +1,166 @@
 """
-Ajouter des hyperliens au HTML
+Extraction de hyperliens du texte des règlements
 """
 
-import argparse
+import itertools
 import logging
 import os
 import re
-from pathlib import Path
+from collections import deque
+from typing import Optional
+
+from .analyse import PALIERS, Document
 
 LOGGER = logging.getLogger("link")
+LQ_RE = re.compile(
+    r"\(\s*(?:R?L\.?R\.?Q\.?|c\.),?(?:\s+(?:c\.?|chapitre)\s+)?(?P<lq>[^\)]+)\)"
+)
+RQ_RE = re.compile(r"(?P<lq>.*?),\s*r.\s*(?P<rq>.*)")
+SEC_RE = re.compile(
+    r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)"
+)
+REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
+PALIER_IDX = {palier: idx for idx, palier in enumerate(PALIERS)}
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    """Add the arguments to the argparse"""
-    parser.add_argument(
-        "-o",
-        "--outdir",
-        help="Repertoire avec les documents",
-        type=Path,
-        default="export",
-    )
-    return parser
+def locate_article(numero: str, doc: Document) -> list[str]:
+    """
+    Placer un article dans l'hierarchie du document.
+    """
+    d = deque(doc.structure.sub)
+    path = []
+    while d:
+        el = d.popleft()
+        if el is None:
+            path.pop()
+            path.pop()
+        elif el.sub:
+            path.append(el.type)
+            path.append(el.numero)
+            d.appendleft(None)
+            d.extendleft(reversed(el.sub))
+        else:
+            if el.type == "Article" and el.numero == numero:
+                return path
+    return []
 
 
-def link_file(root: Path, path: Path, paths: list[Path]) -> None:
-    LOGGER.info("recherche de liens dans %s", path)
-    relroot = path.relative_to(root)
-    parts = relroot.parts
-    temppath = path.with_suffix(".txt.tmp")
-    with open(path, "rt") as infh, open(temppath, "wt") as tempfh:
-        for spam in infh:
-            # Do this in a very artificially-unintelligent way using
-            # regular expressions for now, and not even parsing HTML
-            # (FIXME: we will parse the HTML)
-            if re.search(r"<a|<h|<img", spam):
-                tempfh.write(spam)
-                continue
-
-            def replace_section(m):
-                # Look for a corresponding section (FIXME: only works
-                # for articles, chapters, and annexes for the moment)
-                sectype = m.group(1).title()
-                num = m.group(2).strip(".")
-                artpath = root / parts[0] / sectype / num / "index.html"
-                if artpath.exists():
-                    relpath = os.path.relpath(artpath, path.parent)
-                    LOGGER.info("%s -> %s", m.group(0), relpath)
-                    return f'<a href="{relpath}">{m.group(0)}</a>'
-                else:
-                    LOGGER.info("%s non trouvé", m.group(0))
-                    return m.group(0)
-
-            spam = re.sub(
-                r"\b(article|chapitre|section|sous-section|annexe)\s+([\d\.]+)",
-                replace_section,
-                spam,
-                flags=re.IGNORECASE,
-            )
-            tempfh.write(spam)
-    temppath.rename(path)
+def qualify_destination(
+    dest: list[str], src: list[str], doc: Optional[Document]
+) -> list[str]:
+    """
+    Rajouter des prefix manquants pour un lien relatif.
+    """
+    # Top-level section types
+    if dest[0] in ("Chapitre", "Article", "Annexe"):
+        return dest
+    # Only fully qualified destinations are possible
+    if src[0] == "Annexe":
+        return dest
+    # Need to identify enclosing section/subsection (generally these
+    # are of the form "section N du présent chaptire"...).  Note that
+    # we do not modify the source path here, so we will always end up
+    # with a full destination path
+    if src[0] in ("Article"):
+        if doc is None or len(src) == 1:  # pathological situation...
+            return dest
+        src = locate_article(src[1], doc)
+    try:
+        idx = src.index(dest[0])
+    except ValueError:
+        idx = len(src)
+    return src[:idx] + dest
 
 
-def main(args: argparse.Namespace) -> None:
-    """Fonction principale."""
-    # Find all the possible targets first (will determine if we can link)
-    paths = []
-    for root, dirs, files in os.walk(args.outdir):
-        proot = Path(root)
-        if proot.name in ("Article", "Section", "Chapitre", "SousSection", "Annexe"):
-            LOGGER.info("non-traitement de index des %s", proot.name)
-            continue
-        if proot == args.outdir:
-            LOGGER.info("non-traitement de repertoire principal")
-            continue
-        for f in files:
-            paths.append(proot / f)
-    for root, dirs, files in os.walk(args.outdir):
-        proot = Path(root)
-        if proot.name in ("Article", "Section", "Chapitre", "SousSection", "Annexe"):
-            LOGGER.info("non-traitement de index des %s", proot.name)
-            continue
-        if proot == args.outdir:
-            LOGGER.info("non-traitement de repertoire principal")
-            continue
-        for f in files:
-            p = Path(f)
-            if p.suffix != ".html":
-                continue
-            link_file(args.outdir, proot / f, paths)
+def _resolve_internal(
+    secpath: str, srcpath: str, doc: Optional[Document] = None
+) -> str:
+    secparts = list(secpath.split("/"))
+    srcparts = list(srcpath.split("/"))
+    secparts = qualify_destination(secparts, srcparts, doc)
+    return os.path.relpath("/".join(secparts), "/".join(srcparts))
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    add_arguments(parser)
-    # Done by top-level alexi if not running this as script
-    parser.add_argument(
-        "-v", "--verbose", help="Notification plus verbose", action="store_true"
-    )
-    args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
-    main(args)
+class Resolver:
+    def __init__(self, metadata: Optional[dict] = None):
+        self.metadata = {"docs": {}} if metadata is None else metadata
+        self.docpath = {}
+        for docpath, info in self.metadata["docs"].items():
+            self.docpath[info["numero"]] = docpath
+
+    def __call__(
+        self, text: str, srcpath: str = "", doc: Optional[Document] = None
+    ) -> str:
+        url = self.resolve_external(text)
+        if url:
+            return url
+        return self.resolve_internal(text, srcpath, doc)
+
+    def resolve_absolute_internal(
+        self, numero: str, secpath: str, srcpath: str
+    ) -> Optional[str]:
+        docpath = self.docpath.get(numero)
+        if docpath is None:
+            return None
+        if secpath:
+            return os.path.relpath(f"../{docpath}/{secpath}/index.html", srcpath)
+        else:
+            return os.path.relpath(f"../index.html#{docpath}", srcpath)
+
+    def resolve_internal(
+        self, text: str, srcpath: str, doc: Optional[Document] = None
+    ) -> Optional[str]:
+        """
+        Resoudre certains liens internes.
+        """
+        numero = None
+        if m := REG_RE.search(text):
+            numero = m.group("reg").strip(" .,;")
+            if numero is None:
+                return None
+        sections = []
+        for m in SEC_RE.finditer(text):
+            sectype = m.group("sec").title().replace("-", "")
+            num = m.group("num").strip(" .,;")
+            sections.append((sectype.title(), num))
+        sections.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
+        secpath = "/".join(itertools.chain.from_iterable(sections))
+        if numero:
+            return self.resolve_absolute_internal(numero, secpath, srcpath)
+        if not secpath:
+            return None
+        href = "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
+        LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, href)
+        return href
+
+    def resolve_external(self, text: str) -> Optional[str]:
+        """
+        Resoudre quelques types de liens externes (vers la LAU par exemple)
+        """
+        if m := LQ_RE.search(text):
+            lq = m.group("lq")
+            if m := RQ_RE.match(lq):
+                # Format the super wacky URL style for reglements
+                lq = m.group("lq")
+                rq = m.group("rq")
+                reg = f"{lq},%20r.%20{rq}%20"
+                url = f"https://www.legisquebec.gouv.qc.ca/fr/document/rc/{reg}"
+            else:
+                loi = re.sub(r"\s+", "", lq)
+                url = f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/{loi}"
+        elif "code civil" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/CCQ-1991"
+        elif "cités et villes" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-19"
+        elif "urbanisme" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1"
+        else:
+            return None
+        for m in SEC_RE.finditer(text):
+            sectype = m.group("sec")
+            num = m.group("num")
+            if sectype == "article":
+                num = num.replace(".", "_")
+                url += f"#se:{num}"
+                break
+        return url

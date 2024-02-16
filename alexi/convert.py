@@ -14,7 +14,8 @@ from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMiss
 from pdfplumber.utils import geometry
 from pdfplumber.utils.geometry import T_bbox
 
-from .types import Bloc, T_obj
+from .analyse import Bloc
+from .types import T_obj
 
 LOGGER = logging.getLogger("convert")
 FIELDNAMES = [
@@ -35,72 +36,6 @@ FIELDNAMES = [
     "mctag",
     "tagstack",
 ]
-
-
-def bbox_overlaps(obox: T_bbox, bbox: T_bbox) -> bool:
-    """Déterminer si deux BBox ont une intersection."""
-    ox0, otop, ox1, obottom = obox
-    x0, top, x1, bottom = bbox
-    return ox0 < x1 and ox1 > x0 and otop < bottom and obottom > top
-
-
-def merge_overlaps(images: Iterable[Bloc]) -> list[Bloc]:
-    """Fusionner des blocs qui se touchent en préservant l'ordre"""
-    # FIXME: preserving order maybe not necessary :)
-    ordered_images = list(enumerate(images))
-    ordered_images.sort(key=lambda x: -geometry.calculate_area(x[1].bbox))
-    while True:
-        nimg = len(ordered_images)
-        new_ordered_images = []
-        overlapping = {}
-        for idx, image in ordered_images:
-            for ydx, other in ordered_images:
-                if other is image:
-                    continue
-                if bbox_overlaps(image.bbox, other.bbox):
-                    overlapping[ydx] = other
-            if overlapping:
-                big_box = geometry.merge_bboxes(
-                    (image.bbox, *(other.bbox for other in overlapping.values()))
-                )
-                LOGGER.info(
-                    "image %s overlaps %s merged to %s"
-                    % (
-                        image.bbox,
-                        [other.bbox for other in overlapping.values()],
-                        big_box,
-                    )
-                )
-                bloc_types = set(
-                    bloc.type
-                    for bloc in itertools.chain((image,), overlapping.values())
-                )
-                image_type = "Tableau" if "Tableau" in bloc_types else "Figure"
-                new_image = Bloc(
-                    type=image_type,
-                    contenu=list(
-                        itertools.chain(
-                            image.contenu,
-                            *(other.contenu for other in overlapping.values()),
-                        )
-                    ),
-                    _bbox=big_box,
-                    _page_number=image._page_number,
-                )
-                for oidx, image in ordered_images:
-                    if oidx == idx:
-                        new_ordered_images.append((idx, new_image))
-                    elif oidx in overlapping:
-                        pass
-                    else:
-                        new_ordered_images.append((oidx, image))
-                break
-        if overlapping:
-            ordered_images = new_ordered_images
-        if len(ordered_images) == nimg:
-            break
-    ordered_images.sort()
-    return [img for _, img in ordered_images]
 
 
 def bbox_contains(bbox: T_bbox, ibox: T_bbox) -> bool:
