@@ -12,7 +12,10 @@ from typing import Optional
 from .analyse import PALIERS, Document
 
 LOGGER = logging.getLogger("link")
-LQ_RE = re.compile(r"\(R?LRQ[^\)]+(?P<lq>[A-Z]- ?[\d\.]+)\)")
+LQ_RE = re.compile(
+    r"\(\s*(?:R?L\.?R\.?Q\.?|c\.),?(?:\s+(?:c\.?|chapitre)\s+)?(?P<lq>[^\)]+)\)"
+)
+RQ_RE = re.compile(r"(?P<lq>.*?),\s*r.\s*(?P<rq>.*)")
 SEC_RE = re.compile(
     r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)"
 )
@@ -118,7 +121,7 @@ class Resolver:
         sections = []
         for m in SEC_RE.finditer(text):
             sectype = m.group("sec").title().replace("-", "")
-            num = m.group("num")
+            num = m.group("num").strip(" .,;")
             sections.append((sectype.title(), num))
         sections.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
         secpath = "/".join(itertools.chain.from_iterable(sections))
@@ -126,16 +129,25 @@ class Resolver:
             return self.resolve_absolute_internal(numero, secpath, srcpath)
         if not secpath:
             return None
-        LOGGER.info("resolve %s -> %s", secpath, srcpath)
-        return "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
+        href = "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
+        LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, href)
+        return href
 
     def resolve_external(self, text: str) -> Optional[str]:
         """
         Resoudre quelques types de liens externes (vers la LAU par exemple)
         """
         if m := LQ_RE.search(text):
-            loi = re.sub(r"\s+", "", m.group("lq"))
-            url = f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/{loi}"
+            lq = m.group("lq")
+            if m := RQ_RE.match(lq):
+                # Format the super wacky URL style for reglements
+                lq = m.group("lq")
+                rq = m.group("rq")
+                reg = f"{lq},%20r.%20{rq}%20"
+                url = f"https://www.legisquebec.gouv.qc.ca/fr/document/rc/{reg}"
+            else:
+                loi = re.sub(r"\s+", "", lq)
+                url = f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/{loi}"
         elif "code civil" in text.lower():
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/CCQ-1991"
         elif "cités et villes" in text.lower():

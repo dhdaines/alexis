@@ -28,6 +28,10 @@ LAWS = [
         "l’article 357 de la Loi sur les cités et villes (RLRQ, c. C-19)",
         "https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-19#se:357",
     ),
+    (
+        "Règlement sur le captage des eaux souterraines (L.R.Q. c. Q-2, r. 6)",
+        "https://www.legisquebec.gouv.qc.ca/fr/document/rc/Q-2,%20r.%206%20",
+    ),
 ]
 
 
