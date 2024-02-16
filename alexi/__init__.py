@@ -230,7 +230,7 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARNING,
-        format="%(filename)s:%(lineno)d (%(funcName)s):%(message)s",
+        format="%(filename)s:%(lineno)d (%(funcName)s):%(levelname)s:%(message)s",
     )
     args.func(args)
 
