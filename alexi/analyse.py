@@ -22,7 +22,7 @@ EXTENSION = "jpg"  # Ou png, si désiré (FIXME: webm...)
 class Hyperlien(NamedTuple):
     """Hyperlien dans un bloc de texte."""
 
-    href: str
+    href: Optional[str]
     start: int
     end: int
 
@@ -68,6 +68,44 @@ class Bloc:
     def img(self) -> str:
         bbox = ",".join(str(round(x)) for x in self.bbox)
         return f"page{self.page_number}-{bbox}.{EXTENSION}"
+
+
+# For the moment we will simply use regular expressions but this
+# should be done with the sequence CRF
+SECTION = r"\b(?:article|chapitre|section|sous-section|annexe)s?"
+NUMERO = r"[\d\.XIV]+"
+NUMEROS = rf"{NUMERO}(?:(?:,|\s+et)\s+{NUMERO})*"
+MILIEU = r"\btypes?\s+des?\s+milieux?"
+MTYPE = r"[\dA-Z]+\.\d"
+MTYPES = rf"{MTYPE}(?:(?:,|\s+et)\s+{MTYPE})*"
+REGNUM = r"(?:(?:SQ-)?\d[\d\.A-Z-]+|\(L\.?R\.?Q\.?,?[^\)]+\))"
+REGLEMENT = rf"règlement\s+(?:{REGNUM}|(?:sur|concernant).*?{REGNUM})"
+LOI = r"""
+(?:code\s+civil
+  |loi\s+.*?\((?:R?L\.?R\.?Q\.?|c\.),?[^\)]+\)
+  |loi\s+sur\s+l['’]aménagement\s+et\s+l['’]urbanisme
+  |loi\s+sur\s+les\s+cités\s+et\s+villes
+)"""
+DU = r"(?:du|de\s+l['’]|de\s+la)"
+MATCHER = re.compile(
+    rf"""
+(?:
+   (?:{SECTION}\s+{NUMEROS}
+      (?:\s+{DU}\s+{SECTION}\s+{NUMERO})*
+     |{MILIEU}\s+{MTYPES})
+   (?:\s+{DU}\s+(?:{REGLEMENT}|{LOI}))?
+  |{REGLEMENT}|{LOI})
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def match_links(text: str):
+    """
+    Identifier des hyperliens potentiels dans un texte.
+    """
+    for m in MATCHER.finditer(text):
+        yield Hyperlien(None, m.start(), m.end())
 
 
 def group_iob(words: Iterable[T_obj], key: str = "segment") -> Iterator[Bloc]:
@@ -207,6 +245,12 @@ class Document:
             )
             self.add_element(element)
         else:
+            bloc.liens = list(match_links(bloc.texte))
+            if bloc.liens:
+                LOGGER.info(
+                    "Liens potentiels trouvés: %s",
+                    ",".join(bloc.texte[li.start : li.end] for li in bloc.liens),
+                )
             self.contenu.append(bloc)
 
     def add_element(self, element: Element):
@@ -426,41 +470,3 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
                     "url": str(subsecdir),
                 }
     return metadata
-
-
-# For the moment we will simply use regular expressions but this
-# should be done with the sequence CRF
-SECTION = r"\b(?:article|chapitre|section|sous-section|annexe)s?"
-NUMERO = r"[\d\.XIV]+"
-NUMEROS = f"{NUMERO}(?:(?:,| et) {NUMERO})*"
-MILIEU = r"\btypes? des? milieux?"
-MTYPE = r"[\dA-Z]+\.\d"
-MTYPES = f"{MTYPE}(?:(?:,| et) {MTYPE})*"
-REGLEMENT = r"règlement.*?(?:SQ-)?\d[\d\.A-Z-]+"
-LOI = r"(?:code civil|loi sur .*?\(R?LRQ[^\)]+\))"
-DU = r"(?:du|de l['’]|de la)"
-MATCHER = re.compile(
-    f"(?:"
-    f"(?:({SECTION} {NUMEROS})( {DU} {SECTION} {NUMERO})*"
-    f"|({MILIEU} {MTYPES}))"
-    f"(?: {DU} (?:{REGLEMENT}|{LOI}))?"
-    f"|{REGLEMENT}|{LOI})",
-    re.IGNORECASE,
-)
-
-
-def match_links(text: str):
-    """
-    Identifier des hyperliens potentiels dans un texte.
-    """
-    for m in MATCHER.finditer(text):
-        yield Hyperlien(m.group(), m.start(), m.end())
-
-
-def extract_links(doc: Document, metadata: dict) -> None:
-    """
-    Identifier des hyperliens potentiels dans le texte d'un document.
-    """
-    for idx, c in enumerate(doc.contenu):
-        for m in match_links(c.texte):
-            pass

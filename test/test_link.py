@@ -1,9 +1,8 @@
-import csv
 import json
 import pytest
 from pathlib import Path
 
-from alexi.analyse import Analyseur, Document, match_links, extract_links
+from alexi.analyse import Document, match_links
 from alexi.link import Resolver
 
 DATADIR = Path(__file__).parent / "data"
@@ -209,11 +208,3 @@ def test_match_multiples(text):
     links = list(match_links(text))
     assert links
     assert links[0].start <= 2  # l'
-
-
-def test_extract_links():
-    with open(TRAINDIR / "demolition_articles.csv", "rt") as infh:
-        reader = csv.DictReader(infh)
-        analyseur = Analyseur("demolition_articles", reader)
-        doc = analyseur()
-        extract_links(doc, METADATA)

@@ -125,6 +125,10 @@ class Resolver:
             url = f"https://www.legisquebec.gouv.qc.ca/fr/document/lc/{loi}"
         elif "code civil" in text.lower():
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/CCQ-1991"
+        elif "cités et villes" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-19"
+        elif "urbanisme" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1"
         else:
             return None
         for m in SEC_RE.finditer(text):

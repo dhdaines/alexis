@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable, TextIO
 
 from alexi.analyse import Analyseur, Bloc, Document, Element
-from alexi.analyse import extract_zonage, extract_links
+from alexi.analyse import extract_zonage
 from alexi.convert import Converteur
 from alexi.format import format_html
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
@@ -275,7 +275,7 @@ def output_html(args, doc):
     imgdir = args.outdir / doc.fileid / "img"
     # Do articles/annexes at top level
     seen_paliers = set()
-    doc_titre = doc.titre if doc.titre != "Document" else path.stem
+    doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
     for palier in ("Article", "Annexe"):
         if palier not in doc.paliers:
             continue
@@ -480,9 +480,7 @@ def main(args) -> None:
             metadata["zonage"] = extract_zonage(doc)
     # Create the full tree first to gather information for linking
     metadata["doc"] = make_doc_tree(docs, args.outdir)
-    # Detect and resolve links in the text
-    extract_links(docs, metadata)
-    # Now finally output the text itself
+    # Now finally output the text itself (resolving links detected by analysis)
     for doc in docs:
         output_html(args, doc)
     with open(args.outdir / "index.json", "wt") as outfh:

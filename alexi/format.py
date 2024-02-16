@@ -79,7 +79,12 @@ class HtmlFormatter:
             chunks = []
             for link in bloc.liens:
                 chunks.append(text[start : link.start])
-                chunks.append(f'<a href="{link.href}">{text[link.start:link.end]}</a>')
+                if link.href is None:
+                    chunks.append(text[link.start : link.end])
+                else:
+                    chunks.append(
+                        f'<a href="{link.href}">{text[link.start:link.end]}</a>'
+                    )
                 start = link.end
             chunks.append(text[start:])
             html = "".join(chunks)
