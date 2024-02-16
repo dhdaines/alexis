@@ -1,6 +1,7 @@
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from alexi.analyse import Document, match_links
 from alexi.link import Resolver

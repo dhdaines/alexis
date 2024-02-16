@@ -11,10 +11,9 @@ import operator
 import os
 from collections import deque
 from pathlib import Path
-from typing import Any, Iterable, TextIO, Optional
+from typing import Any, Iterable, Optional, TextIO
 
-from alexi.analyse import Analyseur, Bloc, Document, Element
-from alexi.analyse import extract_zonage
+from alexi.analyse import Analyseur, Bloc, Document, Element, extract_zonage
 from alexi.convert import Converteur
 from alexi.format import HtmlFormatter
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL

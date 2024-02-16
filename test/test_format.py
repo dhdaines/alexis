@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from alexi.analyse import Analyseur, Hyperlien
-from alexi.format import format_html, HtmlFormatter
+from alexi.format import HtmlFormatter, format_html
 
 DATADIR = Path(__file__).parent / "data"
 TRAINDIR = Path(__file__).parent.parent / "data"

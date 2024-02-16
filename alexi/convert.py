@@ -14,8 +14,8 @@ from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMiss
 from pdfplumber.utils import geometry
 from pdfplumber.utils.geometry import T_bbox
 
-from .types import T_obj
 from .analyse import Bloc
+from .types import T_obj
 
 LOGGER = logging.getLogger("convert")
 FIELDNAMES = [

@@ -7,10 +7,10 @@ import logging
 import operator
 import re
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, Optional, NamedTuple
 from pathlib import Path
+from typing import Iterable, Iterator, NamedTuple, Optional
 
-from pdfplumber.utils.geometry import T_bbox, merge_bboxes, calculate_area
+from pdfplumber.utils.geometry import T_bbox, calculate_area, merge_bboxes
 
 from .types import T_obj
 

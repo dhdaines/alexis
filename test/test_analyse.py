@@ -1,7 +1,7 @@
 import csv
 from pathlib import Path
 
-from alexi.analyse import Analyseur, group_iob, extract_zonage
+from alexi.analyse import Analyseur, extract_zonage, group_iob
 from alexi.convert import Converteur
 
 DATADIR = Path(__file__).parent / "data"
