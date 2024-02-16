@@ -13,7 +13,7 @@ from .analyse import PALIERS, Document
 
 LOGGER = logging.getLogger("link")
 LQ_RE = re.compile(
-    r"\(\s*(?:R?L\.?R\.?Q\.?|c\.),?(?:\s+(?:c\.?|chapitre)\s+)?(?P<lq>[^\)]+)\)"
+    r"\(\s*(?:R?L\.?R\.?Q\.?|c\.),?(?:\s*(?:c(?:\.|\s+)|chapitre\s+))?(?P<lq>[^\)]+)\)"
 )
 RQ_RE = re.compile(r"(?P<lq>.*?),\s*r.\s*(?P<rq>.*)")
 SEC_RE = re.compile(
@@ -138,7 +138,7 @@ class Resolver:
         Resoudre quelques types de liens externes (vers la LAU par exemple)
         """
         if m := LQ_RE.search(text):
-            lq = m.group("lq")
+            lq = m.group("lq").strip()
             if m := RQ_RE.match(lq):
                 # Format the super wacky URL style for reglements
                 lq = m.group("lq")
