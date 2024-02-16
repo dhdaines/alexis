@@ -20,7 +20,8 @@ LQ_RE = re.compile(
 )
 RQ_RE = re.compile(r"(?P<lq>.*?),\s*r.\s*(?P<rq>.*)")
 SEC_RE = re.compile(
-    r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)"
+    r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)",
+    re.IGNORECASE,
 )
 REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
 PALIER_IDX = {palier: idx for idx, palier in enumerate(PALIERS)}
@@ -157,6 +158,8 @@ class Resolver:
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-19"
         elif "urbanisme" in text.lower():
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1"
+        elif "environnement" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/Q-2"
         else:
             return None
         for m in SEC_RE.finditer(text):

@@ -49,6 +49,14 @@ LAWS = [
         "Règlement sur la signalisation routière (R.R.Q., c. C-24, r.28)",
         "https://www.legisquebec.gouv.qc.ca/fr/document/rc/C-24,%20r.%2028%20",
     ),
+    (
+        "Loi sur l’aménagement et l’urbanisme",
+        "https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1",
+    ),
+    (
+        "Loi sur la qualité de l'environnement",
+        "https://www.legisquebec.gouv.qc.ca/fr/document/lc/Q-2",
+    ),
 ]
 
 
@@ -115,12 +123,22 @@ BYLAWS = [
         "chapitre 5 du Règlement de zonage 1314-2021-Z",
         "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/index.html",
     ),
+    # common enough that we need to deal with it
+    (
+        "chapitre 6 du Règlement de zonage",
+        "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/6/index.html",
+    ),
+    (
+        "Règlement de zonage",
+        "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
+    ),
     # NOTE: sous-section not expected to work yet
     (
         "section 3 du chapitre 5 du Règlement de zonage 1314-2021-Z",
         "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
     ),
     # TODO: links to milieux, usages, etc
+    # FIXME: Also test invalid links somehow!
 ]
 
 
@@ -130,62 +148,55 @@ def test_bylaws(test_input, expected):
     assert r.resolve_internal(test_input, ".") == expected
 
 
+with open(DATADIR / "lotissement.json", "rt") as infh:
+    LOTISSEMENT = Document.fromdict(json.load(infh))
+with open(DATADIR / "zonage.json", "rt") as infh:
+    ZONAGE = Document.fromdict(json.load(infh))
+
 INTERNALS = [
-    (
-        "article 5",
-        "../5/index.html",
-        "Article/6",
-    ),
-    (
-        "chapitre 2",
-        "../../Chapitre/2/index.html",
-        "Article/6",
-    ),
+    ("article 5", "../5/index.html", "Article/6", None),
+    ("chapitre 2", "../../Chapitre/2/index.html", "Article/6", None),
     (
         "section 2 du chapitre 3",
         "../../Chapitre/3/Section/2/index.html",
         "Article/6",
+        None,
     ),
-    (
-        "section 3",
-        "../3/index.html",
-        "Chapitre/3/Section/2",
-    ),
-    (
-        "chapitre 1",
-        "../../../1/index.html",
-        "Chapitre/3/Section/2",
-    ),
-    (
-        "section 1",
-        "Section/1/index.html",
-        "Chapitre/3",
-    ),
-    (
-        "article 7",
-        "../../../../Article/7/index.html",
-        "Chapitre/3/Section/2",
-    ),
+    ("section 3", "../3/index.html", "Chapitre/3/Section/2", None),
+    ("chapitre 1", "../../../1/index.html", "Chapitre/3/Section/2", None),
+    ("section 1", "Section/1/index.html", "Chapitre/3", None),
+    ("article 7", "../../../../Article/7/index.html", "Chapitre/3/Section/2", None),
     (
         "section 1",
         "../../Chapitre/3/Section/1/index.html",
         "Article/69",  # Is in Chapitre 3 Section 2
+        LOTISSEMENT,
     ),
     (
         "section 3 du présent chapitre",
         "../../Chapitre/1/Section/3/index.html",
         "Article/1",  # Is in Chapitre 1 Section 1
+        LOTISSEMENT,
+    ),
+    (
+        "section 3 du présent chapitre",
+        "../../Chapitre/1/Section/3/index.html",
+        "Article/1",  # Is in Chapitre 1 Section 1
+        LOTISSEMENT,
+    ),
+    (
+        "Section 3 du Chapitre 4",
+        "../../Chapitre/4/Section/3/index.html",
+        "Article/70",
+        None,
     ),
 ]
 
-with open(DATADIR / "lotissement.json", "rt") as infh:
-    LOTISSEMENT = Document.fromdict(json.load(infh))
 
-
-@pytest.mark.parametrize("test_input,expected,sourcepath", INTERNALS)
-def test_internal_links(test_input, expected, sourcepath):
+@pytest.mark.parametrize("test_input,expected,sourcepath,doc", INTERNALS)
+def test_internal_links(test_input, expected, sourcepath, doc):
     r = Resolver(METADATA)
-    assert r.resolve_internal(test_input, sourcepath, LOTISSEMENT) == expected
+    assert r.resolve_internal(test_input, sourcepath, doc) == expected
 
 
 @pytest.mark.parametrize("test_input,expected", LAWS)
@@ -206,8 +217,8 @@ def test_match_bylaws(test_input, expected):
     assert links[0].end == len(test_input)
 
 
-@pytest.mark.parametrize("test_input,expected,_", INTERNALS)
-def test_match_internals(test_input, expected, _):
+@pytest.mark.parametrize("test_input,expected,sourcepath,doc", INTERNALS)
+def test_match_internals(test_input, expected, sourcepath, doc):
     """Verifier qu'on peut reconnaitre les sections"""
     links = list(match_links(test_input))
     assert links
@@ -217,14 +228,43 @@ def test_match_internals(test_input, expected, _):
 
 
 MULTIPLES = [
-    "articles 227, 229 et 231 de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
-    "articles 148.0.8 et 148.0.9 de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
-    "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du Règlement de zonage 1314-2021-Z",
+    (
+        "articles 227, 229 et 231 de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
+        (
+            "articles",
+            ["227", "229", "231"],
+            "Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
+        ),
+    ),
+    (
+        "articles 256.1, 256.2 ou 256.3 de la Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
+        (
+            "articles",
+            ["256.1", "256.2", "256.3"],
+            "Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
+        ),
+    ),
+    (
+        "articles 148.0.8 et 148.0.9 de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
+        (
+            "articles",
+            ["148.0.8", "148.0.9"],
+            "Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
+        ),
+    ),
+    (
+        "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du Règlement de zonage 1314-2021-Z",
+        (
+            "types des milieux",
+            ["T5.1", "T5.2", "T5.3", "ZC.1", "ZC.2"],
+            "Règlement de zonage 1314-2021-Z",
+        ),
+    ),
 ]
 
 
-@pytest.mark.parametrize("text", MULTIPLES)
-def test_match_multiples(text):
+@pytest.mark.parametrize("text,_", MULTIPLES)
+def test_match_multiples(text, _):
     """Verifier qu'on peut reconnaitre les sections multiples"""
     links = list(match_links(text))
     assert links
