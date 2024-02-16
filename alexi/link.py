@@ -85,12 +85,22 @@ def _resolve_internal(
     return os.path.relpath("/".join(secparts), "/".join(srcparts))
 
 
+def normalize_title(title: str):
+    title = title.lower()
+    title = re.sub(r"\s+", " ", title).strip()
+    title = re.sub(r"^règlement (?:de|sur|concernant) ", "", title)
+    title = re.sub(r"\([^\)]+\)$", "", title)
+    return title
+
+
 class Resolver:
     def __init__(self, metadata: Optional[dict] = None):
         self.metadata = {"docs": {}} if metadata is None else metadata
-        self.docpath = {}
+        self.numeros = {}
+        self.titles = {}
         for docpath, info in self.metadata["docs"].items():
-            self.docpath[info["numero"]] = docpath
+            self.numeros[info["numero"]] = docpath
+            self.titles[normalize_title(info["titre"])] = docpath
 
     def __call__(
         self, text: str, srcpath: str = "", doc: Optional[Document] = None
@@ -101,11 +111,8 @@ class Resolver:
         return self.resolve_internal(text, srcpath, doc)
 
     def resolve_absolute_internal(
-        self, numero: str, secpath: str, srcpath: str
+        self, docpath: str, secpath: str, srcpath: str
     ) -> Optional[str]:
-        docpath = self.docpath.get(numero)
-        if docpath is None:
-            return None
         if secpath:
             return os.path.relpath(f"../{docpath}/{secpath}/index.html", srcpath)
         else:
@@ -117,10 +124,20 @@ class Resolver:
         """
         Resoudre certains liens internes.
         """
-        numero = None
+        docpath = None
+        text = re.sub(r"\s+", " ", text).strip()
+        # NOTE: This really matches anything starting with "règlement"
         if m := REG_RE.search(text):
             numero = m.group("reg").strip(" .,;")
             if numero is None:
+                return None
+            docpath = self.numeros.get(numero)
+            if docpath is None:
+                for title in self.titles:
+                    if title in text.lower():
+                        docpath = self.titles[title]
+                        break
+            if docpath is None:
                 return None
         sections = []
         for m in SEC_RE.finditer(text):
@@ -129,8 +146,8 @@ class Resolver:
             sections.append((sectype.title(), num))
         sections.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
         secpath = "/".join(itertools.chain.from_iterable(sections))
-        if numero:
-            return self.resolve_absolute_internal(numero, secpath, srcpath)
+        if docpath:
+            return self.resolve_absolute_internal(docpath, secpath, srcpath)
         if not secpath:
             return None
         href = "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
