@@ -6,10 +6,9 @@ import itertools
 import logging
 import os
 import re
-from collections import deque
-from typing import Optional, Iterator
+from typing import Optional
 
-from .analyse import PALIERS, Document, Element
+from .analyse import PALIERS, Document
 
 LOGGER = logging.getLogger("link")
 
@@ -105,11 +104,12 @@ class Resolver:
 
         srcparts = list(srcpath.split("/"))
         secparts = self.qualify_destination(list(secpath.split("/")), srcparts, doc)
-        secpath = self.resolve_document_path(secparts, doc)
-        relpath = os.path.relpath("/".join(secparts), srcpath)
-        href = f"{relpath}/index.html"
-        LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, href)
-        return href
+        href = self.resolve_document_path(secparts, doc)
+        if href is None:
+            return None
+        relpath = os.path.relpath(href, srcpath)
+        LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, relpath)
+        return f"{relpath}/index.html"
 
     def qualify_destination(
         self, dest: list[str], src: list[str], doc: Optional[Document]
@@ -141,13 +141,15 @@ class Resolver:
         self, dest: list[str], doc: Optional[Document] = None
     ) -> Optional[str]:
         """Verifier la présence d'une cible de lien dans un document et retourner le path."""
+        path = "/".join(dest)
         if doc is None:
-            return "/".join(dest)
+            return path
         # Resolve by path with fuzzing for missing section/chapter/subsection numbers
-
+        for parts, el in doc.structure.traverse():
+            if dest == parts:
+                return path
         # Resolve by title if possible (NOTE: not currently possible)
-
-        return "/".join(dest)
+        return None
 
     def resolve_external(self, text: str) -> Optional[str]:
         """

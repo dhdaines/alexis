@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from alexi.analyse import Document, match_links
-from alexi.link import Resolver
+from alexi.link import Resolver, locate_article
 
 DATADIR = Path(__file__).parent / "data"
 TRAINDIR = Path(__file__).parent.parent / "data"
@@ -190,6 +190,24 @@ INTERNALS = [
         "Article/70",
         None,
     ),
+    (
+        "article 99",
+        None,  # This article does not exit
+        "Article/75",
+        LOTISSEMENT,
+    ),
+    (
+        "section 3 du chapitre 3",
+        None,  # This section does not exit
+        "Article/15",
+        LOTISSEMENT,
+    ),
+    (
+        "Sous-section 3.6 de la Section 3 du présent chapitre",
+        "../../Chapitre/4/Section/3/SousSection/_34/index.html",
+        "Article/233",
+        ZONAGE,
+    ),
 ]
 
 
@@ -225,6 +243,19 @@ def test_match_internals(test_input, expected, sourcepath, doc):
     assert links[0].start <= 2  # l'
     if "présent" not in test_input:
         assert links[0].end == len(test_input)
+
+
+LOCATE = [
+    ("233", "Chapitre/4/Section/5/SousSection/_40"),
+    ("69", "Chapitre/3/Section/4/SousSection/_13"),
+]
+
+
+@pytest.mark.parametrize("test_input,expected", LOCATE)
+def test_locate_article(test_input, expected):
+    """Verifier le placement des articles dans l'hierarchie"""
+    path = "/".join(locate_article(test_input, ZONAGE))
+    assert path == expected
 
 
 MULTIPLES = [
