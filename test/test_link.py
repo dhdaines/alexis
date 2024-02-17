@@ -202,6 +202,12 @@ INTERNALS = [
         "Article/15",
         LOTISSEMENT,
     ),
+    (
+        "article 74",
+        "../74/index.html",
+        "Article/76",
+        LOTISSEMENT,
+    ),
     #    (
     #        "Sous-section 3.6 de la Section 3 du présent chapitre",
     #        "../../Chapitre/4/Section/3/SousSection/_34/index.html",
@@ -232,7 +238,8 @@ def test_match_bylaws(test_input, expected):
     links = list(match_links(test_input))
     assert links
     assert links[0].start <= 2  # l'
-    assert links[0].end == len(test_input)
+    # NOTE: title matches are prioritized but may be shorter
+    # assert links[0].end == len(test_input)
 
 
 @pytest.mark.parametrize("test_input,expected,sourcepath,doc", INTERNALS)
@@ -261,42 +268,35 @@ def test_locate_article(test_input, expected):
 MULTIPLES = [
     (
         "articles 227, 229 et 231 de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
-        (
-            "articles",
-            ["227", "229", "231"],
-            "Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
-        ),
+        "article",
+        ["227", "229", "231"],
+        "de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
     ),
     (
         "articles 256.1, 256.2 ou 256.3 de la Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
-        (
-            "articles",
-            ["256.1", "256.2", "256.3"],
-            "Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
-        ),
+        "article",
+        ["256.1", "256.2", "256.3"],
+        "de la Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
     ),
     (
         "articles 148.0.8 et 148.0.9 de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
-        (
-            "articles",
-            ["148.0.8", "148.0.9"],
-            "Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
-        ),
+        "article",
+        ["148.0.8", "148.0.9"],
+        "de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
     ),
     (
         "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du Règlement de zonage 1314-2021-Z",
-        (
-            "types des milieux",
-            ["T5.1", "T5.2", "T5.3", "ZC.1", "ZC.2"],
-            "Règlement de zonage 1314-2021-Z",
-        ),
+        "types des milieux",
+        ["T5.1", "T5.2", "T5.3", "ZC.1", "ZC.2"],
+        "du Règlement de zonage 1314-2021-Z",
     ),
 ]
 
 
-@pytest.mark.parametrize("text,_", MULTIPLES)
-def test_match_multiples(text, _):
+@pytest.mark.parametrize("text,before,multi,after", MULTIPLES)
+def test_match_multiples(text, before, multi, after):
     """Verifier qu'on peut reconnaitre les sections multiples"""
     links = list(match_links(text))
-    assert links
-    assert links[0].start <= 2  # l'
+    for link, ref in zip(links, multi):
+        assert text[link.start : link.end] == ref
+        assert link.alt == f"{before} {ref} {after}"

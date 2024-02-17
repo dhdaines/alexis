@@ -69,8 +69,8 @@ def test_format_html_links():
         formatter = HtmlFormatter()
         assert formatter.bloc_html(doc.contenu[3]).startswith(LIPSUM)
         doc.contenu[3].liens = [
-            Hyperlien("https://example.com", 6, 11),
-            Hyperlien("https://vdsa.ca", 18, 21),
+            Hyperlien(6, 11, None, "https://example.com"),
+            Hyperlien(18, 21, None, "https://vdsa.ca"),
         ]
         assert formatter.bloc_html(doc.contenu[3]).startswith(LIPSUM_HREF)
 

@@ -23,9 +23,10 @@ EXTENSION = "jpg"  # Ou png, si désiré (FIXME: webm...)
 class Hyperlien(NamedTuple):
     """Hyperlien dans un bloc de texte."""
 
-    href: Optional[str]
     start: int
     end: int
+    alt: Optional[str]
+    href: Optional[str]
 
 
 @dataclass
@@ -103,14 +104,16 @@ DU = r"(?:du|de\s+l['’]|de\s+la)"
 MATCHER = re.compile(
     rf"""
 (?:
-   (?:{SECTION}\s+{NUMEROS}
+   (?:{SECTION}\s+(?P<numeros>{NUMEROS})
       (?:\s+{DU}\s+{SECTION}\s+{NUMERO})*
-     |{MILIEU}\s+{MTYPES})
+     |{MILIEU}\s+(?P<mtypes>{MTYPES}))
    (?:\s+{DU}\s+(?:{REGLEMENT}|{LOI}))?
   |{REGLEMENT}|{LOI})
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+NUMMATCH = re.compile(NUMERO, re.IGNORECASE | re.VERBOSE)
+MTMATCH = re.compile(MTYPE, re.IGNORECASE | re.VERBOSE)
 
 
 def match_links(text: str):
@@ -118,7 +121,28 @@ def match_links(text: str):
     Identifier des hyperliens potentiels dans un texte.
     """
     for m in MATCHER.finditer(text):
-        yield Hyperlien(None, m.start(), m.end())
+        if m.group("numeros") is not None:
+            before = re.sub(r"s$", "", text[: m.start("numeros")].strip())
+            after = text[m.end("numeros") :]
+            for num in NUMMATCH.finditer(m.group("numeros")):
+                yield Hyperlien(
+                    m.start("numeros") + num.start(),
+                    m.start("numeros") + num.end(),
+                    f"{before} {num.group()}{after}",
+                    None,
+                )
+        elif m.group("mtypes") is not None:
+            before = text[: m.start("mtypes")]
+            after = text[m.end("mtypes") :]
+            for mt in MTMATCH.finditer(m.group("mtypes")):
+                yield Hyperlien(
+                    m.start("mtypes") + mt.start(),
+                    m.start("mtypes") + mt.end(),
+                    f"{before}{mt.group()}{after}",
+                    None,
+                )
+        else:
+            yield Hyperlien(m.start(), m.end(), None, None)
 
 
 def group_iob(words: Iterable[T_obj], key: str = "segment") -> Iterator[Bloc]:

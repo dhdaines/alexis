@@ -151,7 +151,10 @@ class Resolver:
             return path
         # Resolve by path with fuzzing for missing section/chapter/subsection numbers
         for parts, el in doc.structure.traverse():
-            if dest == parts:
+            elparts = [el.type, el.numero]
+            if el.type in ("Article", "Annexe") and dest == elparts:
+                return path
+            if dest == [*parts, *elparts]:
                 return path
         # Resolve by title if possible (NOTE: not currently possible)
         return None
