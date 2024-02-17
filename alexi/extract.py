@@ -9,7 +9,6 @@ import json
 import logging
 import operator
 import os
-from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Optional, TextIO
 
@@ -228,15 +227,12 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     if doc.pdfurl is not None:
         outfh.write(f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)')
     outfh.write("</li>\n")
-    top = Path(doc.fileid)
-    d = deque((el, top, 1) for el in doc.structure.sub)
-    prev_level = 1
-    while d:
-        el, parent, level = d.popleft()
+    prev_level = 0
+    for parts, el in doc.structure.traverse():
         if el.type in ("Article", "Annexe"):
-            eldir = top / el.type / el.numero
+            eldir = Path(doc.fileid, el.type, el.numero)
         else:
-            eldir = parent / el.type / el.numero
+            eldir = Path(doc.fileid, *parts, el.type, el.numero)
         if el.numero[0] == "_":
             if el.titre:
                 eltitre = el.titre
@@ -247,6 +243,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
                 eltitre = f"{el.type} {el.numero}: {el.titre}"
             else:
                 eltitre = f"{el.type} {el.numero}"
+        level = len(parts) / 2
         while level < prev_level:
             outfh.write("</ul></details></li>\n")
             prev_level -= 1
@@ -269,9 +266,8 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
                     f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
                 )
             outfh.write(f'<li class="{el.type} leaf">{link}{pdflink}</li>\n')
-        d.extendleft((subel, eldir, level + 1) for subel in reversed(el.sub))
         prev_level = level
-    while prev_level > 1:
+    while prev_level > 0:
         outfh.write("</ul></details></li>\n")
         prev_level -= 1
     outfh.write("</ul>\n")
