@@ -7,9 +7,9 @@ import logging
 import os
 import re
 from collections import deque
-from typing import Optional
+from typing import Optional, Iterator
 
-from .analyse import PALIERS, Document
+from .analyse import PALIERS, Document, Element
 
 LOGGER = logging.getLogger("link")
 
@@ -31,58 +31,9 @@ def locate_article(numero: str, doc: Document) -> list[str]:
     """
     Placer un article dans l'hierarchie du document.
     """
-    d = deque(doc.structure.sub)
-    path = []
-    while d:
-        el = d.popleft()
-        if el is None:
-            path.pop()
-            path.pop()
-        elif el.sub:
-            path.append(el.type)
-            path.append(el.numero)
-            d.appendleft(None)
-            d.extendleft(reversed(el.sub))
-        else:
-            if el.type == "Article" and el.numero == numero:
-                return path
-    return []
-
-
-def qualify_destination(
-    dest: list[str], src: list[str], doc: Optional[Document]
-) -> list[str]:
-    """
-    Rajouter des prefix manquants pour un lien relatif.
-    """
-    # Top-level section types
-    if dest[0] in ("Chapitre", "Article", "Annexe"):
-        return dest
-    # Only fully qualified destinations are possible
-    if src[0] == "Annexe":
-        return dest
-    # Need to identify enclosing section/subsection (generally these
-    # are of the form "section N du présent chaptire"...).  Note that
-    # we do not modify the source path here, so we will always end up
-    # with a full destination path
-    if src[0] in ("Article"):
-        if doc is None or len(src) == 1:  # pathological situation...
-            return dest
-        src = locate_article(src[1], doc)
-    try:
-        idx = src.index(dest[0])
-    except ValueError:
-        idx = len(src)
-    return src[:idx] + dest
-
-
-def _resolve_internal(
-    secpath: str, srcpath: str, doc: Optional[Document] = None
-) -> str:
-    secparts = list(secpath.split("/"))
-    srcparts = list(srcpath.split("/"))
-    secparts = qualify_destination(secparts, srcparts, doc)
-    return os.path.relpath("/".join(secparts), "/".join(srcparts))
+    for path, el in doc.structure.traverse():
+        if el.type == "Article" and el.numero == numero:
+            return path
 
 
 def normalize_title(title: str):
@@ -139,6 +90,7 @@ class Resolver:
                         break
             if docpath is None:
                 return None
+
         sections = []
         for m in SEC_RE.finditer(text):
             sectype = m.group("sec").title().replace("-", "")
@@ -150,9 +102,52 @@ class Resolver:
             return self.resolve_absolute_internal(docpath, secpath, srcpath)
         if not secpath:
             return None
-        href = "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
+
+        srcparts = list(srcpath.split("/"))
+        secparts = self.qualify_destination(list(secpath.split("/")), srcparts, doc)
+        secpath = self.resolve_document_path(secparts, doc)
+        relpath = os.path.relpath("/".join(secparts), srcpath)
+        href = f"{relpath}/index.html"
         LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, href)
         return href
+
+    def qualify_destination(
+        self, dest: list[str], src: list[str], doc: Optional[Document]
+    ) -> list[str]:
+        """
+        Rajouter des prefix manquants pour un lien relatif.
+        """
+        # Top-level section types
+        if dest[0] in ("Chapitre", "Article", "Annexe"):
+            return dest
+        # Only fully qualified destinations are possible
+        if src[0] == "Annexe":
+            return dest
+        # Need to identify enclosing section/subsection (generally these
+        # are of the form "section N du présent chaptire"...).  Note that
+        # we do not modify the source path here, so we will always end up
+        # with a full destination path
+        if src[0] in ("Article"):
+            if doc is None or len(src) == 1:  # pathological situation...
+                return dest
+            src = locate_article(src[1], doc)
+        try:
+            idx = src.index(dest[0])
+        except ValueError:
+            idx = len(src)
+        return src[:idx] + dest
+
+    def resolve_document_path(
+        self, dest: list[str], doc: Optional[Document] = None
+    ) -> Optional[str]:
+        """Verifier la présence d'une cible de lien dans un document et retourner le path."""
+        if doc is None:
+            return "/".join(dest)
+        # Resolve by path with fuzzing for missing section/chapter/subsection numbers
+
+        # Resolve by title if possible (NOTE: not currently possible)
+
+        return "/".join(dest)
 
     def resolve_external(self, text: str) -> Optional[str]:
         """

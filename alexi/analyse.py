@@ -6,6 +6,7 @@ import itertools
 import logging
 import operator
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator, NamedTuple, Optional
@@ -166,6 +167,23 @@ class Element:
         el = Element(**kwargs)
         el.sub = [Element.fromdict(**subel) for subel in el.sub]
         return el
+
+    def traverse(self) -> Iterator[tuple[list[str], "Element"]]:
+        """Pre-order traversal of the subtree."""
+        d = deque(self.sub)
+        path = []
+        while d:
+            el = d.popleft()
+            if el is None:
+                path.pop()
+                path.pop()
+                continue
+            yield path, el
+            if el.sub:
+                path.append(el.type)
+                path.append(el.numero)
+                d.appendleft(None)
+                d.extendleft(reversed(el.sub))
 
 
 ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"

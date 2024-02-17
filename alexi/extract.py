@@ -518,31 +518,17 @@ class Extracteur:
             self.output_sub_index(doc, doc.structure, path)
         self.output_element(doc, path, doc.structure)
 
-        # Walk the structure of the document (FIXME: make a generator)
-        d = deque(doc.structure.sub)
-        while d:
-            el = d.popleft()
-            if el is None:
-                path = path.parent.parent
-                continue
+        for parts, el in doc.structure.traverse():
             if el.type in ("Article", "Annexe"):
                 continue
             LOGGER.info(
                 "Path: %s Structure: %s %s [%s]",
-                path,
+                parts,
                 el.type,
                 el.numero,
                 ",".join("%s %s" % (sel.type, sel.numero) for sel in el.sub),
             )
-            self.output_element(doc, path / el.type / el.numero, el)
-            if el.sub:
-                path = path / el.type / el.numero
-                self.output_sub_index(doc, el, path)
-                d.appendleft(None)
-                LOGGER.debug("SUB: None")
-                for sel in reversed(el.sub):
-                    d.appendleft(sel)
-                    LOGGER.debug("SUB: %s %s", sel.type, sel.numero)
+            self.output_element(doc, Path(*parts, el.type, el.numero), el)
         return doc
 
 
