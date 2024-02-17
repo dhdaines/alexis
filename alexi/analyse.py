@@ -6,6 +6,7 @@ import itertools
 import logging
 import operator
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator, NamedTuple, Optional
@@ -22,9 +23,10 @@ EXTENSION = "jpg"  # Ou png, si désiré (FIXME: webm...)
 class Hyperlien(NamedTuple):
     """Hyperlien dans un bloc de texte."""
 
-    href: Optional[str]
     start: int
     end: int
+    alt: Optional[str]
+    href: Optional[str]
 
 
 @dataclass
@@ -74,32 +76,44 @@ class Bloc:
 # should be done with the sequence CRF
 SECTION = r"\b(?:article|chapitre|section|sous-section|annexe)s?"
 NUMERO = r"[\d\.XIV]+"
-NUMEROS = rf"{NUMERO}(?:(?:,|\s+et)\s+{NUMERO})*"
+NUMEROS = rf"{NUMERO}(?P<numeros>(?:,|\s+(?:et|ou))\s+{NUMERO})*"
 MILIEU = r"\btypes?\s+des?\s+milieux?"
 MTYPE = r"[\dA-Z]+\.\d"
-MTYPES = rf"{MTYPE}(?:(?:,|\s+et)\s+{MTYPE})*"
-REGNUM = (
-    r"(?:(?:SQ-)?\d[\d\.A-Z-]+|\((?:c\.|(?:R\.\s*)?L\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+\))"
-)
-REGLEMENT = rf"règlement\s+(?:{REGNUM}|(?:de|sur|concernant).*?{REGNUM})"
-LOI = r"""
+MTYPES = rf"{MTYPE}(?P<mtypes>(?:,|\s+(?:et|ou))\s+{MTYPE})*"
+RLRQ = r"(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+"
+REGNUM = rf"(?:(?:SQ-)?\d[\d\.A-Z-]+|\({RLRQ}\))"
+REGLEMENT = rf"""
+règlement\s+
+(?:
+   {REGNUM}
+  |de\s+zonage
+  |de\s+lotissement
+  |de\s+construction
+  |(?:sur\s+les|relatif\s+aux)\s+(?:PIIA|plans\s+d['’]implantation\s+et\s+d['’]intégration\s+architecturale)
+  |(?:sur\s+les|relatif\s+aux)\s+permis\s+et\s+(?:les\s+)?certificats
+  |(?:de|sur|concernant).*?{REGNUM}
+)"""
+LOI = rf"""
 (?:code\s+civil
-  |loi\s+.*?\((?:R?L\.?R\.?Q\.?|c\.),?[^\)]+\)
+  |(?:loi|code)\s+.*?\({RLRQ}\)
   |loi\s+sur\s+l['’]aménagement\s+et\s+l['’]urbanisme
+  |loi\s+sur\s+la\s+qualité\s+de\s+l['’]environnement
   |loi\s+sur\s+les\s+cités\s+et\s+villes
 )"""
 DU = r"(?:du|de\s+l['’]|de\s+la)"
 MATCHER = re.compile(
     rf"""
 (?:
-   (?:{SECTION}\s+{NUMEROS}
+   (?:{SECTION}\s+(?P<numero>{NUMEROS})
       (?:\s+{DU}\s+{SECTION}\s+{NUMERO})*
-     |{MILIEU}\s+{MTYPES})
+     |{MILIEU}\s+(?P<mtype>{MTYPES}))
    (?:\s+{DU}\s+(?:{REGLEMENT}|{LOI}))?
   |{REGLEMENT}|{LOI})
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+NUMMATCH = re.compile(NUMERO, re.IGNORECASE | re.VERBOSE)
+MTMATCH = re.compile(MTYPE, re.IGNORECASE | re.VERBOSE)
 
 
 def match_links(text: str):
@@ -107,7 +121,28 @@ def match_links(text: str):
     Identifier des hyperliens potentiels dans un texte.
     """
     for m in MATCHER.finditer(text):
-        yield Hyperlien(None, m.start(), m.end())
+        if m.group("numeros") is not None:
+            before = re.sub(r"s$", "", text[m.start() : m.start("numero")].strip())
+            after = text[m.end("numero") : m.end()]
+            for num in NUMMATCH.finditer(m.group("numero")):
+                yield Hyperlien(
+                    m.start("numero") + num.start(),
+                    m.start("numero") + num.end(),
+                    f"{before} {num.group()}{after}",
+                    None,
+                )
+        elif m.group("mtypes") is not None:
+            before = text[m.start() : m.start("mtype")]
+            after = text[m.end("mtype") : m.end()]
+            for mt in MTMATCH.finditer(m.group("mtype")):
+                yield Hyperlien(
+                    m.start("mtype") + mt.start(),
+                    m.start("mtype") + mt.end(),
+                    f"{before}{mt.group()}{after}",
+                    None,
+                )
+        else:
+            yield Hyperlien(m.start(), m.end(), None, None)
 
 
 def group_iob(words: Iterable[T_obj], key: str = "segment") -> Iterator[Bloc]:
@@ -158,6 +193,23 @@ class Element:
         el = Element(**kwargs)
         el.sub = [Element.fromdict(**subel) for subel in el.sub]
         return el
+
+    def traverse(self) -> Iterator[tuple[list[str], "Element"]]:
+        """Pre-order traversal of the subtree."""
+        d = deque(self.sub)
+        path = []
+        while d:
+            el = d.popleft()
+            if el is None:
+                path.pop()
+                path.pop()
+                continue
+            yield path, el
+            if el.sub:
+                path.append(el.type)
+                path.append(el.numero)
+                d.appendleft(None)
+                d.extendleft(reversed(el.sub))
 
 
 ELTYPE = r"(?i:article|chapitre|section|sous-section|titre|annexe)"

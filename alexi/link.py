@@ -6,20 +6,24 @@ import itertools
 import logging
 import os
 import re
-from collections import deque
 from typing import Optional
 
-from .analyse import PALIERS, Document
+from .analyse import PALIERS, Document, MILIEU, MTYPE
 
 LOGGER = logging.getLogger("link")
+
+# FIXME: Synchronize with analyse regexps
 LQ_RE = re.compile(
-    r"\(\s*(?:R?L\.?R\.?Q\.?|c\.),?(?:\s*(?:c(?:\.|\s+)|chapitre\s+))?(?P<lq>[^\)]+)\)"
+    r"\(\s*(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,"
+    r"?(?:\s*(?:c(?:\.|\s+)|chapitre\s+))?(?P<lq>[^\)]+)\)"
 )
 RQ_RE = re.compile(r"(?P<lq>.*?),\s*r.\s*(?P<rq>.*)")
 SEC_RE = re.compile(
-    r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)"
+    r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)",
+    re.IGNORECASE,
 )
 REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
+MILIEU_RE = re.compile(rf"{MILIEU}\s+(?P<mtype>{MTYPE})", re.IGNORECASE | re.VERBOSE)
 PALIER_IDX = {palier: idx for idx, palier in enumerate(PALIERS)}
 
 
@@ -27,66 +31,32 @@ def locate_article(numero: str, doc: Document) -> list[str]:
     """
     Placer un article dans l'hierarchie du document.
     """
-    d = deque(doc.structure.sub)
-    path = []
-    while d:
-        el = d.popleft()
-        if el is None:
-            path.pop()
-            path.pop()
-        elif el.sub:
-            path.append(el.type)
-            path.append(el.numero)
-            d.appendleft(None)
-            d.extendleft(reversed(el.sub))
-        else:
-            if el.type == "Article" and el.numero == numero:
-                return path
-    return []
+    for path, el in doc.structure.traverse():
+        if el.type == "Article" and el.numero == numero:
+            return path
 
 
-def qualify_destination(
-    dest: list[str], src: list[str], doc: Optional[Document]
-) -> list[str]:
-    """
-    Rajouter des prefix manquants pour un lien relatif.
-    """
-    # Top-level section types
-    if dest[0] in ("Chapitre", "Article", "Annexe"):
-        return dest
-    # Only fully qualified destinations are possible
-    if src[0] == "Annexe":
-        return dest
-    # Need to identify enclosing section/subsection (generally these
-    # are of the form "section N du présent chaptire"...).  Note that
-    # we do not modify the source path here, so we will always end up
-    # with a full destination path
-    if src[0] in ("Article"):
-        if doc is None or len(src) == 1:  # pathological situation...
-            return dest
-        src = locate_article(src[1], doc)
-    try:
-        idx = src.index(dest[0])
-    except ValueError:
-        idx = len(src)
-    return src[:idx] + dest
-
-
-def _resolve_internal(
-    secpath: str, srcpath: str, doc: Optional[Document] = None
-) -> str:
-    secparts = list(secpath.split("/"))
-    srcparts = list(srcpath.split("/"))
-    secparts = qualify_destination(secparts, srcparts, doc)
-    return os.path.relpath("/".join(secparts), "/".join(srcparts))
+def normalize_title(title: str):
+    title = title.lower()
+    title = re.sub(r"\s+", " ", title).strip()
+    title = re.sub(r"^règlement (?:de|sur|concernant|relatif aux) ", "", title)
+    title = re.sub(
+        r"\bpiia\b",
+        r"plans d'implantation et d'intégration architecturale",
+        title,
+    )
+    title = re.sub(r"\([^\)]+\)$", "", title)
+    return title
 
 
 class Resolver:
     def __init__(self, metadata: Optional[dict] = None):
         self.metadata = {"docs": {}} if metadata is None else metadata
-        self.docpath = {}
+        self.numeros = {}
+        self.titles = {}
         for docpath, info in self.metadata["docs"].items():
-            self.docpath[info["numero"]] = docpath
+            self.numeros[info["numero"]] = docpath
+            self.titles[normalize_title(info["titre"])] = docpath
 
     def __call__(
         self, text: str, srcpath: str = "", doc: Optional[Document] = None
@@ -94,14 +64,23 @@ class Resolver:
         url = self.resolve_external(text)
         if url:
             return url
+        url = self.resolve_zonage(text, srcpath)
+        if url:
+            return url
         return self.resolve_internal(text, srcpath, doc)
 
-    def resolve_absolute_internal(
-        self, numero: str, secpath: str, srcpath: str
-    ) -> Optional[str]:
-        docpath = self.docpath.get(numero)
-        if docpath is None:
+    def resolve_zonage(self, text: str, srcpath: str) -> Optional[str]:
+        m = MILIEU_RE.search(text)
+        if m is None:
             return None
+        milieu = self.metadata["zonage"]["milieu"].get(m.group("mtype"))
+        if milieu is None:
+            return None
+        return os.path.relpath(f"../{milieu['url']}/index.html", srcpath)
+
+    def resolve_absolute_internal(
+        self, docpath: str, secpath: str, srcpath: str
+    ) -> Optional[str]:
         if secpath:
             return os.path.relpath(f"../{docpath}/{secpath}/index.html", srcpath)
         else:
@@ -113,30 +92,91 @@ class Resolver:
         """
         Resoudre certains liens internes.
         """
-        numero = None
+        docpath = None
+        text = re.sub(r"\s+", " ", text).strip()
+        # NOTE: This really matches anything starting with "règlement"
         if m := REG_RE.search(text):
             numero = m.group("reg").strip(" .,;")
             if numero is None:
                 return None
+            docpath = self.numeros.get(numero)
+            if docpath is None:
+                for title in self.titles:
+                    if title in text.lower():
+                        docpath = self.titles[title]
+                        break
+            if docpath is None:
+                return None
+
         sections = []
         for m in SEC_RE.finditer(text):
             sectype = m.group("sec").title().replace("-", "")
             num = m.group("num").strip(" .,;")
-            sections.append((sectype.title(), num))
+            sections.append((sectype, num))
         sections.sort(key=lambda x: PALIER_IDX.get(x[0], 0))
         secpath = "/".join(itertools.chain.from_iterable(sections))
-        if numero:
-            return self.resolve_absolute_internal(numero, secpath, srcpath)
+        if docpath:
+            return self.resolve_absolute_internal(docpath, secpath, srcpath)
         if not secpath:
             return None
-        href = "/".join((_resolve_internal(secpath, srcpath, doc), "index.html"))
-        LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, href)
-        return href
+
+        srcparts = list(srcpath.split("/"))
+        secparts = self.qualify_destination(list(secpath.split("/")), srcparts, doc)
+        href = self.resolve_document_path(secparts, doc)
+        if href is None:
+            return None
+        relpath = os.path.relpath(href, srcpath)
+        LOGGER.info("resolve %s à partir de %s: %s", secpath, srcpath, relpath)
+        return f"{relpath}/index.html"
+
+    def qualify_destination(
+        self, dest: list[str], src: list[str], doc: Optional[Document]
+    ) -> list[str]:
+        """
+        Rajouter des prefix manquants pour un lien relatif.
+        """
+        # Top-level section types
+        if dest[0] in ("Chapitre", "Article", "Annexe"):
+            return dest
+        # Only fully qualified destinations are possible
+        if src[0] == "Annexe":
+            return dest
+        # Need to identify enclosing section/subsection (generally these
+        # are of the form "section N du présent chaptire"...).  Note that
+        # we do not modify the source path here, so we will always end up
+        # with a full destination path
+        if src[0] in ("Article"):
+            if doc is None or len(src) == 1:  # pathological situation...
+                return dest
+            src = locate_article(src[1], doc)
+        try:
+            idx = src.index(dest[0])
+        except ValueError:
+            idx = len(src)
+        return src[:idx] + dest
+
+    def resolve_document_path(
+        self, dest: list[str], doc: Optional[Document] = None
+    ) -> Optional[str]:
+        """Verifier la présence d'une cible de lien dans un document et retourner le path."""
+        path = "/".join(dest)
+        if doc is None:
+            return path
+        # Resolve by path with fuzzing for missing section/chapter/subsection numbers
+        for parts, el in doc.structure.traverse():
+            elparts = [el.type, el.numero]
+            if el.type in ("Article", "Annexe") and dest == elparts:
+                return path
+            if dest == [*parts, *elparts]:
+                return path
+        # Resolve by title if possible (NOTE: not currently possible)
+        return None
 
     def resolve_external(self, text: str) -> Optional[str]:
         """
         Resoudre quelques types de liens externes (vers la LAU par exemple)
         """
+        text = re.sub(r"\s+", " ", text).strip()
         if m := LQ_RE.search(text):
             lq = m.group("lq").strip()
             if m := RQ_RE.match(lq):
@@ -154,6 +194,8 @@ class Resolver:
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/C-19"
         elif "urbanisme" in text.lower():
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/A-19.1"
+        elif "environnement" in text.lower():
+            url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/Q-2"
         else:
             return None
         for m in SEC_RE.finditer(text):
