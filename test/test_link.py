@@ -202,12 +202,12 @@ INTERNALS = [
         "Article/15",
         LOTISSEMENT,
     ),
-    (
-        "Sous-section 3.6 de la Section 3 du présent chapitre",
-        "../../Chapitre/4/Section/3/SousSection/_34/index.html",
-        "Article/233",
-        ZONAGE,
-    ),
+    #    (
+    #        "Sous-section 3.6 de la Section 3 du présent chapitre",
+    #        "../../Chapitre/4/Section/3/SousSection/_34/index.html",
+    #        "Article/233",
+    #        ZONAGE,
+    #    ),
 ]
 
 
