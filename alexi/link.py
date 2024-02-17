@@ -38,7 +38,12 @@ def locate_article(numero: str, doc: Document) -> list[str]:
 def normalize_title(title: str):
     title = title.lower()
     title = re.sub(r"\s+", " ", title).strip()
-    title = re.sub(r"^règlement (?:de|sur|concernant) ", "", title)
+    title = re.sub(r"^règlement (?:de|sur|concernant|relatif aux) ", "", title)
+    title = re.sub(
+        r"\bpiia\b",
+        r"plans d'implantation et d'intégration architecturale",
+        title,
+    )
     title = re.sub(r"\([^\)]+\)$", "", title)
     return title
 
