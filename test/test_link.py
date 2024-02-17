@@ -288,7 +288,7 @@ MULTIPLES = [
         "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du Règlement de zonage 1314-2021-Z",
         "types des milieux",
         ["T5.1", "T5.2", "T5.3", "ZC.1", "ZC.2"],
-        "du Règlement de zonage 1314-2021-Z",
+        "du Règlement de zonage",
     ),
 ]
 

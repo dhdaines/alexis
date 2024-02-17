@@ -94,8 +94,9 @@ class HtmlFormatter:
                 link_text = text[link.start : link.end]
                 href = link.href
                 if href is None and self.resolver:
-                    href = self.resolver(link_text, str(self.path), self.doc)
-                    LOGGER.info("%s:%s -> %s", link_text, self.path, href)
+                    href_text = link_text if link.alt is None else link.alt
+                    href = self.resolver(href_text, str(self.path), self.doc)
+                    LOGGER.info("%s:%s -> %s", href_text, self.path, href)
                 if href is None:
                     chunks.append(link_text)
                 else:

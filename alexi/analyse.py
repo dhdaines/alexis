@@ -76,10 +76,10 @@ class Bloc:
 # should be done with the sequence CRF
 SECTION = r"\b(?:article|chapitre|section|sous-section|annexe)s?"
 NUMERO = r"[\d\.XIV]+"
-NUMEROS = rf"{NUMERO}(?:(?:,|\s+(?:et|ou))\s+{NUMERO})*"
+NUMEROS = rf"{NUMERO}(?P<numeros>(?:,|\s+(?:et|ou))\s+{NUMERO})*"
 MILIEU = r"\btypes?\s+des?\s+milieux?"
 MTYPE = r"[\dA-Z]+\.\d"
-MTYPES = rf"{MTYPE}(?:(?:,|\s+(?:et|ou))\s+{MTYPE})*"
+MTYPES = rf"{MTYPE}(?P<mtypes>(?:,|\s+(?:et|ou))\s+{MTYPE})*"
 RLRQ = r"(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+"
 REGNUM = rf"(?:(?:SQ-)?\d[\d\.A-Z-]+|\({RLRQ}\))"
 REGLEMENT = rf"""
@@ -104,9 +104,9 @@ DU = r"(?:du|de\s+l['’]|de\s+la)"
 MATCHER = re.compile(
     rf"""
 (?:
-   (?:{SECTION}\s+(?P<numeros>{NUMEROS})
+   (?:{SECTION}\s+(?P<numero>{NUMEROS})
       (?:\s+{DU}\s+{SECTION}\s+{NUMERO})*
-     |{MILIEU}\s+(?P<mtypes>{MTYPES}))
+     |{MILIEU}\s+(?P<mtype>{MTYPES}))
    (?:\s+{DU}\s+(?:{REGLEMENT}|{LOI}))?
   |{REGLEMENT}|{LOI})
     """,
@@ -122,22 +122,22 @@ def match_links(text: str):
     """
     for m in MATCHER.finditer(text):
         if m.group("numeros") is not None:
-            before = re.sub(r"s$", "", text[: m.start("numeros")].strip())
-            after = text[m.end("numeros") :]
-            for num in NUMMATCH.finditer(m.group("numeros")):
+            before = re.sub(r"s$", "", text[m.start() : m.start("numero")].strip())
+            after = text[m.end("numero") : m.end()]
+            for num in NUMMATCH.finditer(m.group("numero")):
                 yield Hyperlien(
-                    m.start("numeros") + num.start(),
-                    m.start("numeros") + num.end(),
+                    m.start("numero") + num.start(),
+                    m.start("numero") + num.end(),
                     f"{before} {num.group()}{after}",
                     None,
                 )
         elif m.group("mtypes") is not None:
-            before = text[: m.start("mtypes")]
-            after = text[m.end("mtypes") :]
-            for mt in MTMATCH.finditer(m.group("mtypes")):
+            before = text[m.start() : m.start("mtype")]
+            after = text[m.end("mtype") : m.end()]
+            for mt in MTMATCH.finditer(m.group("mtype")):
                 yield Hyperlien(
-                    m.start("mtypes") + mt.start(),
-                    m.start("mtypes") + mt.end(),
+                    m.start("mtype") + mt.start(),
+                    m.start("mtype") + mt.end(),
                     f"{before}{mt.group()}{after}",
                     None,
                 )
