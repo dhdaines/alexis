@@ -132,12 +132,14 @@ BYLAWS = [
         "Règlement de zonage",
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
-    # NOTE: sous-section not expected to work yet
     (
         "section 3 du chapitre 5 du Règlement de zonage 1314-2021-Z",
         "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
     ),
-    # TODO: links to milieux, usages, etc
+    (
+        "type de milieu T5.2",
+        "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/6/SousSection/_89/index.html",
+    ),
     # FIXME: Also test invalid links somehow!
 ]
 
@@ -145,7 +147,7 @@ BYLAWS = [
 @pytest.mark.parametrize("test_input,expected", BYLAWS)
 def test_bylaws(test_input, expected):
     r = Resolver(METADATA)
-    assert r.resolve_internal(test_input, ".") == expected
+    assert r(test_input, ".") == expected
 
 
 with open(DATADIR / "lotissement.json", "rt") as infh:

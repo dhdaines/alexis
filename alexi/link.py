@@ -8,7 +8,7 @@ import os
 import re
 from typing import Optional
 
-from .analyse import PALIERS, Document
+from .analyse import PALIERS, Document, MILIEU, MTYPE
 
 LOGGER = logging.getLogger("link")
 
@@ -23,6 +23,7 @@ SEC_RE = re.compile(
     re.IGNORECASE,
 )
 REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
+MILIEU_RE = re.compile(rf"{MILIEU}\s+(?P<mtype>{MTYPE})", re.IGNORECASE | re.VERBOSE)
 PALIER_IDX = {palier: idx for idx, palier in enumerate(PALIERS)}
 
 
@@ -63,7 +64,19 @@ class Resolver:
         url = self.resolve_external(text)
         if url:
             return url
+        url = self.resolve_zonage(text, srcpath)
+        if url:
+            return url
         return self.resolve_internal(text, srcpath, doc)
+
+    def resolve_zonage(self, text: str, srcpath: str) -> Optional[str]:
+        m = MILIEU_RE.search(text)
+        if m is None:
+            return None
+        milieu = self.metadata["zonage"]["milieu"].get(m.group("mtype"))
+        if milieu is None:
+            return None
+        return os.path.relpath(f"../{milieu['url']}/index.html", srcpath)
 
     def resolve_absolute_internal(
         self, docpath: str, secpath: str, srcpath: str
