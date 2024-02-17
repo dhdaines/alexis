@@ -85,12 +85,12 @@ REGLEMENT = rf"""
 règlement\s+
 (?:
    {REGNUM}
-  |(?:de|sur|concernant).*?{REGNUM}
   |de\s+zonage
   |de\s+lotissement
   |de\s+construction
   |(?:sur\s+les|relatif\s+aux)\s+(?:PIIA|plans\s+d['’]implantation\s+et\s+d['’]intégration\s+architecturale)
   |(?:sur\s+les|relatif\s+aux)\s+permis\s+et\s+(?:les\s+)?certificats
+  |(?:de|sur|concernant).*?{REGNUM}
 )"""
 LOI = rf"""
 (?:code\s+civil
