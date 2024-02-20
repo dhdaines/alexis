@@ -1,7 +1,9 @@
 import csv
+import re
 from pathlib import Path
 
 from alexi.analyse import Analyseur, extract_zonage, group_iob
+from alexi.analyse import MCLASS, MTYPE, MTYPES, ZONE
 from alexi.convert import Converteur
 
 DATADIR = Path(__file__).parent / "data"
@@ -83,7 +85,23 @@ ZONES = {
             "url": "zonage_zones/Chapitre/7/Section/3/SousSection/_5",
         },
     },
+    "zone": [
+        "T1.1-001",
+        "CI-003",
+        "ZI.2-001",
+        "T3.2-018",
+        "ZC.3-001",
+    ],
 }
+
+
+def test_match_zonage():
+    for c in ZONES["categorie_milieu"]:
+        assert re.match(MCLASS, c, re.IGNORECASE)
+    for m in ZONES["milieu"]:
+        assert re.match(MTYPE, m, re.IGNORECASE)
+    for z in ZONES["zone"]:
+        assert re.match(ZONE, z, re.IGNORECASE)
 
 
 def test_analyse_zonage():
@@ -92,7 +110,16 @@ def test_analyse_zonage():
         analyseur = Analyseur("zonage_zones", reader)
         doc = analyseur()
         zones = extract_zonage(doc)
-        assert zones == ZONES
+        assert zones["categorie_milieu"] == ZONES["categorie_milieu"]
+        assert zones["milieu"] == ZONES["milieu"]
+
+
+def test_analyse_usages():
+    with open(TRAINDIR / "zonage_usages.csv", "rt") as infh:
+        reader = csv.DictReader(infh)
+        analyseur = Analyseur("zonage_zones", reader)
+        doc = analyseur()
+        # usages = extract_usages(doc)
 
 
 if __name__ == "__main__":
