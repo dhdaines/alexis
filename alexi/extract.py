@@ -12,7 +12,14 @@ import os
 from pathlib import Path
 from typing import Any, Iterable, Optional, TextIO
 
-from alexi.analyse import Analyseur, Bloc, Document, Element, extract_zonage
+from alexi.analyse import (
+    Analyseur,
+    Bloc,
+    Document,
+    Element,
+    extract_usages,
+    extract_zonage,
+)
 from alexi.convert import Converteur
 from alexi.format import HtmlFormatter
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
@@ -380,6 +387,7 @@ class Extracteur:
             doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)
         if "zonage" in doc.titre.lower() and "zonage" not in self.metadata:
             self.metadata["zonage"] = extract_zonage(doc)
+            self.metadata["zonage"].update(extract_usages(doc))
         return doc
 
     def analyse(self, iob: Iterable[T_obj], conv: Converteur, fileid: str):

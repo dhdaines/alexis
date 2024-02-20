@@ -82,6 +82,9 @@ MCLASS = r"\b(?-i:T\d|C[IUE]|ZM|Z[CI])"
 MTYPE = rf"{MCLASS}(?:.\d)?"
 MTYPES = rf"{MTYPE}(?P<mtypes>(?:,|\s+(?:et|ou))\s+{MTYPE})*"
 ZONE = rf"{MTYPE}-\d+"
+UGOUPE = r"\b(?-i:H|C|I|P|A|CO)"  # LOL Goupe
+UCLASS = rf"{UGOUPE}-\d+"
+USAGE = rf"{UGOUPE}\d+-\d+(?:-\d+)?"
 RLRQ = r"(?:c\.|(?:R\.?\s*)?[LR]\.?\s*R\.?\s*Q\.?)\s*,?[^\)]+"
 REGNUM = rf"(?:(?:SQ-)?\d[\d\.A-Z-]+|\({RLRQ}\))"
 REGLEMENT = rf"""
@@ -486,7 +489,10 @@ class Analyseur:
         return doc
 
 
-def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
+ZoneChose = dict[str, str]
+
+
+def extract_zonage(doc: Document) -> dict[str, dict[str, ZoneChose]]:
     """
     Extraire les éléments du zonage d'un règlement et générer des
     metadonnées pour l'identification des hyperliens et la
@@ -505,7 +511,7 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
         LOGGER.info("Chapitre milieux et zones non trouvé")
         return
     top = Path(doc.fileid) / "Chapitre" / mz.numero
-    metadata: dict[str, dict[str, dict[str, str]]] = {
+    metadata: dict[str, dict[str, ZoneChose]] = {
         "categorie_milieu": {},
         "milieu": {},
     }
@@ -525,4 +531,39 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
                     "titre": m.group(2),
                     "url": str(subsecdir),
                 }
+    return metadata
+
+
+UCLASSMATCH = re.compile(
+    rf"""
+ Classe\s+({UCLASS})\s*:\s*(.*)
+|(.*?)\(({UCLASS})\)
+""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+# FIXME: This is dependent on the formatting
+def make_path(doc, path, el):
+    if el.type in ("Article", "Annexe"):
+        return Path(doc.fileid, el.type, el.numero)
+    else:
+        Path(doc.fileid, *path, el.type, el.numero)
+
+
+def extract_usages(doc: Document):
+    metadata: dict[str, dict[str, ZoneChose]] = {
+        "classe_usage": {},
+        "usage": {},
+    }
+    for path, el in doc.structure.traverse():
+        if m := UCLASSMATCH.search(el.titre):
+            if m.group(1):
+                goup, name = m.group(1), m.group(2)
+            elif m.group(4):
+                goup, name = m.group(4), m.group(3)
+            metadata["classe_usage"][goup] = {
+                "titre": name,
+                "url": str(make_path(doc, path, el)),
+            }
     return metadata

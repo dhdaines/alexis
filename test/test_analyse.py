@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from alexi.analyse import Analyseur, extract_zonage, group_iob
-from alexi.analyse import MCLASS, MTYPE, MTYPES, ZONE
+from alexi.analyse import MCLASS, MTYPE, ZONE, extract_usages
 from alexi.convert import Converteur
 
 DATADIR = Path(__file__).parent / "data"
@@ -85,6 +85,19 @@ ZONES = {
             "url": "zonage_zones/Chapitre/7/Section/3/SousSection/_5",
         },
     },
+    "classe_usage": {
+        "H-01": {"titre": "Habitation unifamiliale)", "url": "zonage_zones/Article/33"},
+        "H-02": {"titre": "Habitation bifamiliale", "url": "zonage_zones/Article/34"},
+        "H-03": {"titre": "Habitation trifamiliale", "url": "zonage_zones/Article/35"},
+        "H-04": {
+            "titre": "Habitation multifamiliale",
+            "url": "zonage_zones/Article/36",
+        },
+        "H-05": {"titre": "Maison mobile", "url": "zonage_zones/Article/37"},
+        "H-06": {"titre": "Habitation collective", "url": "zonage_zones/Article/38"},
+        "I-01": {"titre": "Industrie artisanale ", "url": "zonage_zones/Article/52"},
+    },
+    "usage": {},
     "zone": [
         "T1.1-001",
         "CI-003",
@@ -119,7 +132,8 @@ def test_analyse_usages():
         reader = csv.DictReader(infh)
         analyseur = Analyseur("zonage_zones", reader)
         doc = analyseur()
-        # usages = extract_usages(doc)
+        zones = extract_usages(doc)
+        assert zones["classe_usage"] == ZONES["classe_usage"]
 
 
 if __name__ == "__main__":

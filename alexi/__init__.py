@@ -40,7 +40,7 @@ def write_csv(
 def convert_main(args: argparse.Namespace):
     """Convertir les PDF en CSV"""
     if args.pages:
-        pages = [max(1, int(x)) for x in args.pages.split(",")]
+        pages = [max(1, int(x)) for x in args.pages.split(",") if x]
     else:
         pages = None
     conv = Converteur(args.pdf)
