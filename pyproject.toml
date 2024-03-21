@@ -1,6 +1,39 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alexi"
+dynamic = ["version"]
+description = "\"ALexi, EXtracteur d'Information adélois\""
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "David Huggins-Daines", email = "district6@vdsa.ca" },
+]
+dependencies = [
+    "beautifulsoup4",
+    "joblib",
+    "lxml",
+    "pdfplumber",
+    "scikit-learn",
+    "sklearn-crfsuite @ git+https://github.com/MeMartijn/updated-sklearn-crfsuite.git",
+    "whoosh",
+]
+
+[project.scripts]
+alexi = "alexi:main"
+
+[tool.hatch.version]
+path = "alexi/__about__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/alexi",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
