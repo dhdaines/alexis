@@ -8,7 +8,7 @@ import os
 import re
 from typing import Optional
 
-from .analyse import PALIERS, Document, MILIEU, MTYPE
+from .analyse import MILIEU, MTYPE, PALIERS, Document
 
 LOGGER = logging.getLogger("link")
 
