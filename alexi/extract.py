@@ -88,6 +88,12 @@ STYLE_CSS = """html, body {
 .initial {
     color: #aaa;
 }
+#header a:link {
+    color: #fff;
+}
+#header a:visited {
+    color: #aaa;
+}
 #body {
     overflow-y: scroll;
     padding: 2px;
@@ -247,24 +253,19 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
         while level < prev_level:
             outfh.write("</ul></details></li>\n")
             prev_level -= 1
+        pdflink = ""
+        if doc.pdfurl is not None:
+            pdflink = (
+                f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
+            )
         if el.sub:
             outfh.write(
                 f'<li class="{el.type} node"><details><summary>{eltitre}</summary><ul>\n'
             )
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
-            pdflink = ""
-            if doc.pdfurl is not None:
-                pdflink = (
-                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
-                )
             outfh.write(f'<li class="text">{link}{pdflink}</li>\n')
         else:
             link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
-            pdflink = ""
-            if doc.pdfurl is not None:
-                pdflink = (
-                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
-                )
             outfh.write(f'<li class="{el.type} leaf">{link}{pdflink}</li>\n')
         prev_level = level
     while prev_level > 0:
@@ -479,6 +480,9 @@ class Extracteur:
             doc_titre = doc.titre
             if doc.numero:
                 doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
+        pdflink = ""
+        if doc.pdfurl is not None:
+            pdflink = f' (<a target="_blank" href="{doc.pdfurl}">PDF</a>)'
         HTML_HEADER = (
             HTML_GLOBAL_HEADER
             + f"""    <link rel="stylesheet" href="{rel_style}">
@@ -486,7 +490,7 @@ class Extracteur:
   </head>
   <body>
     <div class="container">
-    <h1 id="header">{doc_titre}</h1>
+    <h1 id="header">{doc_titre}{pdflink}</h1>
     <div id="body">
     """
         )
@@ -494,7 +498,14 @@ class Extracteur:
 </html>
 """
         outdir.mkdir(parents=True, exist_ok=True)
-        LOGGER.info("Génération %s %s -> %s/index.html", el.type, el.numero, outdir)
+        LOGGER.info(
+            "Génération %s %s -> %s/index.html (PDF: %s#%d)",
+            el.type,
+            el.numero,
+            outdir,
+            doc.pdfurl,
+            el.page,
+        )
         formatter = HtmlFormatter(
             doc=doc, imgdir=rel_imgdir, resolver=self.resolver, path=path
         )

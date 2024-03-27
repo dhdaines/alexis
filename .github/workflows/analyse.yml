@@ -2,6 +2,9 @@ name: Téléchargement et analyse des règlements d'urbanisme
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
