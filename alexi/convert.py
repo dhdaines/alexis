@@ -10,8 +10,7 @@ from typing import Iterable, Iterator, Optional, Union
 
 from pdfplumber import PDF
 from pdfplumber.page import Page
-from pdfplumber.structure import (PDFStructElement, PDFStructTree,
-                                  StructTreeMissing)
+from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
 from pdfplumber.utils import geometry
 from pdfplumber.utils.geometry import T_bbox
 

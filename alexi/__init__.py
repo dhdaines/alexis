@@ -27,6 +27,7 @@ from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
+VERSION = "0.4.0"
 
 
 def write_csv(
