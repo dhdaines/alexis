@@ -1,6 +1,82 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alexi"
+dynamic = ["version"]
+description = "\"ALexi, EXtracteur d'Information adélois\""
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "David Huggins-Daines", email = "district6@vdsa.ca" },
+]
+dependencies = [
+    "beautifulsoup4",
+    "joblib",
+    "lxml",
+    "pdfplumber",
+    "scikit-learn",
+    "sklearn-crfsuite",
+    "whoosh",
+]
+
+[project.scripts]
+alexi = "alexi:main"
+
+[tool.hatch.version]
+path = "alexi/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/alexi",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+addopts = "--cov=alexi --cov-report html"
+
+[tool.hatch.envs.default]
+dependencies = [
+  "black",
+  "isort",
+  "flake8",
+  "mypy",
+  "coverage",
+  "pytest",
+  "pytest-cov",
+]
+post-install-commands = [
+  "mypy --install-types --non-interactive alexi",
+]
+
+[tool.hatch.envs.default.scripts]
+test = [
+  "pytest", "coverage html"
+]
+lint = [
+  "black --check alexi",
+  "isort --profile black --check-only alexi test",
+  "flake8 alexi test",
+  "mypy --strict --implicit-reexport alexi",
+]
+format = [
+  "black alexi test",
+  "isort alexi test",
+]
+train = [
+"""python scripts/train_crf.py \\
+    --features text+layout \\
+    --outfile alexi/models/crf.vl.joblib.gz \\
+    data/*.csv""",
+"""python scripts/train_crf.py \\
+    --features text+layout+structure \\
+    --outfile alexi/models/crf.joblib.gz \\
+    data/*.csv""",
+"""python scripts/train_crf_seq.py \\
+    --outfile alexi/models/crfseq.joblib.gz \\
+    data/*.csv""",
+]
+
+[tool.isort]
+profile = "black"

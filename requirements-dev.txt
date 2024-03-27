@@ -1,8 +1,0 @@
-black
-isort
-flake8
-mypy
-pytest
-coverage
-pytest-cov
-types-beautifulsoup4
