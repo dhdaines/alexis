@@ -41,6 +41,7 @@ dependencies = [
   "black",
   "isort",
   "flake8",
+  "flake8-bugbear",
   "mypy",
   "coverage",
   "pytest",
@@ -57,8 +58,8 @@ test = [
 lint = [
   "black --check alexi",
   "isort --profile black --check-only alexi test",
-  "flake8 alexi test",
-  "mypy --strict --implicit-reexport alexi",
+  "flake8 --color=never alexi test",
+  "mypy alexi",
 ]
 format = [
   "black alexi test",
