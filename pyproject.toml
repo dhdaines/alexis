@@ -20,6 +20,17 @@ dependencies = [
     "sklearn-crfsuite",
     "whoosh",
 ]
+[project.optional-dependencies]
+dev = [
+  "black",
+  "isort",
+  "flake8",
+  "flake8-bugbear",
+  "mypy",
+  "coverage",
+  "pytest",
+  "pytest-cov",
+]
 
 [project.scripts]
 alexi = "alexi:main"
@@ -37,16 +48,7 @@ testpaths = ["test"]
 addopts = "--cov=alexi --cov-report html"
 
 [tool.hatch.envs.default]
-dependencies = [
-  "black",
-  "isort",
-  "flake8",
-  "flake8-bugbear",
-  "mypy",
-  "coverage",
-  "pytest",
-  "pytest-cov",
-]
+features = [ "dev" ]
 post-install-commands = [
   "mypy --install-types --non-interactive alexi",
 ]
