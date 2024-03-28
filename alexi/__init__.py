@@ -48,7 +48,7 @@ def convert_main(args: argparse.Namespace):
     if args.images is not None:
         args.images.mkdir(parents=True, exist_ok=True)
         images: list[dict] = []
-        for page_number, group in itertools.groupby(
+        for _, group in itertools.groupby(
             conv.extract_images(pages), operator.attrgetter("page_number")
         ):
             merged = merge_overlaps(group)

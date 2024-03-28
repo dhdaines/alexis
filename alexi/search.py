@@ -19,5 +19,6 @@ def search(indexdir: Path, terms: List[str]) -> None:
         results = searcher.search(query)
         for r in results:
             print(
-                f'https://ville.sainte-adele.qc.ca/upload/documents/{r["document"]}#page={r["page"]} {r["titre"]}'
+                f'https://ville.sainte-adele.qc.ca/upload/documents/{r["document"]}'
+                f'#page={r["page"]} {r["titre"]}'
             )

@@ -68,7 +68,7 @@ def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             "top": min(int(word["top"]) for word in line),
             "bottom": max(int(word["bottom"]) for word in line),
         }
-        for idx, word in enumerate(line):
+        for idx in range(len(line)):  # , word in enumerate(line):
             features = [
                 "first=%d" % (idx == 0),
                 "last=%d" % (idx == len(line) - 1),

@@ -63,12 +63,14 @@ BLOC = {
     "Amendement": "p",
 }
 
+CURPATH = Path(".")
+
 
 class HtmlFormatter:
     def __init__(
         self,
-        imgdir: PathLike = ".",
-        doc: Optional[Document] = None,
+        doc: Document,
+        imgdir: PathLike = CURPATH,
         resolver: Optional[Resolver] = None,
         path: Optional[Path] = None,
         indent: int = 2,
@@ -198,4 +200,4 @@ def format_html(
     imgdir: str = ".",
     fragment: bool = True,
 ) -> str:
-    return HtmlFormatter(imgdir, doc=doc, indent=indent)(element, fragment)
+    return HtmlFormatter(imgdir=Path(imgdir), doc=doc, indent=indent)(element, fragment)

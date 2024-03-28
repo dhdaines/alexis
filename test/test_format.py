@@ -31,13 +31,30 @@ HTML = """<h1 class="header">
   <h4>Titre du document</h4>
   <h4>Titre 1</h4>
   <p>Contenu 1, contenu 2, contenu 3.</p>
-  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
+  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+  eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
+  ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+  aliquip ex ea commodo consequat. Duis aute irure dolor in
+  reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
+  pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+  culpa qui officia deserunt mollit anim id est laborum.</p>
+
   <h4>Titre 2</h4>
   <p>Encore du contenu!</p>
   <li>1. Énumération 1</li>
   <li>2. Énumération 2</li>
   <li>a) Énumération imbriquée</li>
-  <p>3. Longue énumération : Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
+  <p>3. Longue énumération : Lorem ipsum dolor sit amet, consectetur
+  adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+  dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+  exercitation ullamco laboris nisi ut aliquip ex ea commodo
+  consequat. Duis aute irure dolor in reprehenderit in voluptate velit
+  esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
+  cupidatat non proident, sunt in culpa qui officia deserunt mollit
+  anim id est laborum.</p>
+
   <p>Tableau</p>
   <p>Chose Truc</p>
   <p>Chose 1 Truc 1</p>
@@ -66,7 +83,7 @@ def test_format_html_links():
         reader = csv.DictReader(infh)
         analyseur = Analyseur("pdf_structure", reader)
         doc = analyseur()
-        formatter = HtmlFormatter()
+        formatter = HtmlFormatter(doc)
         assert formatter.bloc_html(doc.contenu[3]).startswith(LIPSUM)
         doc.contenu[3].liens = [
             Hyperlien(6, 11, None, "https://example.com"),

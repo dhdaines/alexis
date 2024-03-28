@@ -229,7 +229,8 @@ class Converteur:
                 d.extend(el.children)
 
         for el in gather_elements():
-            # Note: we must sort them as we can't guarantee they come in any particular order
+            # Note: we must sort them as we can't guarantee they come
+            # in any particular order
             mcids = list(get_child_mcids(el))
             mcids.sort()
             for page_number, group in itertools.groupby(mcids, operator.itemgetter(0)):

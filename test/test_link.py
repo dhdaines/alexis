@@ -38,7 +38,8 @@ LAWS = [
         "https://www.legisquebec.gouv.qc.ca/fr/document/lc/Q-2",
     ),
     (
-        "Règlement sur les normes d’intervention dans les forêts du domaine public (c. F-4.1, r. 7)",
+        "Règlement sur les normes d’intervention dans les forêts du "
+        "domaine public (c. F-4.1, r. 7)",
         "https://www.legisquebec.gouv.qc.ca/fr/document/rc/F-4.1,%20r.%207%20",
     ),
     (
@@ -71,29 +72,35 @@ METADATA = {
         "categorie_milieu": {
             "T5": {
                 "titre": "CENTRE-VILLE",
-                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/6",
+                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z"
+                "/Chapitre/7/Section/6",
             },
         },
         "milieu": {
             "T5.1": {
                 "titre": "VILLAGEOIS",
-                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/6/SousSection/_88",
+                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z"
+                "/Chapitre/7/Section/6/SousSection/_88",
             },
             "T5.2": {
                 "titre": "NÉO-VILLAGEOIS",
-                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/6/SousSection/_89",
+                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z"
+                "/Chapitre/7/Section/6/SousSection/_89",
             },
             "T5.3": {
                 "titre": "COMPACT",
-                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/6/SousSection/_90",
+                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z"
+                "/Chapitre/7/Section/6/SousSection/_90",
             },
             "ZC.1": {
                 "titre": "COMMERCE RÉCRÉOTOURISTIQUE INTENSIF",
-                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/9/SousSection/_95",
+                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z"
+                "/Chapitre/7/Section/9/SousSection/_95",
             },
             "ZC.2": {
                 "titre": "COMMERCIAL",
-                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/7/Section/9/SousSection/_96",
+                "url": "20231213-Codification-administrative-Rgl-1314-2021-Z"
+                "/Chapitre/7/Section/9/SousSection/_96",
             },
         },
     },
@@ -101,12 +108,14 @@ METADATA = {
         "Rgl-1314-2021-PC-version-en-vigueur-20231013": {
             "numero": "1314-2021-PC",
             "titre": "Règlement sur les permis et certificats ",
-            "pdf": "https://ville.sainte-adele.qc.ca/upload/documents/Rgl-1314-2021-PC-version-en-vigueur-20231013.pdf",
+            "pdf": "https://ville.sainte-adele.qc.ca/upload/documents"
+            "/Rgl-1314-2021-PC-version-en-vigueur-20231013.pdf",
         },
         "20231213-Codification-administrative-Rgl-1314-2021-Z": {
             "numero": "1314-2021-Z",
             "titre": "Règlement de zonage ",
-            "pdf": "https://ville.sainte-adele.qc.ca/upload/documents/20231213-Codification-administrative-Rgl-1314-2021-Z.pdf",
+            "pdf": "https://ville.sainte-adele.qc.ca/upload/documents"
+            "/20231213-Codification-administrative-Rgl-1314-2021-Z.pdf",
         },
     },
 }
@@ -269,25 +278,29 @@ def test_locate_article(test_input, expected):
 
 MULTIPLES = [
     (
-        "articles 227, 229 et 231 de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
+        "articles 227, 229 et 231 de la Loi sur l’aménagement et "
+        "l’urbanisme (LRQ, A-19.1)",
         "article",
         ["227", "229", "231"],
         "de la Loi sur l’aménagement et l’urbanisme (LRQ, A-19.1)",
     ),
     (
-        "articles 256.1, 256.2 ou 256.3 de la Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
+        "articles 256.1, 256.2 ou 256.3 de la Loi sur l’aménagement et "
+        "l’urbanisme (L.R.Q., chapitre A-19.1)",
         "article",
         ["256.1", "256.2", "256.3"],
         "de la Loi sur l’aménagement et l’urbanisme (L.R.Q., chapitre A-19.1)",
     ),
     (
-        "articles 148.0.8 et 148.0.9 de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
+        "articles 148.0.8 et 148.0.9 de la Loi sur l’aménagement et "
+        "l’urbanisme (LRQ A-19.1)",
         "article",
         ["148.0.8", "148.0.9"],
         "de la Loi sur l’aménagement et l’urbanisme (LRQ A-19.1)",
     ),
     (
-        "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du Règlement de zonage 1314-2021-Z",
+        "types des milieux T5.1, T5.2, T5.3, ZC.1 et ZC.2 du "
+        "Règlement de zonage 1314-2021-Z",
         "types des milieux",
         ["T5.1", "T5.2", "T5.3", "ZC.1", "ZC.2"],
         "du Règlement de zonage",
