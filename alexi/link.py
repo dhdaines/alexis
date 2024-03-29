@@ -34,6 +34,7 @@ def locate_article(numero: str, doc: Document) -> list[str]:
     for path, el in doc.structure.traverse():
         if el.type == "Article" and el.numero == numero:
             return path
+    return []
 
 
 def normalize_title(title: str):
@@ -60,7 +61,7 @@ class Resolver:
 
     def __call__(
         self, text: str, srcpath: str = "", doc: Optional[Document] = None
-    ) -> str:
+    ) -> Optional[str]:
         url = self.resolve_external(text)
         if url:
             return url
@@ -158,7 +159,8 @@ class Resolver:
     def resolve_document_path(
         self, dest: list[str], doc: Optional[Document] = None
     ) -> Optional[str]:
-        """Verifier la présence d'une cible de lien dans un document et retourner le path."""
+        """Verifier la présence d'une cible de lien dans un document et
+        retourner le path."""
         path = "/".join(dest)
         if doc is None:
             return path

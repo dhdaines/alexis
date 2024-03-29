@@ -11,11 +11,10 @@ jobs:
       uses: actions/checkout@v4
     - name: Install
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install -e .
+        python3 -m pip install hatch
     - name: Cross-validate
       run: |
-        sh results/run.sh
+        hatch run -- sh results/run.sh
     - name: Upload results
       uses: actions/upload-artifact@v4
       with:
@@ -23,7 +22,7 @@ jobs:
         path: results/*.csv
     - name: Train
       run: |
-        make train
+        hatch run train
     - name: Upload models
       uses: actions/upload-artifact@v4
       with:

@@ -52,7 +52,7 @@ def index(indir: Path, outdir: Path) -> None:
         for subdir in docdir.iterdir():
             if not docdir.is_dir():
                 continue
-            for dirpath, dirnames, filenames in os.walk(subdir, topdown=True):
+            for dirpath, _, filenames in os.walk(subdir, topdown=True):
                 if "index.json" not in filenames:
                     continue
                 add_from_dir(writer, document, Path(dirpath))
