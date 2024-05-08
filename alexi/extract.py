@@ -72,7 +72,10 @@ HTML_GLOBAL_HEADER = """<!DOCTYPE html>
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css"
+integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls"
+          crossorigin="anonymous">
 """
 STYLE_CSS = """html, body {
     margin: 0;
@@ -93,6 +96,12 @@ STYLE_CSS = """html, body {
     color: #eee;
 }
 .initial {
+    color: #aaa;
+}
+#header a:link {
+    color: #fff;
+}
+#header a:visited {
     color: #aaa;
 }
 #body {
@@ -229,7 +238,8 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     """
     outfh.write("<ul>\n")
     outfh.write(
-        f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">Texte intégral</a>\n'
+        f'<li class="text"><a target="_blank" href="{doc.fileid}/index.html">'
+        "Texte intégral</a>\n"
     )
     if doc.pdfurl is not None:
         outfh.write(f'(<a target="_blank" href="{doc.pdfurl}">PDF</a>)')
@@ -250,28 +260,24 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
                 eltitre = f"{el.type} {el.numero}: {el.titre}"
             else:
                 eltitre = f"{el.type} {el.numero}"
-        level = len(parts) / 2
+        level = len(parts) // 2
         while level < prev_level:
             outfh.write("</ul></details></li>\n")
             prev_level -= 1
+        pdflink = ""
+        if doc.pdfurl is not None:
+            pdflink = (
+                f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
+            )
         if el.sub:
             outfh.write(
-                f'<li class="{el.type} node"><details><summary>{eltitre}</summary><ul>\n'
+                f'<li class="{el.type} node"><details><summary>{eltitre}'
+                "</summary><ul>\n"
             )
             link = f'<a target="_blank" href="{eldir}/index.html">Texte intégral</a>'
-            pdflink = ""
-            if doc.pdfurl is not None:
-                pdflink = (
-                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
-                )
             outfh.write(f'<li class="text">{link}{pdflink}</li>\n')
         else:
             link = f'<a target="_blank" href="{eldir}/index.html">{eltitre}</a>'
-            pdflink = ""
-            if doc.pdfurl is not None:
-                pdflink = (
-                    f' (<a target="_blank" href="{doc.pdfurl}#page={el.page}">PDF</a>)'
-                )
             outfh.write(f'<li class="{el.type} leaf">{link}{pdflink}</li>\n')
         prev_level = level
     while prev_level > 0:
@@ -280,7 +286,7 @@ def make_doc_subtree(doc: Document, outfh: TextIO):
     outfh.write("</ul>\n")
 
 
-def make_doc_tree(docs: list[Document], outdir: Path) -> list[dict]:
+def make_doc_tree(docs: list[Document], outdir: Path) -> dict[str, dict[str, str]]:
     HTML_HEADER = (
         HTML_GLOBAL_HEADER
         + """    <title>ALEXI</title>
@@ -382,6 +388,7 @@ class Extracteur:
                 iob = list(self.crf_s(crf(feats)))
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
+        assert conv is not None
         doc = self.analyse(iob, conv, path.stem)
         if self.pdfdata:
             doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)
@@ -416,7 +423,9 @@ class Extracteur:
         self.metadata["docs"] = make_doc_tree(docs, self.outdir)
         self.resolver = Resolver(self.metadata)
 
-    def output_section_index(self, doc: Document, path: Path, elements: list[Element]):
+    def output_section_index(
+        self, doc: Document, path: Path, elements: Iterable[Element]
+    ):
         """Générer l'index de textes à un palier (Article, Annexe, etc)"""
         doc_titre = doc.titre if doc.titre != "Document" else doc.fileid
         title = f"{doc_titre}: {path.name}s"
@@ -443,7 +452,8 @@ class Extracteur:
                 lines.append(f'{off}{sp}{sp}<span class="number">{el.numero}</span>')
                 titre = el.titre if el.titre else f"{el.type} {el.numero}"
             lines.append(
-                f'{off}{sp}{sp}<a href="{el.numero}/index.html" class="title">{titre}</a>'
+                f'{off}{sp}{sp}<a href="{el.numero}/index.html" '
+                f'class="title">{titre}</a>'
             )
             lines.append(f"{off}{sp}</li>")
         HTML_FOOTER = """</ul>
@@ -487,6 +497,9 @@ class Extracteur:
             doc_titre = doc.titre
             if doc.numero:
                 doc_titre = f'{doc.numero} <span class="nomobile">{doc.titre}</span>'
+        pdflink = ""
+        if doc.pdfurl is not None:
+            pdflink = f' (<a target="_blank" href="{doc.pdfurl}">PDF</a>)'
         HTML_HEADER = (
             HTML_GLOBAL_HEADER
             + f"""    <link rel="stylesheet" href="{rel_style}">
@@ -494,7 +507,7 @@ class Extracteur:
   </head>
   <body>
     <div class="container">
-    <h1 id="header">{doc_titre}</h1>
+    <h1 id="header">{doc_titre}{pdflink}</h1>
     <div id="body">
     """
         )
@@ -502,9 +515,16 @@ class Extracteur:
 </html>
 """
         outdir.mkdir(parents=True, exist_ok=True)
-        LOGGER.info("Génération %s %s -> %s/index.html", el.type, el.numero, outdir)
+        LOGGER.info(
+            "Génération %s %s -> %s/index.html (PDF: %s#%d)",
+            el.type,
+            el.numero,
+            outdir,
+            doc.pdfurl,
+            el.page,
+        )
         formatter = HtmlFormatter(
-            doc=doc, imgdir=rel_imgdir, resolver=self.resolver, path=path
+            doc=doc, imgdir=Path(rel_imgdir), resolver=self.resolver, path=path
         )
         with open(outdir / "index.html", "wt") as outfh:
             outfh.write(HTML_HEADER)

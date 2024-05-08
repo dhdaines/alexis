@@ -27,6 +27,7 @@ from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
+VERSION = "0.4.0"
 
 
 def write_csv(
@@ -47,7 +48,7 @@ def convert_main(args: argparse.Namespace):
     if args.images is not None:
         args.images.mkdir(parents=True, exist_ok=True)
         images: list[dict] = []
-        for page_number, group in itertools.groupby(
+        for _, group in itertools.groupby(
             conv.extract_images(pages), operator.attrgetter("page_number")
         ):
             merged = merge_overlaps(group)

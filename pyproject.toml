@@ -17,18 +17,26 @@ dependencies = [
     "lxml",
     "pdfplumber",
     "scikit-learn",
-    "sklearn-crfsuite @ git+https://github.com/MeMartijn/updated-sklearn-crfsuite.git",
+    "sklearn-crfsuite",
     "whoosh",
+]
+[project.optional-dependencies]
+dev = [
+  "black",
+  "isort",
+  "flake8",
+  "flake8-bugbear",
+  "mypy",
+  "coverage",
+  "pytest",
+  "pytest-cov",
 ]
 
 [project.scripts]
 alexi = "alexi:main"
 
 [tool.hatch.version]
-path = "alexi/__about__.py"
-
-[tool.hatch.metadata]
-allow-direct-references = true
+path = "alexi/__init__.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -37,3 +45,41 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+addopts = "--cov=alexi --cov-report html"
+
+[tool.hatch.envs.default]
+features = [ "dev" ]
+post-install-commands = [
+  "mypy --install-types --non-interactive alexi",
+]
+
+[tool.hatch.envs.default.scripts]
+test = [
+  "pytest", "coverage html"
+]
+lint = [
+  "black --check alexi",
+  "isort --profile black --check-only alexi test",
+  "flake8 --color=never alexi test",
+  "mypy alexi",
+]
+format = [
+  "black alexi test",
+  "isort alexi test",
+]
+train = [
+"""python scripts/train_crf.py \\
+    --features text+layout \\
+    --outfile alexi/models/crf.vl.joblib.gz \\
+    data/*.csv""",
+"""python scripts/train_crf.py \\
+    --features text+layout+structure \\
+    --outfile alexi/models/crf.joblib.gz \\
+    data/*.csv""",
+"""python scripts/train_crf_seq.py \\
+    --outfile alexi/models/crfseq.joblib.gz \\
+    data/*.csv""",
+]
+
+[tool.isort]
+profile = "black"

@@ -63,12 +63,14 @@ BLOC = {
     "Amendement": "p",
 }
 
+CURPATH = Path(".")
+
 
 class HtmlFormatter:
     def __init__(
         self,
-        imgdir: PathLike = ".",
-        doc: Optional[Document] = None,
+        doc: Document,
+        imgdir: PathLike = CURPATH,
         resolver: Optional[Resolver] = None,
         path: Optional[Path] = None,
         indent: int = 2,
@@ -130,6 +132,9 @@ class HtmlFormatter:
                         f'{off}{sp}{sp}<span class="number">{el.numero}</span>'
                     )
             lines.append(f'{off}{sp}{sp}<span class="title">{el.titre}</span>')
+            pdflink = self.pdflink(el)
+            if pdflink:
+                lines.append(f"{off}{sp}{sp}{pdflink}")
             lines.append(f"{off}{sp}</{header}>")
         idx = el.debut
         fin = len(self.doc.contenu) if el.fin == -1 else el.fin
@@ -151,6 +156,17 @@ class HtmlFormatter:
             lines.append(off + f"</{tag}>")
         return lines
 
+    def pdflink(self, el: Optional[Element] = None) -> str:
+        """Lien HTML vers la page du PDF original"""
+        if self.doc.pdfurl is None:
+            return ""
+        if el is not None:
+            return (
+                f' (<a target="_blank" href="{self.doc.pdfurl}#page={el.page}">PDF</a>)'
+            )
+        else:
+            return f' (<a target="_blank" href="{self.doc.pdfurl}">PDF</a>)'
+
     def __call__(
         self,
         element: Optional[Element] = None,
@@ -170,7 +186,7 @@ class HtmlFormatter:
             doc_header = f"""<!DOCTYPE html>
     <html>
       <head>
-        <title>{self.doc.titre}</title>
+        <title>{self.doc.titre}{self.pdflink()}</title>
       </head>
       <body>"""
             doc_footer = "</body></html>"
@@ -184,4 +200,4 @@ def format_html(
     imgdir: str = ".",
     fragment: bool = True,
 ) -> str:
-    return HtmlFormatter(imgdir, doc=doc, indent=indent)(element, fragment)
+    return HtmlFormatter(imgdir=Path(imgdir), doc=doc, indent=indent)(element, fragment)

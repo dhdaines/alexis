@@ -195,14 +195,14 @@ class Element:
     # NOTE: pydantic would do this automatically, seems dataclasses don't
     @classmethod
     def fromdict(self, **kwargs) -> "Element":
+        kwargs["sub"] = [Element.fromdict(**subel) for subel in kwargs.get("sub", [])]
         el = Element(**kwargs)
-        el.sub = [Element.fromdict(**subel) for subel in el.sub]
         return el
 
     def traverse(self) -> Iterator[tuple[list[str], "Element"]]:
         """Pre-order traversal of the subtree."""
-        d = deque(self.sub)
-        path = []
+        d: deque[Element | None] = deque(self.sub)
+        path: list[str] = []
         while d:
             el = d.popleft()
             if el is None:
@@ -241,12 +241,12 @@ NUMENDRE = re.compile(rf".*\b{NUM}{DOTSPACEDASH}\s*$")
 class Document:
     """Document avec blocs de texte et structure."""
 
-    unknown_id: int = 0
     fileid: str
-    pdfurl: Optional[str] = None
     meta: dict[str, str]
     paliers: dict[str, list[Element]]
     contenu: list[Bloc]
+    unknown_id: int = 0
+    pdfurl: Optional[str] = None
 
     def __init__(self, fileid: str, numero: str = "", titre: str = "Document") -> None:
         self.fileid = fileid
@@ -456,7 +456,7 @@ class Analyseur:
                 else:
                     new_blocs.extend(page_blocs)
             else:
-                new_blocs.extend(group)
+                new_blocs.extend(group)  # noqa: B031
         self.blocs = new_blocs
 
     def __call__(
@@ -480,12 +480,10 @@ class Analyseur:
             titre = titre[: m.start(1)]
         doc = Document(self.fileid, numero, titre)
         doc.meta = self.metadata
-        # Group block-level text elements by page from segment tags
         if blocs is None:
             blocs = self.blocs
-        for page, blocs in itertools.groupby(blocs, operator.attrgetter("page_number")):
-            for bloc in blocs:
-                doc.add_bloc(bloc)
+        for bloc in blocs:
+            doc.add_bloc(bloc)
         return doc
 
 
@@ -501,7 +499,7 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, ZoneChose]]:
     mz: Optional[Element] = None
     if "Chapitre" not in doc.paliers:
         LOGGER.warning("Aucun chapitre présent dans %s", doc.fileid)
-        return
+        return {}
     for c in doc.paliers["Chapitre"]:
         if "milieux et zones" in c.titre.lower():
             LOGGER.info("Extraction de milieux et zones")
@@ -509,7 +507,7 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, ZoneChose]]:
             break
     if mz is None:
         LOGGER.info("Chapitre milieux et zones non trouvé")
-        return
+        return {}
     top = Path(doc.fileid) / "Chapitre" / mz.numero
     metadata: dict[str, dict[str, ZoneChose]] = {
         "categorie_milieu": {},
