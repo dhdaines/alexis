@@ -14,7 +14,7 @@ import operator
 import sys
 from pathlib import Path
 
-from . import download, extract, annotate
+from . import annotate, download, extract
 from .analyse import Analyseur, Bloc, merge_overlaps
 from .convert import Converteur, write_csv
 from .format import format_html

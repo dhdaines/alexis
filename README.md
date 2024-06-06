@@ -66,8 +66,8 @@ annoter, par exemple:
     --pages 1,2,3
 
 Dans le PDF, pour le moment, des rectangles colorés sont utiliser pour
-représenter les différents éléments annotés et aider à répérer les
-erreurs.  Notamment:
+représenter les blocs annotés et aider à répérer les erreurs.
+Notamment:
 
 - Les chapitres et annexes sont en rouge
 - Les sections et articles sont en rose (plus foncé plus le type
@@ -76,6 +76,9 @@ erreurs.  Notamment:
   avec les articles)
 - Les en-têtes et pieds de page sont en jaune-vert-couleur-de-bile
 - Tout le reste est en noir (alinéas, tableaux, figures)
+
+Pour les éléments de séquence (il y a juste les titres et les numéros)
+ceux-ci sont indiqués par un remplissage vert clair transparent.
 
 Avec un logiciel de feuilles de calcul dont LibreOffice ou Excel, on
 peut alors modifier `1314-page1.csv` pour corriger la segmentation.

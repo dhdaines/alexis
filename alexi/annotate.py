@@ -15,12 +15,10 @@ import pypdfium2.raw as pdfium_c
 
 from alexi.analyse import group_iob
 from alexi.convert import Converteur, write_csv
-from alexi.label import Identificateur, DEFAULT_MODEL as DEFAULT_LABEL_MODEL
-from alexi.segment import (
-    Segmenteur,
-    DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL,
-    DEFAULT_MODEL_NOSTRUCT,
-)
+from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
+from alexi.label import Identificateur
+from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
+from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -67,9 +65,8 @@ def annotate_pdf(
             outpage += 1
         while len(pdf) > len(pages):
             pdf.del_page(outpage)
-    blocs = group_iob(iob)
     for page, (page_number, group) in zip(
-        pdf, itertools.groupby(blocs, attrgetter("page_number"))
+        pdf, itertools.groupby(group_iob(iob), attrgetter("page_number"))
     ):
         page_height = page.get_height()
         LOGGER.info("page %d", page_number)
@@ -96,6 +93,25 @@ def annotate_pdf(
             elif bloc.type in ("Tete", "Pied"):  # Jaunâtre
                 pdfium_c.FPDFPageObj_SetStrokeColor(path, 200, 200, 50, 255)
             # Autrement noir
+            pdfium_c.FPDFPageObj_SetStrokeWidth(path, 1)
+            pdfium_c.FPDFPage_InsertObject(page, path)
+        pdfium_c.FPDFPage_GenerateContent(page)
+    for page, (page_number, group) in zip(
+        pdf, itertools.groupby(group_iob(iob, "sequence"), attrgetter("page_number"))
+    ):
+        page_height = page.get_height()
+        LOGGER.info("page %d", page_number)
+        for bloc in group:
+            x0, top, x1, bottom = bloc.bbox
+            width = x1 - x0
+            height = bottom - top
+            y = page_height - bottom
+            LOGGER.info("element %s à %d, %d, %d, %d", bloc.type, x0, y, width, height)
+            path = pdfium_c.FPDFPageObj_CreateNewRect(
+                x0 - 1, y - 1, width + 2, height + 2
+            )
+            pdfium_c.FPDFPath_SetDrawMode(path, pdfium_c.FPDF_FILLMODE_ALTERNATE, False)
+            pdfium_c.FPDFPageObj_SetFillColor(path, 50, 200, 50, 50)
             pdfium_c.FPDFPageObj_SetStrokeWidth(path, 1)
             pdfium_c.FPDFPage_InsertObject(page, path)
         pdfium_c.FPDFPage_GenerateContent(page)
