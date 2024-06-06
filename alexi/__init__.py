@@ -13,11 +13,10 @@ import logging
 import operator
 import sys
 from pathlib import Path
-from typing import Any, Iterable, TextIO
 
-from . import download, extract
+from . import download, extract, annotate
 from .analyse import Analyseur, Bloc, merge_overlaps
-from .convert import FIELDNAMES, Converteur
+from .convert import Converteur, write_csv
 from .format import format_html
 from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
@@ -28,14 +27,6 @@ from .segment import Segmenteur
 
 LOGGER = logging.getLogger("alexi")
 VERSION = "0.4.0"
-
-
-def write_csv(
-    doc: Iterable[dict[str, Any]], outfh: TextIO, fieldnames: list[str] = FIELDNAMES
-):
-    writer = csv.DictWriter(outfh, fieldnames, extrasaction="ignore")
-    writer.writeheader()
-    writer.writerows(doc)
 
 
 def convert_main(args: argparse.Namespace):
@@ -223,6 +214,13 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     search.add_argument("query", help="Requête", nargs="+")
     search.set_defaults(func=search_main)
+
+    annotate_command = subp.add_parser(
+        "annotate", help="Annoter un PDF pour corriger erreurs"
+    )
+    annotate.add_arguments(annotate_command)
+    annotate_command.set_defaults(func=annotate.main)
+
     return parser
 
 
