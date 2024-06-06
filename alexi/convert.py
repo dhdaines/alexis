@@ -1,12 +1,13 @@
 """Conversion de PDF en CSV"""
 
+import csv
 import itertools
 import logging
 import operator
 from collections import deque
 from io import BufferedReader, BytesIO
 from pathlib import Path
-from typing import Iterable, Iterator, Optional, Union
+from typing import Any, Iterable, Iterator, Optional, TextIO, Union
 
 from pdfplumber import PDF
 from pdfplumber.page import Page
@@ -36,6 +37,14 @@ FIELDNAMES = [
     "mctag",
     "tagstack",
 ]
+
+
+def write_csv(
+    doc: Iterable[dict[str, Any]], outfh: TextIO, fieldnames: list[str] = FIELDNAMES
+):
+    writer = csv.DictWriter(outfh, fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(doc)
 
 
 def bbox_contains(bbox: T_bbox, ibox: T_bbox) -> bool:
