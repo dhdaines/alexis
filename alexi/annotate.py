@@ -10,8 +10,8 @@ from operator import attrgetter
 from pathlib import Path
 from typing import Any
 
-import pypdfium2 as pdfium
-import pypdfium2.raw as pdfium_c
+import pypdfium2 as pdfium  # type: ignore
+import pypdfium2.raw as pdfium_c  # type: ignore
 
 from alexi.analyse import group_iob
 from alexi.convert import Converteur, write_csv
