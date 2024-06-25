@@ -52,36 +52,56 @@ La commande `alexi annotate` vise à faciliter ce processus.
 
 Par exemple, si l'on veut corriger l'extraction de la page 1 du
 règlement 1314-2023-DEM, on peut d'abord extraire les données et une
-visualisation de la segmentation et classification avec:
+visualisation de la segmentation et classification avec cette commande
+(on peut spécifier le nom de base de fichiers comme deuxième argument):
 
     alexi annotate --pages 1 \
-        download/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
+        download/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf \
+        1314-page1
 
-Par défaut, cela créera des fichiers dans le même repertoire que
-`alexi extract`, alors
-`export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1`.  L'option
-`--outdir` peut être utilisée pour spécifier un autre repertoire de
-base.  Les fichiers générer sont:
+Cela créera les fichers `1314-page1.pdf` et `1314-page1.csv`. Notez
+qu'il est possible de spécifier plusieurs pages à extraire et
+annoter, par exemple:
 
-    page1.pdf  # PDF annoté avec la segmentation
-    page1.csv  # Traits distintcifs utilisés pour le modèle
+    --pages 1,2,3
+
+Dans le PDF, pour le moment, des rectangles colorés sont utiliser pour
+représenter les blocs annotés et aider à répérer les erreurs.
+Notamment:
+
+- Les chapitres et annexes sont en rouge
+- Les sections et articles sont en rose (plus foncé plus le type
+  d'élément est large)
+- Les listes sont en bleu-vert (parce qu'elles sont souvent confondues
+  avec les articles)
+- Les en-têtes et pieds de page sont en jaune-vert-couleur-de-bile
+- Tout le reste est en noir (alinéas, tableaux, figures)
+
+Pour les éléments de séquence (il y a juste les titres et les numéros)
+ceux-ci sont indiqués par un remplissage vert clair transparent.
 
 Avec un logiciel de feuilles de calcul dont LibreOffice ou Excel, on
-peut alors modifier `page1.csv` pour corriger la segmentation.  Il est
-*très important* de spécifier ces paramètres lorsqu'on ouvre et
+peut alors modifier `1314-page1.csv` pour corriger la segmentation.
+Il est *très important* de spécifier ces paramètres lorsqu'on ouvre et
 sauvegarde le fichier CSV:
 
 - La colonne "text" doit avoir le type "Texte" (et pas "Standard")
 - Le seul séparateur de colonne devrait être la virgule (pas de
   point-virgule, tab, etc)
 
-Par la suite la visualisation s'effectue avec:
+Une fois les erreurs corrigés, le résultat peut être vu avec:
 
-    alexi annotate export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1
+    alexi annotate --pages 1 \
+        --csv 1314-page1.csv \
+        download/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1.pdf
+        1314-page1
 
-Une fois les erreurs corrigés, il suffit de copier
-`export/2023-03-20-Rgl-1314-2023-DEM-Adoption-_1/page1.csv` vers le
-repertoire `data` et réentrainer le modèle avec `scripts/retrain.sh`.
+Cela mettra à jour le fichier `1314-page1.pdf` avec les nouvelles
+annotations.
+
+Une fois satisfait du résultat, il suffira de copier `1314-page1.csv`
+vers le repertoire `data` et réentrainer le modèle avec
+`scripts/retrain.sh`.
 
 Extraction de catégories pertinentes du zonage
 ----------------------------------------------
