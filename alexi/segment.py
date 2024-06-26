@@ -244,6 +244,16 @@ def split_pages(words: Iterable[dict]) -> Iterable[list[dict]]:
     return (list(p) for idx, p in itertools.groupby(words, operator.itemgetter("page")))
 
 
+def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
+    """Enlever les mots dans des tableaux car on va s'en occuper autrement."""
+    for w in words:
+        if "Tableau" in w["segment"]:
+            continue
+        if "Table" in w["tagstack"]:
+            continue
+        yield w
+
+
 def load(paths: Iterable[PathLike]) -> Iterator[dict]:
     for p in paths:
         with open(Path(p), "rt") as infh:

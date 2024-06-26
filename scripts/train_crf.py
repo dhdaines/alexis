@@ -15,7 +15,7 @@ from sklearn.metrics import make_scorer  # type: ignore
 from sklearn.model_selection import KFold, cross_validate  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import load, page2features, page2labels, split_pages
+from alexi.segment import load, page2features, page2labels, split_pages, filter_tab
 
 LOGGER = logging.getLogger("train-crf")
 
@@ -30,9 +30,6 @@ def make_argparse():
     )
     parser.add_argument("--features", default="vsl", help="Extracteur de traits")
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
-    parser.add_argument(
-        "--train-dev", action="store_true", help="Ajouter dev set au train set"
-    )
     parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
     parser.add_argument(
         "--c1", default=0.25, type=float, help="Coefficient de regularisation L1"
@@ -57,16 +54,6 @@ def make_argparse():
     parser.add_argument("-o", "--outfile", help="Fichier destination pour modele")
     parser.add_argument("-s", "--scores", help="Fichier destination pour évaluations")
     return parser
-
-
-def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
-    """Enlever les mots dans des tableaux car on va s'en occuper autrement."""
-    for w in words:
-        if "Tableau" in w["segment"]:
-            continue
-        if "Table" in w["tagstack"]:
-            continue
-        yield w
 
 
 def run_cv(args: argparse.Namespace, params: dict, X, y):
