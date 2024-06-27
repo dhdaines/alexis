@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn",
     "sklearn-crfsuite",
     "whoosh",
+    "tokenizers",
 ]
 [project.optional-dependencies]
 dev = [

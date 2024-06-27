@@ -20,6 +20,9 @@ DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
 FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
 
+if False:
+    from tokenizers import Tokenizer  # STFU, pyflakes
+
 
 class Bullet(Enum):
     NUMERIC = re.compile(r"^(\d+)[\)\.°-]$")
@@ -240,11 +243,11 @@ def page2tokens(page):
     return (x["text"] for x in page)
 
 
-def split_pages(words: Iterable[dict]) -> Iterable[list[dict]]:
+def split_pages(words: Iterable[T_obj]) -> Iterable[list[T_obj]]:
     return (list(p) for idx, p in itertools.groupby(words, operator.itemgetter("page")))
 
 
-def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
+def filter_tab(words: Iterable[T_obj]) -> Iterator[T_obj]:
     """Enlever les mots dans des tableaux car on va s'en occuper autrement."""
     for w in words:
         if "Tableau" in w["segment"]:
@@ -254,7 +257,46 @@ def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
         yield w
 
 
-def load(paths: Iterable[PathLike]) -> Iterator[dict]:
+def retokenize(words: Iterable[T_obj], tokenizer: "Tokenizer") -> Iterator[T_obj]:
+    """Refaire la tokenisation en alignant les traits et etiquettes.
+
+    Notez que parce que le positionnement de chaque sous-mot sera
+    identique aux autres, les modeles de mise en page risquent de ne
+    pas bien marcher.  Il serait preferable d'appliquer la
+    tokenisation directement sur les caracteres.
+    """
+    for widx, w in enumerate(words):
+        e = tokenizer.encode(w["text"], add_special_tokens=False)
+        for tidx, (tok, tid) in enumerate(zip(e.tokens, e.ids)):
+            wt = w.copy()
+            wt["text"] = tok
+            wt["word"] = w["text"]
+            wt["word_id"] = widx
+            wt["token_id"] = tid
+            # Change B to I for subtokens
+            if tidx > 0:
+                for ltype in "sequence", "segment":
+                    if ltype in w:
+                        label = w[ltype]
+                        if label and label[0] == "B":
+                            wt[ltype] = f"I-{label[2:]}"
+            yield wt
+
+
+def detokenize(words: Iterable[T_obj], _tokenizer: "Tokenizer") -> Iterator[T_obj]:
+    """Defaire la retokenisation"""
+    widx = -1
+    for w in words:
+        if w["word_id"] != widx:
+            widx = w["word_id"]
+            w["text"] = w["word"]
+            del w["word"]
+            del w["word_id"]
+            del w["token_id"]
+            yield w
+
+
+def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
     for p in paths:
         with open(Path(p), "rt") as infh:
             reader = csv.DictReader(infh)

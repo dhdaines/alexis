@@ -6,7 +6,6 @@ import itertools
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Iterator
 
 import joblib  # type: ignore
 import numpy as np
@@ -15,7 +14,15 @@ from sklearn.metrics import make_scorer  # type: ignore
 from sklearn.model_selection import KFold, cross_validate  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import load, page2features, page2labels, split_pages, filter_tab
+from alexi.segment import (
+    load,
+    page2features,
+    page2labels,
+    split_pages,
+    filter_tab,
+    retokenize,
+)
+from tokenizers import Tokenizer
 
 LOGGER = logging.getLogger("train-crf")
 
@@ -53,6 +60,9 @@ def make_argparse():
     )
     parser.add_argument("-o", "--outfile", help="Fichier destination pour modele")
     parser.add_argument("-s", "--scores", help="Fichier destination pour évaluations")
+    parser.add_argument(
+        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
+    )
     return parser
 
 
@@ -133,8 +143,11 @@ def main():
     parser = make_argparse()
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    data = load(args.csvs)
-    pages = list(split_pages(filter_tab(data)))
+    data = filter_tab(load(args.csvs))
+    if args.tokenize:
+        tokenizer = Tokenizer.from_pretrained("camembert-base")
+        data = retokenize(data, tokenizer)
+    pages = list(split_pages(data))
     X = [page2features(s, args.features, args.n) for s in pages]
     y = [page2labels(s, args.labels) for s in pages]
     params = {
