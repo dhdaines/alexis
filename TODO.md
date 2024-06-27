@@ -1,24 +1,3 @@
-Tracking some time
-------------------
-
-- fix sous-section links 1h
-  - test case 15 min
-  - fuzzy matching of element numbers w/sequence 30 min
-  - deploy 15 min
-
-- links to categories 1h
-  - test case 15 min
-  - collect cases and implement 30 min
-  
-- links to zones 2h
-  - implement zone query in ZONALDA (with centroid) 1h30
-  - extract zone links (multiple usually) 30min
-
-- links to usages 1h30
-  - test case 15 min
-  - analysis function 45 min
-  - linking as above 30 min
-
 Immediate fixes/enhancements
 ----------------------------
 
@@ -42,6 +21,7 @@ DERP LERNING
   - Retokenize CSVs using CamemBERT tokenizer (spread features on pieces)
   - Train PyTorch-CRF: https://pytorch-crf.readthedocs.io/en/stable/
   - possibly use Skorch to do evaluation: https://skorch.readthedocs.io/en/stable/
+  - or torchmetrics, or poutyne, or HF evaluate, etc, etc, etc omg
 
 Documentation
 -------------
