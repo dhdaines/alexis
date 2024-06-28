@@ -1,4 +1,5 @@
 from alexi import segment
+from collections import Counter
 import itertools
 from pathlib import Path
 
@@ -15,32 +16,31 @@ from torch.utils.data import DataLoader
 
 from sklearn.model_selection import train_test_split
 from poutyne import set_seeds, Model, ExponentialLR, EarlyStopping
+from sklearn_crfsuite import metrics
 
 DATA = list(Path("data").glob("*.csv"))
 
 
 def make_dataset(csvs):
     iobs = segment.load(csvs)
-    data = []
     for p in segment.split_pages(segment.filter_tab(iobs)):
         features = list(
             dict(x.split("=", maxsplit=2) for x in feats)
             for feats in segment.textpluslayoutplusstructure_features(p)
         )
         labels = list(segment.page2labels(p))
-        data.append((features, labels))
-    return data
+        yield features, labels
 
 
-all_data = make_dataset(DATA)
+X, y = zip(*make_dataset(DATA))
 
-labelset = set(itertools.chain.from_iterable(labels for page, labels in all_data))
+labelset = set(itertools.chain.from_iterable(y))
 id2label = sorted(labelset, reverse=True)
 label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 
-featnames = sorted(k for k in all_data[0][0][0].keys() if not k.startswith("line:"))
+featnames = sorted(k for k in X[0][0] if not k.startswith("line:"))
 feat2id = {name: {"": 0} for name in featnames}
-for feats in itertools.chain.from_iterable(page for page, labels in all_data):
+for feats in itertools.chain.from_iterable(X):
     for name, ids in feat2id.items():
         if feats[name] not in ids:
             ids[feats[name]] = len(ids)
@@ -50,7 +50,7 @@ all_data = [
         [[feat2id[name][feats[name]] for name in featnames] for feats in page],
         [label2id[tag] for tag in labels],
     )
-    for page, labels in all_data
+    for page, labels in zip(X, y)
 ]
 
 train_data, dt_data = train_test_split(
@@ -166,4 +166,55 @@ model.fit_generator(
         ),
     ],
 )
-test_loss, test_acc = model.evaluate_generator(test_loader)
+
+
+def pad_collate_fn_predict(batch):
+    # Require data to be externally sorted by length for prediction
+    # (otherwise we have no idea which output corresponds to which input! WTF Poutyne!)
+    sequences_tokens, lengths = zip(
+        *((torch.LongTensor(tokens), len(tokens)) for (tokens, labels) in batch)
+    )
+    lengths = torch.LongTensor(lengths)
+    padded_sequences_tokens = pad_sequence(
+        sequences_tokens, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_tokens = pack_padded_sequence(
+        padded_sequences_tokens, lengths.cpu(), batch_first=True
+    )
+    return pack_padded_sequences_tokens
+
+
+ordering, sorted_test_data = zip(
+    *sorted(enumerate(test_data), reverse=True, key=lambda x: len(x[1][0]))
+)
+test_loader = DataLoader(
+    sorted_test_data, batch_size=batch_size, collate_fn=pad_collate_fn_predict
+)
+out = model.predict_generator(test_loader, concatenate_returns=False)
+predictions = []
+lengths = [len(tokens) for tokens, _ in sorted_test_data]
+for batch in out:
+    # fucking torch transpose doesn't fucking work like fucking numpy
+    # transpose, what the fuck also why the fuck do we have to even do
+    # this, what the fucking fuck pytorch
+    batch = batch.transpose((0, 2, 1)).argmax(-1)
+    for length, row in zip(lengths, batch):
+        predictions.append(row[:length])
+    del lengths[: len(batch)]
+y_pred = [[id2label[x] for x in page] for page in predictions]
+y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
+label_counts = Counter(itertools.chain.from_iterable(y_true))
+labels = [x for x in label_counts if x[0] == "B" and label_counts[x] >= 10]
+print(
+    "ALL",
+    metrics.flat_f1_score(
+        y_true, y_pred, labels=labels, average="macro", zero_division=0.0
+    ),
+)
+for name in labels:
+    print(
+        name,
+        metrics.flat_f1_score(
+            y_true, y_pred, labels=[name], average="macro", zero_division=0.0
+        ),
+    )
