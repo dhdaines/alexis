@@ -1,22 +1,24 @@
-from alexi import segment
-from collections import Counter
+import csv
 import itertools
+from collections import Counter
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.utils.rnn import (
-    pad_packed_sequence,
-    pack_padded_sequence,
-    pad_sequence,
-    PackedSequence,
-)
-from torch.utils.data import DataLoader
-
-from sklearn.model_selection import train_test_split
-from poutyne import set_seeds, Model, ExponentialLR, EarlyStopping
+from poutyne import EarlyStopping, ExponentialLR, Model, set_seeds
+from sklearn.model_selection import KFold
 from sklearn_crfsuite import metrics
+from torch.nn.utils.rnn import (
+    PackedSequence,
+    pack_padded_sequence,
+    pad_packed_sequence,
+    pad_sequence,
+)
+from torch.utils.data import DataLoader, Subset
+
+from alexi import segment
 
 DATA = list(Path("data").glob("*.csv"))
 
@@ -137,6 +139,7 @@ id2label = sorted(labelset, reverse=True)
 label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 
 featnames = sorted(k for k in X[0][0] if not k.startswith("line:"))
+featdims = {name: 32 if name in ("text", "lower") else 2 for name in featnames}
 feat2id = {name: {"": 0} for name in featnames}
 for feats in itertools.chain.from_iterable(X):
     for name, ids in feat2id.items():
@@ -151,72 +154,87 @@ all_data = [
     for page, labels in zip(X, y)
 ]
 
-train_data, dt_data = train_test_split(
-    all_data, train_size=0.8, shuffle=True, random_state=42
-)
-dev_data, test_data = train_test_split(dt_data, train_size=0.5)
-
 cuda_device = 0
 device = torch.device("cuda:%d" % cuda_device if torch.cuda.is_available() else "cpu")
 batch_size = 32
-set_seeds(1234)
+seed = 1381
+set_seeds(seed)
 
-train_loader = DataLoader(
-    train_data, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn
-)
-dev_loader = DataLoader(dev_data, batch_size=batch_size, collate_fn=pad_collate_fn)
-test_loader = DataLoader(test_data, batch_size=batch_size, collate_fn=pad_collate_fn)
-
-featdims = {name: 32 if name in ("text", "lower") else 2 for name in featnames}
-
-my_network = MyNetwork(featnames, featdims, feat2id, len(id2label))
-optimizer = optim.Adam(my_network.parameters(), lr=0.1)
-loss_function = nn.CrossEntropyLoss()
-model = Model(
-    my_network,
-    optimizer,
-    loss_function,
-    batch_metrics=["accuracy", "f1"],
-    device=device,
-)
-model.fit_generator(
-    train_loader,
-    dev_loader,
-    epochs=200,
-    callbacks=[
-        ExponentialLR(gamma=0.99),
-        EarlyStopping(monitor="val_acc", mode="max", patience=20, verbose=True),
-    ],
-)
-ordering, sorted_test_data = zip(
-    *sorted(enumerate(test_data), reverse=True, key=lambda x: len(x[1][0]))
-)
-test_loader = DataLoader(
-    sorted_test_data, batch_size=batch_size, collate_fn=pad_collate_fn_predict
-)
-out = model.predict_generator(test_loader, concatenate_returns=False)
-predictions = []
-lengths = [len(tokens) for tokens, _ in sorted_test_data]
-for batch in out:
-    # numpy.transpose != torch.transpose because Reasons
-    batch = batch.transpose((0, 2, 1)).argmax(-1)
-    for length, row in zip(lengths, batch):
-        predictions.append(row[:length])
-    del lengths[: len(batch)]
-y_pred = [[id2label[x] for x in page] for page in predictions]
-y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
-label_counts = Counter(itertools.chain.from_iterable(y_true))
+kf = KFold(n_splits=4, shuffle=True, random_state=seed)
+scores = {"test_macro_f1": []}
+label_counts = Counter(itertools.chain.from_iterable(y))
 labels = [x for x in label_counts if x[0] == "B" and label_counts[x] >= 10]
-print(
-    "ALL",
-    metrics.flat_f1_score(
-        y_true, y_pred, labels=labels, average="macro", zero_division=0.0
-    ),
-)
-for name in labels:
-    print(
-        name,
-        metrics.flat_f1_score(
-            y_true, y_pred, labels=[name], average="macro", zero_division=0.0
-        ),
+for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
+    train_data = Subset(all_data, train_idx)
+    train_loader = DataLoader(
+        train_data, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn
     )
+    dev_data = Subset(all_data, dev_idx)
+    dev_loader = DataLoader(dev_data, batch_size=batch_size, collate_fn=pad_collate_fn)
+
+    my_network = MyNetwork(featnames, featdims, feat2id, len(id2label))
+    optimizer = optim.Adam(my_network.parameters(), lr=0.1)
+    loss_function = nn.CrossEntropyLoss()
+    model = Model(
+        my_network,
+        optimizer,
+        loss_function,
+        batch_metrics=["accuracy", "f1"],
+        device=device,
+    )
+    model.fit_generator(
+        train_loader,
+        dev_loader,
+        epochs=100,
+        callbacks=[
+            ExponentialLR(gamma=0.99),
+            EarlyStopping(monitor="val_acc", mode="max", patience=20, verbose=True),
+        ],
+    )
+    ordering, sorted_test_data = zip(
+        *sorted(enumerate(dev_data), reverse=True, key=lambda x: len(x[1][0]))
+    )
+    test_loader = DataLoader(
+        sorted_test_data, batch_size=batch_size, collate_fn=pad_collate_fn_predict
+    )
+    out = model.predict_generator(test_loader, concatenate_returns=False)
+    predictions = []
+    lengths = [len(tokens) for tokens, _ in sorted_test_data]
+    for batch in out:
+        # numpy.transpose != torch.transpose because Reasons
+        batch = batch.transpose((0, 2, 1)).argmax(-1)
+        for length, row in zip(lengths, batch):
+            predictions.append(row[:length])
+        del lengths[: len(batch)]
+    y_pred = [[id2label[x] for x in page] for page in predictions]
+    y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
+    macro_f1 = metrics.flat_f1_score(
+        y_true, y_pred, labels=labels, average="macro", zero_division=0.0
+    )
+    scores["test_macro_f1"].append(macro_f1)
+    print("fold", fold + 1, "ALL", macro_f1)
+    for name in labels:
+        label_f1 = metrics.flat_f1_score(
+            y_true, y_pred, labels=[name], average="micro", zero_division=0.0
+        )
+        scores.setdefault(name, []).append(label_f1)
+        print("fold", fold + 1, name, label_f1)
+
+with open("rnnscores.csv", "wt") as outfh:
+    fieldnames = [
+        "Label",
+        "Average",
+        *range(1, len(scores["test_macro_f1"]) + 1),
+    ]
+    writer = csv.DictWriter(outfh, fieldnames=fieldnames)
+    writer.writeheader()
+
+    def makerow(name, scores):
+        row = {"Label": name, "Average": np.mean(scores)}
+        for idx, score in enumerate(scores):
+            row[idx + 1] = score
+        return row
+
+    writer.writerow(makerow("ALL", scores["test_macro_f1"]))
+    for name in labels:
+        writer.writerow(makerow(name, scores[name]))
