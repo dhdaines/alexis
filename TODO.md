@@ -18,10 +18,16 @@ DERP LERNING
 ------------
 
 - Segmentation
-  - Retokenize CSVs using CamemBERT tokenizer (spread features on pieces)
-  - Train PyTorch-CRF: https://pytorch-crf.readthedocs.io/en/stable/
-  - possibly use Skorch to do evaluation: https://skorch.readthedocs.io/en/stable/
-  - or torchmetrics, or poutyne, or HF evaluate, etc, etc, etc omg
+  - Retokenize CSVs using CamemBERT tokenizer (spread features on pieces) DONE
+    - doesn't work well for CRFs, possibly due to:
+      - all subwords have the same position, so layout features are wrong
+      - hand-crafted features maybe don't work the same on subwords (leading _ thing)
+  - Train a BiLSTM model with vsl features
+    - Learning rate decay and early stopping DONE
+    - Embed words and categorical features DONE
+    - Use same evaluator as CRF training for comparison
+      - *Should* just be able to use the sklearn class directly?
+    - Scale layout features by page size and include as vector
 
 Documentation
 -------------
