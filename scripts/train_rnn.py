@@ -73,10 +73,9 @@ labelset = set(itertools.chain.from_iterable(y))
 id2label = sorted(labelset, reverse=True)
 label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 
-featnames = sorted(k for k in X[0][0] if not k.startswith("v:"))
 vecnames = sorted(k for k in X[0][0] if k.startswith("v:"))
-featdims = {name: 32 if name in ("text", "lower") else 4 for name in featnames}
-feat2id = {name: {"": 0} for name in featnames}
+featdims = {"lower": 32, "fontname": 4, "rgb": 4, "mctag": 4}
+feat2id = {name: {"": 0} for name in featdims}
 for feats in itertools.chain.from_iterable(X):
     for name, ids in feat2id.items():
         if feats[name] not in ids:
@@ -86,7 +85,7 @@ for feats in itertools.chain.from_iterable(X):
 def make_page_feats(feat2id, page):
     return [
         (
-            [feat2id[name][feats[name]] for name in featnames],
+            [feat2id[name][feats[name]] for name in featdims],
             [float(feats[name]) for name in vecnames],
         )
         for feats in page
@@ -184,7 +183,6 @@ def pad_collate_fn_predict(batch):
 class MyNetwork(nn.Module):
     def __init__(
         self,
-        featnames,
         featdims,
         feat2id,
         n_labels,
@@ -196,7 +194,7 @@ class MyNetwork(nn.Module):
         super().__init__()
         self.hidden_state = None
         self.embedding_layers = {}
-        for name in featnames:
+        for name in featdims:
             self.embedding_layers[name] = nn.Embedding(
                 len(feat2id[name]),
                 featdims[name],
@@ -225,7 +223,7 @@ class MyNetwork(nn.Module):
         if isinstance(features, PackedSequence):
             stack = [
                 self.embedding_layers[name](features.data[:, idx])
-                for idx, name in enumerate(featnames)
+                for idx, name in enumerate(featdims)
             ]
             stack.append(vectors.data)
             inputs = torch.nn.utils.rnn.PackedSequence(
@@ -234,7 +232,7 @@ class MyNetwork(nn.Module):
         else:
             stack = [
                 self.embedding_layers[name](inputs[:, idx])
-                for idx, name in enumerate(featnames)
+                for idx, name in enumerate(featdims)
             ]
             stack.append(vectors)
             inputs = torch.hstack(stack)
@@ -266,7 +264,7 @@ for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
     dev_data = Subset(all_data, dev_idx)
     dev_loader = DataLoader(dev_data, batch_size=batch_size, collate_fn=pad_collate_fn)
 
-    my_network = MyNetwork(featnames, featdims, feat2id, len(id2label))
+    my_network = MyNetwork(featdims, feat2id, len(id2label))
     optimizer = optim.Adam(my_network.parameters(), lr=0.1)
     loss_function = nn.CrossEntropyLoss()
     model = Model(
