@@ -34,40 +34,124 @@ def make_dataset(csvs):
         yield features, labels
 
 
+X, y = zip(*make_dataset(DATA))
+
+labelset = set(itertools.chain.from_iterable(y))
+id2label = sorted(labelset, reverse=True)
+label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
+
+featnames = sorted(k for k in X[0][0] if not k.startswith("line:"))
+vecnames = sorted(k for k in X[0][0] if k.startswith("line:"))
+featdims = {name: 32 if name in ("text", "lower") else 2 for name in featnames}
+feat2id = {name: {"": 0} for name in featnames}
+for feats in itertools.chain.from_iterable(X):
+    for name, ids in feat2id.items():
+        if feats[name] not in ids:
+            ids[feats[name]] = len(ids)
+
+
+def make_page_feats(feat2id, page):
+    page_feats = []
+    # FIXME: rather inefficient scaling
+    max_feats = None
+    for feats in page:
+        vector = [float(feats[name]) for name in vecnames]
+        if max_feats is None:
+            max_feats = np.abs(vector)
+        else:
+            max_feats = np.maximum(max_feats, np.abs(vector))
+        page_feats.append(([feat2id[name][feats[name]] for name in featnames], vector))
+    max_feats[max_feats == 0] = 1
+    for idx, (tokens, vector) in enumerate(page_feats):
+        page_feats[idx] = (tokens, vector / max_feats)
+    return page_feats
+
+
+all_data = [
+    (
+        make_page_feats(feat2id, page),
+        [label2id[tag] for tag in labels],
+    )
+    for page, labels in zip(X, y)
+]
+veclen = len(all_data[0][0][0][1])
+print(all_data[0][0][0])
+
+
+def batch_sort_key(example):
+    features, labels = example
+    return -len(labels)
+
+
 def pad_collate_fn(batch):
-    sequences_tokens, sequences_labels, lengths = zip(
-        *[
-            (torch.LongTensor(tokens), torch.LongTensor(labels), len(tokens))
-            for (tokens, labels) in sorted(batch, key=lambda x: len(x[0]), reverse=True)
-        ]
-    )
+    batch.sort(key=batch_sort_key)
+    # Don't use a list comprehension here so we can better understand
+    sequences_features = []
+    sequences_vectors = []
+    sequences_labels = []
+    lengths = []
+    for example in batch:
+        features, labels = example
+        feats, vector = zip(*features)
+        assert len(labels) == len(feats)
+        assert len(labels) == len(vector)
+        sequences_features.append(torch.LongTensor(feats))
+        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_labels.append(torch.LongTensor(labels))
+        lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
-    padded_sequences_tokens = pad_sequence(
-        sequences_tokens, batch_first=True, padding_value=0
+    padded_sequences_features = pad_sequence(
+        sequences_features, batch_first=True, padding_value=0
     )
-    pack_padded_sequences_tokens = pack_padded_sequence(
-        padded_sequences_tokens, lengths.cpu(), batch_first=True
+    pack_padded_sequences_features = pack_padded_sequence(
+        padded_sequences_features, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_vectors = pad_sequence(
+        sequences_vectors, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_vectors = pack_padded_sequence(
+        padded_sequences_vectors, lengths.cpu(), batch_first=True
     )
     padded_sequences_labels = pad_sequence(
         sequences_labels, batch_first=True, padding_value=-100
     )
-    return pack_padded_sequences_tokens, padded_sequences_labels
+    return (
+        (pack_padded_sequences_features, pack_padded_sequences_vectors),
+        padded_sequences_labels,
+    )
 
 
 def pad_collate_fn_predict(batch):
     # Require data to be externally sorted by length for prediction
     # (otherwise we have no idea which output corresponds to which input! WTF Poutyne!)
-    sequences_tokens, lengths = zip(
-        *((torch.LongTensor(tokens), len(tokens)) for (tokens, labels) in batch)
-    )
+    # Don't use a list comprehension here so we can better understand
+    sequences_features = []
+    sequences_vectors = []
+    sequences_labels = []
+    lengths = []
+    for example in batch:
+        features, labels = example
+        feats, vector = zip(*features)
+        assert len(labels) == len(feats)
+        assert len(labels) == len(vector)
+        sequences_features.append(torch.LongTensor(feats))
+        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_labels.append(torch.LongTensor(labels))
+        lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
-    padded_sequences_tokens = pad_sequence(
-        sequences_tokens, batch_first=True, padding_value=0
+    padded_sequences_features = pad_sequence(
+        sequences_features, batch_first=True, padding_value=0
     )
-    pack_padded_sequences_tokens = pack_padded_sequence(
-        padded_sequences_tokens, lengths.cpu(), batch_first=True
+    pack_padded_sequences_features = pack_padded_sequence(
+        padded_sequences_features, lengths.cpu(), batch_first=True
     )
-    return pack_padded_sequences_tokens
+    padded_sequences_vectors = pad_sequence(
+        sequences_vectors, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_vectors = pack_padded_sequence(
+        padded_sequences_vectors, lengths.cpu(), batch_first=True
+    )
+    return (pack_padded_sequences_features, pack_padded_sequences_vectors)
 
 
 class MyNetwork(nn.Module):
@@ -91,7 +175,7 @@ class MyNetwork(nn.Module):
                 padding_idx=0,
             )
             self.add_module(f"embedding_{name}", self.embedding_layers[name])
-        dimension = sum(featdims.values())
+        dimension = sum(featdims.values()) + veclen
         self.lstm_layer = nn.LSTM(
             input_size=dimension,
             hidden_size=hidden_size,
@@ -103,26 +187,29 @@ class MyNetwork(nn.Module):
             hidden_size * (2 if bidirectional else 1), n_labels
         )
 
-    def forward(self, pack_padded_tokens_vectors: PackedSequence | torch.Tensor):
+    def forward(
+        self,
+        features: PackedSequence | torch.Tensor,
+        vectors: PackedSequence | torch.Tensor,
+    ):
         # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
-        if isinstance(pack_padded_tokens_vectors, PackedSequence):
-            embeddings = torch.hstack(
-                [
-                    self.embedding_layers[name](pack_padded_tokens_vectors.data[:, idx])
-                    for idx, name in enumerate(featnames)
-                ]
-            )
-            embeddings = torch.nn.utils.rnn.PackedSequence(
-                embeddings, pack_padded_tokens_vectors.batch_sizes
+        if isinstance(features, PackedSequence):
+            stack = [
+                self.embedding_layers[name](features.data[:, idx])
+                for idx, name in enumerate(featnames)
+            ]
+            stack.append(vectors.data)
+            inputs = torch.nn.utils.rnn.PackedSequence(
+                torch.hstack(stack), features.batch_sizes
             )
         else:
-            embeddings = torch.hstack(
-                [
-                    self.embedding_layers[name](pack_padded_tokens_vectors[:, idx])
-                    for idx, name in enumerate(featnames)
-                ]
-            )
-        lstm_out, self.hidden_state = self.lstm_layer(embeddings)
+            stack = [
+                self.embedding_layers[name](inputs[:, idx])
+                for idx, name in enumerate(featnames)
+            ]
+            stack.append(vectors)
+            inputs = torch.hstack(stack)
+        lstm_out, self.hidden_state = self.lstm_layer(inputs)
         if isinstance(lstm_out, PackedSequence):
             lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
         tag_space = self.output_layer(lstm_out)
@@ -131,28 +218,6 @@ class MyNetwork(nn.Module):
         )  # We need to transpose since it's a sequence (but why?!)
         return tag_space
 
-
-X, y = zip(*make_dataset(DATA))
-
-labelset = set(itertools.chain.from_iterable(y))
-id2label = sorted(labelset, reverse=True)
-label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-
-featnames = sorted(k for k in X[0][0] if not k.startswith("line:"))
-featdims = {name: 32 if name in ("text", "lower") else 2 for name in featnames}
-feat2id = {name: {"": 0} for name in featnames}
-for feats in itertools.chain.from_iterable(X):
-    for name, ids in feat2id.items():
-        if feats[name] not in ids:
-            ids[feats[name]] = len(ids)
-
-all_data = [
-    (
-        [[feat2id[name][feats[name]] for name in featnames] for feats in page],
-        [label2id[tag] for tag in labels],
-    )
-    for page, labels in zip(X, y)
-]
 
 cuda_device = 0
 device = torch.device("cuda:%d" % cuda_device if torch.cuda.is_available() else "cpu")
