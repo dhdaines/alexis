@@ -51,31 +51,29 @@ for feats in itertools.chain.from_iterable(X):
 
 
 def make_page_feats(feat2id, page):
-    page_feats = []
-    # FIXME: rather inefficient scaling
-    max_feats = None
-    for feats in page:
-        vector = [float(feats[name]) for name in vecnames]
-        if max_feats is None:
-            max_feats = np.abs(vector)
-        else:
-            max_feats = np.maximum(max_feats, np.abs(vector))
-        page_feats.append(([feat2id[name][feats[name]] for name in featnames], vector))
-    max_feats[max_feats == 0] = 1
-    for idx, (tokens, vector) in enumerate(page_feats):
-        page_feats[idx] = (tokens, vector / max_feats)
-    return page_feats
+    return [
+        (
+            [feat2id[name][feats[name]] for name in featnames],
+            [float(feats[name]) for name in vecnames],
+        )
+        for feats in page
+    ]
+
+
+def make_page_labels(label2id, page):
+    return [label2id[tag] for tag in page]
 
 
 all_data = [
-    (
-        make_page_feats(feat2id, page),
-        [label2id[tag] for tag in labels],
-    )
+    (make_page_feats(feat2id, page), make_page_labels(label2id, labels))
     for page, labels in zip(X, y)
 ]
 veclen = len(all_data[0][0][0][1])
-print(all_data[0][0][0])
+vecmax = np.zeros(veclen)
+for page, _ in all_data:
+    for _, vector in page:
+        vecmax = np.maximum(vecmax, np.abs(vector))
+print(vecmax)
 
 
 def batch_sort_key(example):
@@ -96,7 +94,7 @@ def pad_collate_fn(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
@@ -135,7 +133,7 @@ def pad_collate_fn_predict(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
