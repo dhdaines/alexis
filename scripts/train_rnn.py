@@ -23,26 +23,59 @@ from alexi import segment
 DATA = list(Path("data").glob("*.csv"))
 
 
+def make_fontname(fontname):
+    a, plus, b = fontname.partition("+")
+    if plus:
+        return b
+    return fontname
+
+
+def add_deltas(page):
+    prev = {}
+    for w in page:
+        for f in list(f for f in w if f.startswith("v:")):
+            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
+            prev[f] = w[f]
+    prev = {}
+    for w in page:
+        for f in list(f for f in w if f.endswith(":delta")):
+            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
+            prev[f] = w[f]
+
+
 def make_dataset(csvs):
     iobs = segment.load(csvs)
     for p in segment.split_pages(segment.filter_tab(iobs)):
-        features = list(
-            dict(x.split("=", maxsplit=2) for x in feats)
-            for feats in segment.textpluslayoutplusstructure_features(p)
-        )
+        features = [
+            {
+                "lower": w["text"].lower(),
+                "fontname": make_fontname(w["fontname"]),
+                "mctag": w["mctag"],
+                "rgb": w["rgb"],
+                "v:x0": float(w["x0"]) / float(w["page_width"]),
+                "v:top": float(w["top"]) / float(w["page_height"]),
+                "v:x1": float(w["x1"]) / float(w["page_width"]),
+                "v:bottom": float(w["bottom"]) / float(w["page_height"]),
+                "v:height": (float(w["bottom"]) - float(w["top"]))
+                / float(w["page_height"]),
+            }
+            for w in p
+        ]
+        add_deltas(features)
         labels = list(segment.page2labels(p))
         yield features, labels
 
 
 X, y = zip(*make_dataset(DATA))
+print(X[0])
 
 labelset = set(itertools.chain.from_iterable(y))
 id2label = sorted(labelset, reverse=True)
 label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 
-featnames = sorted(k for k in X[0][0] if not k.startswith("line:"))
-vecnames = sorted(k for k in X[0][0] if k.startswith("line:"))
-featdims = {name: 32 if name in ("text", "lower") else 2 for name in featnames}
+featnames = sorted(k for k in X[0][0] if not k.startswith("v:"))
+vecnames = sorted(k for k in X[0][0] if k.startswith("v:"))
+featdims = {name: 32 if name in ("text", "lower") else 4 for name in featnames}
 feat2id = {name: {"": 0} for name in featnames}
 for feats in itertools.chain.from_iterable(X):
     for name, ids in feat2id.items():
@@ -69,11 +102,7 @@ all_data = [
     for page, labels in zip(X, y)
 ]
 veclen = len(all_data[0][0][0][1])
-vecmax = np.zeros(veclen)
-for page, _ in all_data:
-    for _, vector in page:
-        vecmax = np.maximum(vecmax, np.abs(vector))
-print(vecmax)
+print(all_data[0][0])
 
 
 def batch_sort_key(example):
@@ -94,7 +123,7 @@ def pad_collate_fn(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
@@ -133,7 +162,7 @@ def pad_collate_fn_predict(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
@@ -162,6 +191,7 @@ class MyNetwork(nn.Module):
         hidden_size=32,
         num_layer=1,
         bidirectional=True,
+        dropout=0,
     ):
         super().__init__()
         self.hidden_state = None
@@ -180,6 +210,7 @@ class MyNetwork(nn.Module):
             num_layers=num_layer,
             bidirectional=bidirectional,
             batch_first=True,
+            dropout=dropout,
         )
         self.output_layer = nn.Linear(
             hidden_size * (2 if bidirectional else 1), n_labels
@@ -250,8 +281,8 @@ for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
         dev_loader,
         epochs=100,
         callbacks=[
-            ExponentialLR(gamma=0.99),
-            EarlyStopping(monitor="val_acc", mode="max", patience=20, verbose=True),
+            ExponentialLR(gamma=0.95),
+            EarlyStopping(monitor="val_acc", mode="max", patience=10, verbose=True),
         ],
     )
     ordering, sorted_test_data = zip(
