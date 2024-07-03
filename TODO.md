@@ -33,18 +33,23 @@ DERP LERNING
     - scale all the things by page size (slightly less good than by
       abs(max(feats)) but probably more robust)
     - upweight B- tags by 2.0
-    - smaller word embeddings (not enough data to train them well, and
-      they are not reliable)
     - taking the best model using f1_macro
+  - Inconclusive
+    - GRU or plain RNN with lower learning rate
+      - LSTM is maybe overparameterized?
+      - Improves label accuracy quite a lot but mean F1 not really
   - Things that did not help
+    - wider word embeddings (just using the same dimension for all embeddings works best...)
     - weighting classes by inverse frequency (just upweight B as it's what we care about)
     - more LSTM layers
     - much wider LSTM
     - much narrower LSTM
     - dropout on LSTM layers
+    - extra feedforward layer
   - Things yet to be tried
     - CRF output layer (should help a lot)
     - label smoothing
+    - feedforward layer before RNN
     - dropout in other places
     
 Documentation
