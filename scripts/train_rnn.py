@@ -388,8 +388,8 @@ def main():
         predictions = []
         lengths = [len(tokens) for tokens, _ in sorted_test_data]
         for batch in out:
-            scores, labels, mask = batch
-            for length, row in zip(lengths, labels):
+            _scores, tags, _mask = batch
+            for length, row in zip(lengths, tags):
                 predictions.append(np.array(row[:length]))
             del lengths[: len(batch)]
         y_pred = [[id2label[x] for x in page] for page in predictions]
