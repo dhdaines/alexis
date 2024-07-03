@@ -235,7 +235,7 @@ class MyNetwork(nn.Module):
         featdims,
         feat2id,
         n_labels,
-        hidden_size=32,
+        hidden_size=64,
         num_layer=1,
         bidirectional=True,
         dropout=0,
