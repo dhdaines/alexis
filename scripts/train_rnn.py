@@ -349,7 +349,7 @@ def main():
         )
 
         my_network = MyNetwork(featdims, feat2id, veclen, len(id2label))
-        optimizer = optim.Adam(my_network.parameters(), lr=0.1)
+        optimizer = optim.Adam(my_network.parameters(), lr=0.01)
         loss_function = MyCRFLoss(my_network.crf_layer)
         model = Model(
             my_network,
