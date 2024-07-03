@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from poutyne import EarlyStopping, ExponentialLR, Model, set_seeds
+from poutyne import EarlyStopping, ExponentialLR, Model, ModelCheckpoint, set_seeds
 from sklearn.model_selection import KFold
 from sklearn_crfsuite import metrics
 from torch.nn.utils.rnn import (
@@ -50,6 +50,10 @@ def make_dataset(csvs):
             dict(w.split("=", maxsplit=2) for w in feats)
             for feats in segment.textpluslayoutplusstructure_features(p)
         )
+        for f, w in zip(features, p):
+            f["v:x0"] = float(w["x0"])
+            f["v:top"] = float(w["top"])
+
         add_deltas(features)
         labels = list(segment.page2labels(p))
         yield features, labels
@@ -277,7 +281,7 @@ set_seeds(seed)
 kf = KFold(n_splits=4, shuffle=True, random_state=seed)
 scores = {"test_macro_f1": []}
 label_counts = Counter(itertools.chain.from_iterable(y))
-labels = [x for x in label_counts if x[0] == "B" and label_counts[x] >= 10]
+labels = sorted(x for x in label_counts if x[0] == "B" and label_counts[x] >= 10)
 for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
     train_data = Subset(all_data, train_idx)
     train_loader = DataLoader(
@@ -301,8 +305,19 @@ for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
         dev_loader,
         epochs=100,
         callbacks=[
-            ExponentialLR(gamma=0.95),
-            EarlyStopping(monitor="val_acc", mode="max", patience=10, verbose=True),
+            ExponentialLR(gamma=0.99),
+            ModelCheckpoint(
+                monitor="val_fscore_macro",
+                filename="rnnmodel.pkl",
+                mode="max",
+                save_best_only=True,
+                restore_best=True,
+                keep_only_last_best=True,
+                verbose=True,
+            ),
+            EarlyStopping(
+                monitor="val_fscore_macro", mode="max", patience=10, verbose=True
+            ),
         ],
     )
     ordering, sorted_test_data = zip(
@@ -349,6 +364,10 @@ with open("rnnscores.csv", "wt") as outfh:
             row[idx + 1] = score
         return row
 
-    writer.writerow(makerow("ALL", scores["test_macro_f1"]))
+    row = makerow("ALL", scores["test_macro_f1"])
+    writer.writerow(row)
+    print("average", "ALL", row["Average"])
     for name in labels:
-        writer.writerow(makerow(name, scores[name]))
+        row = makerow(name, scores[name])
+        writer.writerow(row)
+        print("average", row["Label"], row["Average"])
