@@ -46,21 +46,10 @@ def add_deltas(page):
 def make_dataset(csvs):
     iobs = segment.load(csvs)
     for p in segment.split_pages(segment.filter_tab(iobs)):
-        features = [
-            {
-                "lower": w["text"].lower(),
-                "fontname": make_fontname(w["fontname"]),
-                "mctag": w["mctag"],
-                "rgb": w["rgb"],
-                "v:x0": float(w["x0"]) / float(w["page_width"]),
-                "v:top": float(w["top"]) / float(w["page_height"]),
-                "v:x1": float(w["x1"]) / float(w["page_width"]),
-                "v:bottom": float(w["bottom"]) / float(w["page_height"]),
-                "v:height": (float(w["bottom"]) - float(w["top"]))
-                / float(w["page_height"]),
-            }
-            for w in p
-        ]
+        features = list(
+            dict(w.split("=", maxsplit=2) for w in feats)
+            for feats in segment.textpluslayoutplusstructure_features(p)
+        )
         add_deltas(features)
         labels = list(segment.page2labels(p))
         yield features, labels
@@ -73,8 +62,33 @@ labelset = set(itertools.chain.from_iterable(y))
 id2label = sorted(labelset, reverse=True)
 label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 
-vecnames = sorted(k for k in X[0][0] if k.startswith("v:"))
-featdims = {"lower": 32, "fontname": 4, "rgb": 4, "mctag": 4}
+vecnames = [
+    "first",
+    "last",
+    "line:height",
+    "line:left",
+    "line:top",
+    "line:gap",
+    "line:indent",
+]
+featdims = {
+    "lower": 32,
+    "rgb": 4,
+    "mctag": 4,
+    "uppercase": 2,
+    "title": 2,
+    "punc": 2,
+    "endpunc": 2,
+    "numeric": 2,
+    "bold": 2,
+    "italic": 2,
+    "toc": 2,
+    "header": 2,
+    "head:table": 2,
+    "head:chapitre": 2,
+    "head:annexe": 2,
+}
+
 feat2id = {name: {"": 0} for name in featdims}
 for feats in itertools.chain.from_iterable(X):
     for name, ids in feat2id.items():
@@ -102,6 +116,11 @@ all_data = [
 ]
 veclen = len(all_data[0][0][0][1])
 print(all_data[0][0])
+vecmax = np.zeros(veclen)
+for page, _ in all_data:
+    for _, vector in page:
+        vecmax = np.maximum(vecmax, np.abs(vector))
+print(vecmax)
 
 
 def batch_sort_key(example):
@@ -122,7 +141,7 @@ def pad_collate_fn(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
@@ -161,7 +180,7 @@ def pad_collate_fn_predict(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
