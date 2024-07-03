@@ -22,13 +22,31 @@ DERP LERNING
     - doesn't work well for CRFs, possibly due to:
       - all subwords have the same position, so layout features are wrong
       - hand-crafted features maybe don't work the same on subwords (leading _ thing)
-  - Train a BiLSTM model with vsl features
+  - Train a BiLSTM model with vsl features DONE
     - Learning rate decay and early stopping DONE
     - Embed words and categorical features DONE
-    - Use same evaluator as CRF training for comparison
-      - *Should* just be able to use the sklearn class directly?
-    - Scale layout features by page size and include as vector
-
+    - Use same evaluator as CRF training for comparison DONE
+    - Scale layout features by page size and include as vector DONE
+  - Things that helped
+    - use all the manually created features and embed them with >=4 dimensions
+    - deltas and delta-deltas
+    - scale all the things by page size (slightly less good than by
+      abs(max(feats)) but probably more robust)
+    - upweight B- tags by 2.0
+    - smaller word embeddings (not enough data to train them well, and
+      they are not reliable)
+    - taking the best model using f1_macro
+  - Things that did not help
+    - weighting classes by inverse frequency (just upweight B as it's what we care about)
+    - more LSTM layers
+    - much wider LSTM
+    - much narrower LSTM
+    - dropout on LSTM layers
+  - Things yet to be tried
+    - CRF output layer (should help a lot)
+    - label smoothing
+    - dropout in other places
+    
 Documentation
 -------------
 
