@@ -17,6 +17,7 @@ from torch.nn.utils.rnn import (
     pad_sequence,
 )
 from torch.utils.data import DataLoader, Subset
+from bi_lstm_crf import CRF
 
 from alexi import segment
 
@@ -151,8 +152,9 @@ def pad_collate_fn(batch):
     padded_sequences_labels = pad_sequence(
         sequences_labels, batch_first=True, padding_value=-100
     )
+    mask = torch.ne(padded_sequences_labels, -100)
     return (
-        (pack_padded_sequences_features, pack_padded_sequences_vectors),
+        (pack_padded_sequences_features, pack_padded_sequences_vectors, mask),
         padded_sequences_labels,
     )
 
@@ -175,7 +177,12 @@ def pad_collate_fn_predict(batch):
         sequences_vectors.append(torch.FloatTensor(vector))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
-    lengths = torch.LongTensor(lengths)
+    max_len = max(lengths)
+    len_lens = len(lengths)
+    lengths = torch.LongTensor(lengths).cpu()
+    # ought to be built into torch...
+    # https://stackoverflow.com/questions/53403306/how-to-batch-convert-sentence-lengths-to-masks-in-pytorch
+    mask = torch.arange(max_len).expand(len_lens, max_len) < lengths.unsqueeze(1)
     padded_sequences_features = pad_sequence(
         sequences_features, batch_first=True, padding_value=0
     )
@@ -188,7 +195,7 @@ def pad_collate_fn_predict(batch):
     pack_padded_sequences_vectors = pack_padded_sequence(
         padded_sequences_vectors, lengths.cpu(), batch_first=True
     )
-    return (pack_padded_sequences_features, pack_padded_sequences_vectors)
+    return (pack_padded_sequences_features, pack_padded_sequences_vectors, mask)
 
 
 class MyNetwork(nn.Module):
@@ -223,14 +230,13 @@ class MyNetwork(nn.Module):
             batch_first=True,
             dropout=dropout,
         )
-        self.output_layer = nn.Linear(
-            hidden_size * (2 if bidirectional else 1), n_labels
-        )
+        self.crf_layer = CRF(hidden_size * (2 if bidirectional else 1), n_labels)
 
     def forward(
         self,
         features: PackedSequence | torch.Tensor,
         vectors: PackedSequence | torch.Tensor,
+        mask: torch.Tensor,
     ):
         # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
         if isinstance(features, PackedSequence):
@@ -252,11 +258,30 @@ class MyNetwork(nn.Module):
         lstm_out, self.hidden_state = self.lstm_layer(inputs)
         if isinstance(lstm_out, PackedSequence):
             lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
-        tag_space = self.output_layer(lstm_out)
-        tag_space = tag_space.transpose(
-            -1, 1
-        )  # We need to transpose since it's a sequence (but why?!)
-        return tag_space
+        _scores, labels = self.crf_layer(lstm_out, mask)
+        return lstm_out, labels, mask
+
+
+class MyCRFLoss:
+    def __init__(self, crf):
+        self.crf = crf
+
+    def __call__(self, returns, y_true):
+        logits, _labels, mask = returns
+        # Annoyingly, CRF requires masked labels to be valid indices
+        y_true[~mask] = 0
+        return self.crf.loss(logits, y_true, mask)
+
+
+def my_accuracy(y_pred, y_true):
+    """poutyne's "accuracy" is totally useless here"""
+    _score, y_pred, y_mask = y_pred
+    n_labels = 0
+    n_true = 0
+    for pred, true, _mask in zip(y_pred, y_true, y_mask):
+        n_labels += len(pred)  # it is not padded
+        n_true += torch.eq(torch.Tensor(pred), true[: len(pred)].cpu()).sum()
+    return n_true / n_labels * 100
 
 
 def main():
@@ -325,16 +350,12 @@ def main():
 
         my_network = MyNetwork(featdims, feat2id, veclen, len(id2label))
         optimizer = optim.Adam(my_network.parameters(), lr=0.1)
-        loss_function = nn.CrossEntropyLoss(
-            weight=torch.FloatTensor([2 if x[0] == "B" else 1 for x in id2label])
-            # weight=torch.FloatTensor([label_weights.get(x, 1.0) for x in id2label])
-            # weight=torch.FloatTensor([1 / label_counts[x] for x in id2label])
-        )
+        loss_function = MyCRFLoss(my_network.crf_layer)
         model = Model(
             my_network,
             optimizer,
             loss_function,
-            batch_metrics=["accuracy", "f1"],
+            batch_metrics=[my_accuracy],
             device=device,
         )
         model.fit_generator(
@@ -344,7 +365,7 @@ def main():
             callbacks=[
                 ExponentialLR(gamma=0.99),
                 ModelCheckpoint(
-                    monitor="val_fscore_macro",
+                    monitor="val_my_accuracy",
                     filename="rnnmodel.pkl",
                     mode="max",
                     save_best_only=True,
@@ -353,7 +374,7 @@ def main():
                     verbose=True,
                 ),
                 EarlyStopping(
-                    monitor="val_fscore_macro", mode="max", patience=10, verbose=True
+                    monitor="val_my_accuracy", mode="max", patience=10, verbose=True
                 ),
             ],
         )
@@ -367,10 +388,9 @@ def main():
         predictions = []
         lengths = [len(tokens) for tokens, _ in sorted_test_data]
         for batch in out:
-            # numpy.transpose != torch.transpose because Reasons
-            batch = batch.transpose((0, 2, 1)).argmax(-1)
-            for length, row in zip(lengths, batch):
-                predictions.append(row[:length])
+            scores, labels, mask = batch
+            for length, row in zip(lengths, labels):
+                predictions.append(np.array(row[:length]))
             del lengths[: len(batch)]
         y_pred = [[id2label[x] for x in page] for page in predictions]
         y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
