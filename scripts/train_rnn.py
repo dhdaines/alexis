@@ -91,7 +91,7 @@ vecnames = [
     "v:bottom:delta:delta",
 ]
 featdims = {
-    "lower": 32,
+    "lower": 8,
     "rgb": 4,
     "mctag": 4,
     "uppercase": 4,
@@ -317,6 +317,8 @@ for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
     optimizer = optim.Adam(my_network.parameters(), lr=0.1)
     loss_function = nn.CrossEntropyLoss(
         weight=torch.FloatTensor([2 if x[0] == "B" else 1 for x in id2label])
+        # weight=torch.FloatTensor([label_weights.get(x, 1.0) for x in id2label])
+        # weight=torch.FloatTensor([1 / label_counts[x] for x in id2label])
     )
     model = Model(
         my_network,
