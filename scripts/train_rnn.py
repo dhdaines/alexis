@@ -311,7 +311,7 @@ def main():
         "v:bottom:delta:delta",
     ]
     featdims = {
-        "lower": 8,
+        "lower": 32,
         "rgb": 8,
         "mctag": 8,
         "uppercase": 8,
@@ -348,8 +348,8 @@ def main():
             dev_data, batch_size=batch_size, collate_fn=pad_collate_fn
         )
 
-        my_network = MyNetwork(featdims, feat2id, veclen, len(id2label))
-        optimizer = optim.Adam(my_network.parameters(), lr=0.01)
+        my_network = MyNetwork(featdims, feat2id, veclen, len(id2label), hidden_size=80)
+        optimizer = optim.Adam(my_network.parameters(), lr=0.1)
         loss_function = MyCRFLoss(my_network.crf_layer)
         model = Model(
             my_network,
@@ -363,7 +363,7 @@ def main():
             dev_loader,
             epochs=100,
             callbacks=[
-                ExponentialLR(gamma=0.99),
+                ExponentialLR(gamma=0.9),
                 ModelCheckpoint(
                     monitor="val_my_accuracy",
                     filename="rnnmodel.pkl",
