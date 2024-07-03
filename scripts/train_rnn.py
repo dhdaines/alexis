@@ -315,7 +315,9 @@ for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
 
     my_network = MyNetwork(featdims, feat2id, len(id2label))
     optimizer = optim.Adam(my_network.parameters(), lr=0.1)
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.CrossEntropyLoss(
+        weight=torch.FloatTensor([2 if x[0] == "B" else 1 for x in id2label])
+    )
     model = Model(
         my_network,
         optimizer,
