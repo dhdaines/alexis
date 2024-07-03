@@ -56,20 +56,15 @@ def make_dataset(csvs):
 
 
 X, y = zip(*make_dataset(DATA))
-print(X[0])
 
 labelset = set(itertools.chain.from_iterable(y))
 id2label = sorted(labelset, reverse=True)
 label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 
 vecnames = [
-    "first",
-    "last",
-    "line:height",
     "line:left",
     "line:top",
     "line:gap",
-    "line:indent",
 ]
 featdims = {
     "lower": 32,
@@ -87,6 +82,10 @@ featdims = {
     "head:table": 4,
     "head:chapitre": 4,
     "head:annexe": 4,
+    "line:indent": 4,
+    "line:height": 4,
+    "first": 4,
+    "last": 4,
 }
 
 feat2id = {name: {"": 0} for name in featdims}
@@ -94,6 +93,9 @@ for feats in itertools.chain.from_iterable(X):
     for name, ids in feat2id.items():
         if feats[name] not in ids:
             ids[feats[name]] = len(ids)
+print("Vocabulary size:")
+for feat, vals in feat2id.items():
+    print(f"\t{feat}: {len(vals)}")
 
 
 def make_page_feats(feat2id, page):
@@ -115,12 +117,13 @@ all_data = [
     for page, labels in zip(X, y)
 ]
 veclen = len(all_data[0][0][0][1])
-print(all_data[0][0])
 vecmax = np.zeros(veclen)
 for page, _ in all_data:
     for _, vector in page:
         vecmax = np.maximum(vecmax, np.abs(vector))
-print(vecmax)
+print("Scaling:")
+for feat, val in zip(vecnames, vecmax):
+    print(f"\t{feat}: {val}")
 
 
 def batch_sort_key(example):
