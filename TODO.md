@@ -19,14 +19,15 @@ DERP LERNING
 
 - Segmentation
   - Retokenize CSVs using CamemBERT tokenizer (spread features on pieces) DONE
-    - doesn't work well for CRFs, possibly due to:
-      - all subwords have the same position, so layout features are wrong
-      - hand-crafted features maybe don't work the same on subwords (leading _ thing)
   - Train a BiLSTM model with vsl features DONE
     - Learning rate decay and early stopping DONE
     - Embed words and categorical features DONE
     - Use same evaluator as CRF training for comparison DONE
     - Scale layout features by page size and include as vector DONE
+  - CRF output layer
+    - Just try dropping in the loss function?
+  - Tokenize from chars
+  - Do prediction with Transformers
   - Things that helped
     - use all the manually created features and embed them with >=4 dimensions
     - deltas and delta-deltas
@@ -38,7 +39,11 @@ DERP LERNING
     - GRU or plain RNN with lower learning rate
       - LSTM is maybe overparameterized?
       - Improves label accuracy quite a lot but mean F1 not really
+      - This seems to be a consequence of lower learning rate not cell typpe
   - Things that did not help
+    - CamemBERT tokenizer doesn't work well for CRFs, possibly due to:
+      - all subwords have the same position, so layout features are wrong
+      - hand-crafted features maybe don't work the same on subwords (leading _ thing)
     - wider word embeddings (just using the same dimension for all embeddings works best...)
     - weighting classes by inverse frequency (just upweight B as it's what we care about)
     - more LSTM layers
@@ -48,6 +53,7 @@ DERP LERNING
     - extra feedforward layer
   - Things yet to be tried
     - CRF output layer (should help a lot)
+    - hyperparameter t00ning
     - label smoothing
     - feedforward layer before RNN
     - dropout in other places
