@@ -51,8 +51,17 @@ def make_dataset(csvs):
             for feats in segment.textpluslayoutplusstructure_features(p)
         )
         for f, w in zip(features, p):
-            f["v:x0"] = float(w["x0"])
-            f["v:top"] = float(w["top"])
+            f["line:left"] = float(f["line:left"]) / float(w["page_width"])
+            f["line:top"] = float(f["line:top"]) / float(w["page_height"])
+            f["v:top"] = float(w["top"]) / float(w["page_height"])
+            f["v:left"] = float(w["x0"]) / float(w["page_width"])
+            f["v:top"] = float(w["top"]) / float(w["page_height"])
+            f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
+                w["page_width"]
+            )
+            f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
+                w["page_height"]
+            )
 
         add_deltas(features)
         labels = list(segment.page2labels(p))
@@ -68,7 +77,18 @@ label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
 vecnames = [
     "line:left",
     "line:top",
-    "line:gap",
+    "v:left",
+    "v:top",
+    "v:right",
+    "v:bottom",
+    "v:left:delta",
+    "v:top:delta",
+    "v:right:delta",
+    "v:bottom:delta",
+    "v:left:delta:delta",
+    "v:top:delta:delta",
+    "v:right:delta:delta",
+    "v:bottom:delta:delta",
 ]
 featdims = {
     "lower": 32,
@@ -86,8 +106,9 @@ featdims = {
     "head:table": 4,
     "head:chapitre": 4,
     "head:annexe": 4,
-    "line:indent": 4,
     "line:height": 4,
+    "line:indent": 4,
+    "line:gap": 4,
     "first": 4,
     "last": 4,
 }
@@ -125,9 +146,9 @@ vecmax = np.zeros(veclen)
 for page, _ in all_data:
     for _, vector in page:
         vecmax = np.maximum(vecmax, np.abs(vector))
-print("Scaling:")
-for feat, val in zip(vecnames, vecmax):
-    print(f"\t{feat}: {val}")
+# print("Scaling:")
+# for feat, val in zip(vecnames, vecmax):
+#     print(f"\t{feat}: {val}")
 
 
 def batch_sort_key(example):
@@ -148,7 +169,8 @@ def pad_collate_fn(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
@@ -187,7 +209,8 @@ def pad_collate_fn_predict(batch):
         assert len(labels) == len(feats)
         assert len(labels) == len(vector)
         sequences_features.append(torch.LongTensor(feats))
-        sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
         sequences_labels.append(torch.LongTensor(labels))
         lengths.append(len(labels))
     lengths = torch.LongTensor(lengths)
