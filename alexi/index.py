@@ -4,56 +4,116 @@ Construire un index pour faire des recherches dans les données extraites.
 
 import json
 import logging
-import os
+import re
 from pathlib import Path
+from dataclasses import dataclass
 
-from whoosh.analysis import CharsetFilter, StemmingAnalyzer  # type: ignore
-from whoosh.fields import ID, NUMERIC, TEXT, Schema  # type: ignore
-from whoosh.index import create_in  # type: ignore
-from whoosh.support.charset import charset_table_to_dict  # type: ignore
-from whoosh.support.charset import default_charset
-from whoosh.writing import IndexWriter  # type: ignore
+from bs4 import BeautifulSoup
+from lunr import lunr, get_default_builder
+from lunr.pipeline import Pipeline
+from unidecode import unidecode
 
 LOGGER = logging.getLogger("index")
-CHARMAP = charset_table_to_dict(default_charset)
-ANALYZER = StemmingAnalyzer() | CharsetFilter(CHARMAP)
 
 
-def add_from_dir(writer: IndexWriter, document: str, docdir: Path) -> dict:
-    with open(docdir / "index.json") as infh:
-        element = json.load(infh)
-        titre = f'{element["type"]} {element["numero"]}: {element["titre"]}'
-        page = element.get("page", 1)
-    LOGGER.info("Indexing %s: %s", docdir, element["titre"])
-    with open(docdir / "index.md") as infh:
-        writer.add_document(
-            document=document, page=page, titre=titre, contenu=infh.read()
-        )
-    return element
+@dataclass
+class Document:
+    url: str
+    titre: str
+    texte: str
+
+
+def body_text(soup: BeautifulSoup):
+    body = soup.div(id="body")[0]
+    for header in body(class_="header"):
+        header.extract()
+    for img in body("img"):
+        alt = soup.new_tag("p")
+        alt.string = img["alt"]
+        img.replace_with(alt)
+    return re.sub("\n\n+", "\n\n", soup.text.strip())
+
+
+def unifold(token, _idx=None, _tokens=None):
+    def wrap_unidecode(text, _metadata):
+        return unidecode(text)
+
+    return token.update(wrap_unidecode)
+
+
+Pipeline.register_function(unifold, "unifold")
 
 
 def index(indir: Path, outdir: Path) -> None:
+    """
+    Generer l'index a partir des fichiers HTML.
+    """
+    # Metadata (use to index specific zones, etc)
+    # with open(indir / "index.json", "rt") as infh:
+    #     metadata = json.load(infh)
+
+    # lunr does not do storage so we store plaintext here
+    textes = {}
+
+    # Use index.html to find things (as in the js version)
+    LOGGER.info("Traitement: %s", indir / "index.html")
+    with open(indir / "index.html", "rt") as infh:
+        soup = BeautifulSoup(infh, features="lxml")
+    for section in soup.select("li.node"):
+        summary = section.summary
+        if summary is None:
+            LOGGER.error("<summary> non trouvé dans %s", section)
+            continue
+        title = summary.text
+        if "Document" in section["class"]:
+            LOGGER.info("Texte complet de %s ne sera pas indexé", title)
+            continue
+        url = section.a["href"]
+        # Assume it is a relative URL (we made it)
+        LOGGER.info("Traitement: %s: %s", title, indir / url)
+        with open(indir / url, "rt") as infh:
+            subsoup = BeautifulSoup(infh, features="lxml")
+            textes[url] = {"titre": title, "texte": body_text(subsoup)}
+    for text in soup.select("li.leaf"):
+        title = text.a.text
+        url = text.a["href"]
+        LOGGER.info("Traitement: %s: %s", title, indir / url)
+        with open(indir / url, "rt") as infh:
+            subsoup = BeautifulSoup(infh, features="lxml")
+            textes[url] = {"titre": title, "texte": body_text(subsoup)}
+
     outdir.mkdir(exist_ok=True)
-    schema = Schema(
-        document=ID(stored=True),
-        page=NUMERIC(stored=True),
-        titre=TEXT(ANALYZER, stored=True),
-        contenu=TEXT(ANALYZER, stored=True),
+    with open(outdir / "textes.json", "wt", encoding="utf-8") as outfh:
+        json.dump(textes, outfh, indent=2, ensure_ascii=False)
+
+    builder = get_default_builder("fr")
+    # Skip the trimmer for titles (FIXME: instead we should add some
+    # missing characters to it so it will match zones, usages, etc)
+    for funcname in ("lunr-multi-trimmer-fr",):
+        builder.pipeline.skip(
+            builder.pipeline.registered_functions[funcname], ["titre"]
+        )
+    # Add a missing pipeline function for search (don't add the
+    # trimmer as it will strip out zones, usages, etc)
+    for funcname in ("stopWordFilter-fr",):
+        builder.search_pipeline.before(
+            builder.search_pipeline.registered_functions["stemmer-fr"],
+            builder.search_pipeline.registered_functions[funcname],
+        )
+    builder.pipeline.add(unifold)
+    builder.metadata_whitelist.append("position")
+    LOGGER.info("pipeline: %s", builder.pipeline)
+    LOGGER.info("search pipeline: %s", builder.pipeline)
+
+    index = lunr(
+        ref="url",
+        fields=[{"field_name": "titre", "boost": 2}, "texte"],
+        documents=[
+            {"url": url, "titre": doc["titre"], "texte": doc["texte"]}
+            for url, doc in textes.items()
+        ],
+        languages="fr",
+        builder=builder,
     )
-    ix = create_in(outdir, schema)
-    writer = ix.writer()
-    for docdir in indir.iterdir():
-        if not docdir.is_dir():
-            continue
-        if not (docdir / "index.json").exists():
-            continue
-        document = docdir.with_suffix(".pdf").name
-        add_from_dir(writer, document, docdir)
-        for subdir in docdir.iterdir():
-            if not docdir.is_dir():
-                continue
-            for dirpath, _, filenames in os.walk(subdir, topdown=True):
-                if "index.json" not in filenames:
-                    continue
-                add_from_dir(writer, document, Path(dirpath))
-    writer.commit()
+    with open(outdir / "index.json", "wt", encoding="utf-8") as outfh:
+        json.dump(index.serialize(), outfh, indent=2, ensure_ascii=False)
