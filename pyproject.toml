@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn",
     "sklearn-crfsuite",
     "lunr[languages]",
+    "unidecode",
 ]
 [project.optional-dependencies]
 dev = [
