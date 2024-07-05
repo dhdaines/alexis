@@ -9,7 +9,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
-from lunr import lunr, get_default_builder
+from lunr import lunr, get_default_builder, trimmer
 from lunr.pipeline import Pipeline
 from unidecode import unidecode
 
@@ -87,19 +87,22 @@ def index(indir: Path, outdir: Path) -> None:
         json.dump(textes, outfh, indent=2, ensure_ascii=False)
 
     builder = get_default_builder("fr")
-    # Skip the trimmer for titles (FIXME: instead we should add some
-    # missing characters to it so it will match zones, usages, etc)
-    for funcname in ("lunr-multi-trimmer-fr",):
-        builder.pipeline.skip(
-            builder.pipeline.registered_functions[funcname], ["titre"]
-        )
-    # Add a missing pipeline function for search (don't add the
-    # trimmer as it will strip out zones, usages, etc)
-    for funcname in ("stopWordFilter-fr",):
-        builder.search_pipeline.before(
-            builder.search_pipeline.registered_functions["stemmer-fr"],
-            builder.search_pipeline.registered_functions[funcname],
-        )
+    # DO NOT USE the French trimmer as it is seriously defective
+    builder.pipeline.remove(
+        builder.pipeline.registered_functions["lunr-multi-trimmer-fr"]
+    )
+    builder.pipeline.before(
+        builder.pipeline.registered_functions["stopWordFilter-fr"], trimmer.trimmer
+    )
+    # Missing pipeline functions for search
+    builder.search_pipeline.before(
+        builder.search_pipeline.registered_functions["stemmer-fr"],
+        builder.search_pipeline.registered_functions["stopWordFilter-fr"],
+    )
+    builder.search_pipeline.before(
+        builder.search_pipeline.registered_functions["stopWordFilter-fr"],
+        trimmer.trimmer,
+    )
     builder.pipeline.add(unifold)
     builder.metadata_whitelist.append("position")
     LOGGER.info("pipeline: %s", builder.pipeline)
