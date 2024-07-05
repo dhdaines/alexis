@@ -199,7 +199,7 @@ def make_argparse() -> argparse.ArgumentParser:
         "--outdir",
         help="Repertoire destination pour l'index",
         type=Path,
-        default="indexdir",
+        default="export/_idx",
     )
     index.add_argument("indir", help="Repertoire avec les fichiers extraits", type=Path)
     index.set_defaults(func=index_main)
