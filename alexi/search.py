@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 from typing import List
 
-from lunr.languages import get_nltk_builder
-from lunr.index import Index
+from lunr.index import Index  # type: ignore
+from lunr.languages import get_nltk_builder  # type: ignore
+
 from alexi.index import unifold
 
 # This is just here to register the necessary pipeline functions

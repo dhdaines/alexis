@@ -5,13 +5,13 @@ Construire un index pour faire des recherches dans les données extraites.
 import json
 import logging
 import re
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 
 from bs4 import BeautifulSoup
-from lunr import lunr, get_default_builder, trimmer
-from lunr.pipeline import Pipeline
-from unidecode import unidecode
+from lunr import get_default_builder, lunr, trimmer  # type: ignore
+from lunr.pipeline import Pipeline  # type: ignore
+from unidecode import unidecode  # type: ignore
 
 LOGGER = logging.getLogger("index")
 
@@ -24,10 +24,11 @@ class Document:
 
 
 def body_text(soup: BeautifulSoup):
-    body = soup.div(id="body")[0]
-    for header in body(class_="header"):
+    body = soup.find_all("div", id="body")
+    assert body is not None
+    for header in body[0](class_="header"):
         header.extract()
-    for img in body("img"):
+    for img in body[0]("img"):
         alt = soup.new_tag("p")
         alt.string = img["alt"]
         img.replace_with(alt)
@@ -68,15 +69,22 @@ def index(indir: Path, outdir: Path) -> None:
         if "Document" in section["class"]:
             LOGGER.info("Texte complet de %s ne sera pas indexé", title)
             continue
-        url = section.a["href"]
+        a = section.a
+        assert a is not None
+        url = a["href"]
+        assert not isinstance(url, list)
         # Assume it is a relative URL (we made it)
         LOGGER.info("Traitement: %s: %s", title, indir / url)
         with open(indir / url, "rt") as infh:
             subsoup = BeautifulSoup(infh, features="lxml")
             textes[url] = {"titre": title, "texte": body_text(subsoup)}
     for text in soup.select("li.leaf"):
-        title = text.a.text
-        url = text.a["href"]
+        assert text is not None
+        a = text.a
+        assert a is not None
+        title = a.text
+        url = a["href"]
+        assert not isinstance(url, list)
         LOGGER.info("Traitement: %s: %s", title, indir / url)
         with open(indir / url, "rt") as infh:
             subsoup = BeautifulSoup(infh, features="lxml")
