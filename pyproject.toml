@@ -18,7 +18,7 @@ dependencies = [
     "pdfplumber",
     "scikit-learn",
     "sklearn-crfsuite",
-    "whoosh",
+    "lunr[languages]",
 ]
 [project.optional-dependencies]
 dev = [
