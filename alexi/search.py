@@ -15,11 +15,12 @@ from alexi.index import unifold
 get_nltk_builder(["fr"])
 
 
-def search(indexdir: Path, terms: List[str]) -> None:
+def search(indexdir: Path, terms: List[str], nresults: int) -> None:
     with open(indexdir / "index.json", "rt", encoding="utf-8") as infh:
         index = Index.load(json.load(infh))
     index.pipeline.add(unifold)
     results = index.search(" ".join(terms))
-    for r in results:
+    for idx, r in enumerate(results):
+        if idx == nresults:
+            break
         print(r)
-        print(r["match_data"].metadata)
