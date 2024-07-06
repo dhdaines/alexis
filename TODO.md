@@ -24,10 +24,14 @@ DERP LERNING
     - Embed words and categorical features DONE
     - Use same evaluator as CRF training for comparison DONE
     - Scale layout features by page size and include as vector DONE
-  - CRF output layer
-    - Just try dropping in the loss function?
+  - CRF output layer DONE
   - Tokenize from chars
   - Do prediction with Transformers
+    - not expecting this to work very well due to sequence length limits
+    - what happens if we split a page in the middle of a paragraph?
+    - or in the middle of a word?
+    - could do a heuristic based pre-chunking (e.g. on a "large
+      enough" vertical whitespace)
   - Things that helped
     - use all the manually created features and embed them with >=4 dimensions
     - deltas and delta-deltas
@@ -51,8 +55,20 @@ DERP LERNING
     - much narrower LSTM
     - dropout on LSTM layers
     - extra feedforward layer
+    - CRF output layer
+      - training becomes very unstable and macro f1 is really bad
+      - probably due to:
+        - very imbalanced classes (lots of I, very little O or B)
+          - can possibly be solved using AllenNLP implementation
+        - very long sequences (another aspect of the same problem)
+          - path score for a long sequence will converge to 0 if
+            transition weights are too small
+          - can possibly be solved by initializing the transition
+            weights with something non-random (I think the AllenNLP
+            implementation also does this)
   - Things yet to be tried
-    - CRF output layer (should help a lot)
+    - better CRF implementation (AllenNLP modules lite)
+    - pre-trained or pre-computed word embeddings
     - hyperparameter t00ning
     - label smoothing
     - feedforward layer before RNN
@@ -84,9 +100,7 @@ Unprioritized future stuff
   - have to hack the crfsuite file to do this
   - not at all easy to do with sklearn-crfsuite magical pickling
   - otherwise ... treat I-B as B-B when following O or I-A (as before)
-- workflow for correcting individual pages
-  - convenience functions for "visual debugging" in pdfplumber style
-  - instructions to identify and extract CSV for page
+- investigate using a different CRF library
 - tune regularization (some more)
 - compare memory footprint of main branch versus html_output
 - levels of lists
