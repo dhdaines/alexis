@@ -101,7 +101,7 @@ annotations.
 
 Une fois satisfait du résultat, il suffira de copier `1314-page1.csv`
 vers le repertoire `data` et réentrainer le modèle avec
-`scripts/retrain.sh`.
+`hatch run train`.
 
 Extraction de catégories pertinentes du zonage
 ----------------------------------------------

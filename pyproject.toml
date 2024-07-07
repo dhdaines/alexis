@@ -72,14 +72,14 @@ train = [
 """python scripts/train_crf.py \\
     --features text+layout \\
     --outfile alexi/models/crf.vl.joblib.gz \\
-    data/*.csv""",
+    data/*.csv data/patches/*.csv""",
 """python scripts/train_crf.py \\
     --features text+layout+structure \\
     --outfile alexi/models/crf.joblib.gz \\
-    data/*.csv""",
+    data/*.csv data/patches/*.csv""",
 """python scripts/train_crf_seq.py \\
     --outfile alexi/models/crfseq.joblib.gz \\
-    data/*.csv""",
+    data/*.csv data/patches/*.csv""",
 ]
 
 [tool.isort]
