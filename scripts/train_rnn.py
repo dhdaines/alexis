@@ -1,5 +1,9 @@
+"""Entrainer un LSTM pour segmentation/identification"""
+
+import argparse
 import csv
 import itertools
+import logging
 from collections import Counter
 from pathlib import Path
 
@@ -10,19 +14,74 @@ import torch.optim as optim
 from poutyne import EarlyStopping, ExponentialLR, Model, ModelCheckpoint, set_seeds
 from sklearn.model_selection import KFold
 from sklearn_crfsuite import metrics
+from torch.nn.utils.rnn import PackedSequence, pad_packed_sequence
 from torch.utils.data import DataLoader, Subset
+
 from scripts.train_rnn_crf import (
-    make_dataset,
     make_all_data,
+    make_dataset,
     pad_collate_fn,
     pad_collate_fn_predict,
 )
-from torch.nn.utils.rnn import (
-    PackedSequence,
-    pad_packed_sequence,
-)
 
-DATA = list((Path(__file__).parent.parent / "data").glob("*.csv"))
+
+def make_argparse():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "csvs", nargs="+", help="Fichiers CSV d'entrainement", type=Path
+    )
+    parser.add_argument(
+        "--nepoch", default=100, type=int, help="Nombre maximal d'epochs d'entrainement"
+    )
+    parser.add_argument("--batch-size", default=32, type=int, help="Taille du batch")
+    parser.add_argument(
+        "--word-dim", default=32, type=int, help="Dimension des embeddings des mots"
+    )
+    parser.add_argument(
+        "--feat-dim", default=8, type=int, help="Dimension des embeddings des traits"
+    )
+    parser.add_argument(
+        "--lr", default=0.01, type=float, help="Facteur d'apprentissage"
+    )
+    parser.add_argument(
+        "--gamma", default=0.99, type=float, help="Coefficient de reduction du LR"
+    )
+    parser.add_argument(
+        "--bscale", default=1.0, type=float, help="Facteur applique aux debuts de bloc"
+    )
+    parser.add_argument(
+        "--hidden-size", default=64, type=int, help="Largeur de la couche cachee"
+    )
+    parser.add_argument(
+        "--patience", default=10, type=int, help="Patience pour arret anticipe"
+    )
+    parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
+    parser.add_argument(
+        "--min-count",
+        default=10,
+        type=int,
+        help="Seuil d'évaluation pour chaque classification",
+    )
+    parser.add_argument(
+        "-x",
+        "--cross-validation-folds",
+        default=4,
+        type=int,
+        help="Faire la validation croisée pour évaluer le modèle.",
+    )
+    parser.add_argument(
+        "-o",
+        "--outfile",
+        help="Fichier destination pour modele",
+        default="rnnmodel.pkl",
+    )
+    parser.add_argument(
+        "-s",
+        "--scores",
+        help="Fichier destination pour évaluations",
+        default="rnnscores.csv",
+    )
+    return parser
 
 
 class MyNetwork(nn.Module):
@@ -95,15 +154,17 @@ class MyNetwork(nn.Module):
 
 
 def main():
+    parser = make_argparse()
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
+
     cuda_device = 0
     device = torch.device(
         "cuda:%d" % cuda_device if torch.cuda.is_available() else "cpu"
     )
-    batch_size = 32
-    seed = 1381
-    set_seeds(seed)
+    set_seeds(args.seed)
 
-    X, y = zip(*make_dataset(DATA))
+    X, y = zip(*make_dataset(args.csvs))
     vecnames = [
         "line:left",
         "line:top",
@@ -121,49 +182,63 @@ def main():
         "v:bottom:delta:delta",
     ]
     featdims = {
-        "lower": 32,
-        "rgb": 8,
-        "mctag": 8,
-        "uppercase": 8,
-        "title": 8,
-        "punc": 8,
-        "endpunc": 8,
-        "numeric": 8,
-        "bold": 8,
-        "italic": 8,
-        "toc": 8,
-        "header": 8,
-        "head:table": 8,
-        "head:chapitre": 8,
-        "head:annexe": 8,
-        "line:height": 8,
-        "line:indent": 8,
-        "line:gap": 8,
-        "first": 8,
-        "last": 8,
+        "lower": args.word_dim,
+        "rgb": args.feat_dim,
+        "mctag": args.feat_dim,
+        "uppercase": args.feat_dim,
+        "title": args.feat_dim,
+        "punc": args.feat_dim,
+        "endpunc": args.feat_dim,
+        "numeric": args.feat_dim,
+        "bold": args.feat_dim,
+        "italic": args.feat_dim,
+        "toc": args.feat_dim,
+        "header": args.feat_dim,
+        "head:table": args.feat_dim,
+        "head:chapitre": args.feat_dim,
+        "head:annexe": args.feat_dim,
+        "line:height": args.feat_dim,
+        "line:indent": args.feat_dim,
+        "line:gap": args.feat_dim,
+        "first": args.feat_dim,
+        "last": args.feat_dim,
     }
     all_data, feat2id, id2label = make_all_data(X, y, featdims, vecnames)
-    kf = KFold(n_splits=4, shuffle=True, random_state=seed)
+    kf = KFold(
+        n_splits=args.cross_validation_folds, shuffle=True, random_state=args.seed
+    )
     scores = {"test_macro_f1": []}
     label_counts = Counter(itertools.chain.from_iterable(y))
-    labels = sorted(x for x in label_counts if x[0] == "B" and label_counts[x] >= 10)
+    labels = sorted(
+        x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
+    )
     veclen = len(all_data[0][0][0][1])
     for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
         train_data = Subset(all_data, train_idx)
         train_loader = DataLoader(
-            train_data, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn
+            train_data,
+            batch_size=args.batch_size,
+            shuffle=True,
+            collate_fn=pad_collate_fn,
         )
         dev_data = Subset(all_data, dev_idx)
         dev_loader = DataLoader(
-            dev_data, batch_size=batch_size, collate_fn=pad_collate_fn
+            dev_data, batch_size=args.batch_size, collate_fn=pad_collate_fn
         )
 
-        my_network = MyNetwork(featdims, feat2id, veclen, len(id2label), hidden_size=64)
-        optimizer = optim.Adam(my_network.parameters(), lr=0.1)
+        my_network = MyNetwork(
+            featdims, feat2id, veclen, len(id2label), hidden_size=args.hidden_size
+        )
+        optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
         loss_function = nn.CrossEntropyLoss(
             # weight=torch.FloatTensor([10 if x[0] == "B" else 1 for x in id2label])
             # weight=torch.FloatTensor([label_weights.get(x, 1.0) for x in id2label])
-            weight=torch.FloatTensor([1 / label_counts[x] for x in id2label])
+            weight=torch.FloatTensor(
+                [
+                    (args.bscale if x[0] == "B" else 1.0) / label_counts[x]
+                    for x in id2label
+                ]
+            )
         )
         model = Model(
             my_network,
@@ -175,12 +250,12 @@ def main():
         model.fit_generator(
             train_loader,
             dev_loader,
-            epochs=100,
+            epochs=args.nepoch,
             callbacks=[
-                ExponentialLR(gamma=0.99),
+                ExponentialLR(gamma=args.gamma),
                 ModelCheckpoint(
                     monitor="val_fscore_macro",
-                    filename="rnnmodel.pkl",
+                    filename=args.outfile,
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
@@ -188,7 +263,10 @@ def main():
                     verbose=True,
                 ),
                 EarlyStopping(
-                    monitor="val_fscore_macro", mode="max", patience=10, verbose=True
+                    monitor="val_fscore_macro",
+                    mode="max",
+                    patience=args.patience,
+                    verbose=True,
                 ),
             ],
         )
@@ -196,7 +274,9 @@ def main():
             *sorted(enumerate(dev_data), reverse=True, key=lambda x: len(x[1][0]))
         )
         test_loader = DataLoader(
-            sorted_test_data, batch_size=batch_size, collate_fn=pad_collate_fn_predict
+            sorted_test_data,
+            batch_size=args.batch_size,  # FIXME: Actually not relevant here
+            collate_fn=pad_collate_fn_predict,
         )
         out = model.predict_generator(test_loader, concatenate_returns=False)
         predictions = []
@@ -221,7 +301,7 @@ def main():
             scores.setdefault(name, []).append(label_f1)
             print("fold", fold + 1, name, label_f1)
 
-    with open("rnnscores.csv", "wt") as outfh:
+    with open(args.scores, "wt") as outfh:
         fieldnames = [
             "Label",
             "Average",
