@@ -17,62 +17,72 @@ Immediate fixes/enhancements
 DERP LERNING
 ------------
 
-- Segmentation
-  - Retokenize CSVs using CamemBERT tokenizer (spread features on pieces) DONE
-  - Train a BiLSTM model with vsl features DONE
-    - Learning rate decay and early stopping DONE
-    - Embed words and categorical features DONE
-    - Use same evaluator as CRF training for comparison DONE
-    - Scale layout features by page size and include as vector DONE
-  - CRF output layer DONE
-  - Tokenize from chars
-  - Do prediction with Transformers
-    - not expecting this to work very well due to sequence length limits
-    - what happens if we split a page in the middle of a paragraph?
-    - or in the middle of a word?
-    - could do a heuristic based pre-chunking (e.g. on a "large
-      enough" vertical whitespace)
-  - Things that helped
-    - use all the manually created features and embed them with >=4 dimensions
-    - deltas and delta-deltas
-    - scale all the things by page size (slightly less good than by
-      abs(max(feats)) but probably more robust)
-    - upweight B- tags by 2.0
-    - taking the best model using f1_macro
-  - Inconclusive
-    - GRU or plain RNN with lower learning rate
-      - LSTM is maybe overparameterized?
-      - Improves label accuracy quite a lot but mean F1 not really
-      - This seems to be a consequence of lower learning rate not cell typpe
-  - Things that did not help
-    - CamemBERT tokenizer doesn't work well for CRFs, possibly due to:
-      - all subwords have the same position, so layout features are wrong
-      - hand-crafted features maybe don't work the same on subwords (leading _ thing)
-    - wider word embeddings (just using the same dimension for all embeddings works best...)
-    - weighting classes by inverse frequency (just upweight B as it's what we care about)
-    - more LSTM layers
-    - much wider LSTM
-    - much narrower LSTM
-    - dropout on LSTM layers
-    - extra feedforward layer
-    - CRF output layer
-      - training becomes very unstable and macro f1 is really bad
-      - probably due to:
-        - very imbalanced classes (lots of I, very little O or B)
-          - can possibly be solved using AllenNLP implementation
-        - very long sequences (another aspect of the same problem)
-          - path score for a long sequence will converge to 0 if
-            transition weights are too small
-          - can possibly be solved by initializing the transition
-            weights with something non-random (I think the AllenNLP
-            implementation also does this)
-  - Things yet to be tried
-    - better CRF implementation (AllenNLP modules lite)
-    - pre-trained or pre-computed word embeddings
-    - hyperparameter t00ning
-    - label smoothing
-    - feedforward layer before RNN
-    - dropout in other places
+Segmentation
+============
+
+- Retokenize CSVs using CamemBERT tokenizer (spread features on pieces) DONE
+- Train a BiLSTM model with vsl features DONE
+  - Learning rate decay and early stopping DONE
+  - Embed words and categorical features DONE
+  - Use same evaluator as CRF training for comparison DONE
+  - Scale layout features by page size and include as vector DONE
+- CRF output layer DONE
+- Tokenize from chars
+- Use Transformers for embeddings
+  - Heuristic pre-chunking as described below
+  - Either tokenize from chars (above) or use first embedding per word
+  - Probably project 768 dimensions down to something smaller
+- Do prediction with Transformers
+  - not expecting this to work very well due to sequence length limits
+  - what happens if we split a page in the middle of a paragraph?
+  - or in the middle of a word?
+  - could do a heuristic based pre-chunking (e.g. on a "large
+    enough" vertical whitespace)
+
+Segmentation results
+====================
+
+- Things that helped
+  - use all the manually created features and embed them with >=4 dimensions
+  - deltas and delta-deltas
+  - scale all the things by page size (slightly less good than by
+    abs(max(feats)) but probably more robust)
+  - upweight B- tags by 2.0
+  - taking the best model using f1_macro
+- Inconclusive
+  - GRU or plain RNN with lower learning rate
+    - LSTM is maybe overparameterized?
+    - Improves label accuracy quite a lot but mean F1 not really
+    - This seems to be a consequence of lower learning rate not cell typpe
+  - wider word embeddings (maybe or maybe not, doing grid search...)
+- Things that did not help
+  - CamemBERT tokenizer doesn't work well for CRFs, possibly due to:
+    - all subwords have the same position, so layout features are wrong
+    - hand-crafted features maybe don't work the same on subwords (leading _ thing)
+  - weighting classes by inverse frequency (just upweight B as it's what we care about)
+  - more LSTM layers
+  - much wider LSTM
+  - much narrower LSTM
+  - dropout on LSTM layers
+  - extra feedforward layer
+  - CRF output layer
+    - training becomes very unstable and macro f1 is really bad
+    - probably due to:
+      - very imbalanced classes (lots of I, very little O or B)
+        - can possibly be solved using AllenNLP implementation
+      - very long sequences (another aspect of the same problem)
+        - path score for a long sequence will converge to 0 if
+          transition weights are too small
+        - can possibly be solved by initializing the transition
+          weights with something non-random (I think the AllenNLP
+          implementation also does this)
+- Things yet to be tried
+  - better CRF implementation (AllenNLP modules lite)
+  - pre-trained or pre-computed word embeddings
+  - hyperparameter t00ning
+  - label smoothing
+  - feedforward layer before RNN
+  - dropout in other places
     
 Documentation
 -------------
