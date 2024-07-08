@@ -146,6 +146,7 @@ def write_fold(
                         int(float(word[f]) / maxdim * 1000)
                         for f in "x0 top x1 bottom".split()
                     ]
+                    assert all(x <= 1000 for x in bbox)
                     box = " ".join(str(f) for f in bbox)
                     print("\t".join((word["text"], word["segment"])), file=txtfh)
                     print(
