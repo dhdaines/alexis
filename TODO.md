@@ -26,6 +26,10 @@ Segmentation
   - Embed words and categorical features DONE
   - Use same evaluator as CRF training for comparison DONE
   - Scale layout features by page size and include as vector DONE
+  - Retrain from full dataset + patches
+    - early stopping? sample a dev set?
+  - Do extraction and qualitative evaluation
+    - sort for batch processing then unsort afterwards
 - CRF output layer DONE
 - Tokenize from chars
 - Use Transformers for embeddings

@@ -50,7 +50,7 @@ def make_argparse():
         "--bscale", default=1.0, type=float, help="Facteur applique aux debuts de bloc"
     )
     parser.add_argument(
-        "--hidden-size", default=64, type=int, help="Largeur de la couche cachee"
+        "--hidden-size", default=80, type=int, help="Largeur de la couche cachee"
     )
     parser.add_argument(
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
