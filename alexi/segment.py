@@ -300,7 +300,9 @@ def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
     for p in paths:
         with open(Path(p), "rt") as infh:
             reader = csv.DictReader(infh)
-            yield from reader
+            for row in reader:
+                row["path"] = str(p)
+                yield row
 
 
 class Segmenteur:

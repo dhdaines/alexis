@@ -5,9 +5,8 @@ import itertools
 import logging
 import operator
 from collections import deque
-from io import BufferedReader, BytesIO
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional, TextIO, Union
+from typing import Any, Iterable, Iterator, Optional, TextIO
 
 from pdfplumber import PDF
 from pdfplumber.page import Page
@@ -123,15 +122,17 @@ def get_word_features(
 
 class Converteur:
     pdf: PDF
+    path: Path
     tree: Optional[PDFStructTree]
     y_tolerance: int
 
     def __init__(
         self,
-        path_or_fp: Union[str, Path, BufferedReader, BytesIO],
+        path: Path,
         y_tolerance: int = 2,
     ):
         self.pdf = PDF.open(path_or_fp)
+        self.path = path
         self.y_tolerance = y_tolerance
         try:
             # Get the tree for the *entire* document since elements
@@ -180,7 +181,8 @@ class Converteur:
                     continue
                 if word["x1"] > page.width or word["bottom"] > page.height:
                     continue
-                yield get_word_features(word, page, chars, elmap)
+                feats = get_word_features(word, page, chars, elmap)
+                feats["path"] = str(self.path)
 
     def make_bloc(
         self, el: PDFStructElement, page_number: int, mcids: Iterable[int]
