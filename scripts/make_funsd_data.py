@@ -126,6 +126,12 @@ def write_fold(
                     ipage.to_image().save(pngpath)
                 else:
                     pngpath = Path(f"{pdfpath.stem}-{pageno}.png")
+            page_width = int(page[0]["page_width"])
+            page_height = int(page[0]["page_height"])
+            maxdim = max(page_width, page_height)
+            mediabox = " ".join(
+                str(int(f / maxdim * 1000)) for f in (page_width, page_height)
+            )
             tpage = list(segment.retokenize(page, tokenizer))
             LOGGER.info("page: %d tokens", len(tpage))
             tseg = list(resegment(tpage, max_seq_length))
@@ -136,10 +142,11 @@ def write_fold(
                 # again...)
                 for word in segment.detokenize(seg, tokenizer):
                     labels.add(word["segment"])
-                    box = " ".join(word[f] for f in "x0 top x1 bottom".split())
-                    mediabox = " ".join(
-                        word[f] for f in "page_width page_height".split()
-                    )
+                    bbox = [
+                        int(float(word[f]) / maxdim * 1000)
+                        for f in "x0 top x1 bottom".split()
+                    ]
+                    box = " ".join(str(f) for f in bbox)
                     print("\t".join((word["text"], word["segment"])), file=txtfh)
                     print(
                         "\t".join((word["text"], box)),
