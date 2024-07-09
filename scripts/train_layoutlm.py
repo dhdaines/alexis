@@ -18,6 +18,8 @@ from seqeval.metrics import (
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+torch.manual_seed(1234)
+np.random.seed(1234)
 
 
 class FunsdDataset(Dataset):
