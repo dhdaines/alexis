@@ -3,7 +3,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from alexi.segment import Segmenteur, retokenize, detokenize
+from alexi.segment import Segmenteur, detokenize, retokenize
 
 TESTDATADIR = Path(__file__).parent / "data"
 DATADIR = Path(__file__).parent.parent / "data"

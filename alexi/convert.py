@@ -131,7 +131,7 @@ class Converteur:
         path: Path,
         y_tolerance: int = 2,
     ):
-        self.pdf = PDF.open(path_or_fp)
+        self.pdf = PDF.open(path)
         self.path = path
         self.y_tolerance = y_tolerance
         try:
@@ -183,6 +183,7 @@ class Converteur:
                     continue
                 feats = get_word_features(word, page, chars, elmap)
                 feats["path"] = str(self.path)
+                yield feats
 
     def make_bloc(
         self, el: PDFStructElement, page_number: int, mcids: Iterable[int]

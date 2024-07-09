@@ -50,9 +50,6 @@ addopts = "--cov=alexi --cov-report html"
 
 [tool.hatch.envs.default]
 features = [ "dev" ]
-post-install-commands = [
-  "mypy --install-types --non-interactive alexi",
-]
 
 [tool.hatch.envs.default.scripts]
 test = [
@@ -62,7 +59,7 @@ lint = [
   "black --check alexi",
   "isort --profile black --check-only alexi test",
   "flake8 --color=never alexi test",
-  "mypy alexi",
+  "mypy --non-interactive --install-types alexi",
 ]
 format = [
   "black alexi test",

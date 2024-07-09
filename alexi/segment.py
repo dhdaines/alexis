@@ -21,7 +21,7 @@ DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
 FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
 
 if False:
-    from tokenizers import Tokenizer  # STFU, pyflakes
+    from tokenizers import Tokenizer  # type: ignore
 
 
 class Bullet(Enum):
