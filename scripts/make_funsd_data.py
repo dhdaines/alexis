@@ -194,23 +194,25 @@ def main():
     tokenizer = Tokenizer.from_pretrained("microsoft/layoutlm-base-uncased")
     pages = list(segment.split_pages(segment.filter_tab(segment.load(args.csvs))))
     kf = KFold(n_splits=4, shuffle=True, random_state=args.seed)
-    train_idx, dev_idx = next(iter(kf.split(pages)))
-    labels = write_fold(
-        (pages[x] for x in train_idx),
-        tokenizer,
-        args.max_seq_length,
-        args.outdir / "train",
-    )
-    devlabels = write_fold(
-        (pages[x] for x in dev_idx),
-        tokenizer,
-        args.max_seq_length,
-        args.outdir / "test",
-    )
-    labels.update(devlabels)
-    with open(args.outdir / "labels.txt", "wt") as outfh:
-        for label in labels:
-            print(label, file=outfh)
+    for fold, (train_idx, dev_idx) in enumerate(kf.split(pages)):
+        foldir = args.outdir / f"fold{fold + 1}"
+        foldir.mkdir()
+        labels = write_fold(
+            (pages[x] for x in train_idx),
+            tokenizer,
+            args.max_seq_length - 3,
+            foldir / "train",
+        )
+        devlabels = write_fold(
+            (pages[x] for x in dev_idx),
+            tokenizer,
+            args.max_seq_length - 3,
+            foldir / "test",
+        )
+        labels.update(devlabels)
+        with open(foldir / "labels.txt", "wt") as outfh:
+            for label in labels:
+                print(label, file=outfh)
 
 
 if __name__ == "__main__":

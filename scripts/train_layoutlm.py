@@ -1,20 +1,17 @@
+import argparse
+import csv
 import logging
 import os
-import torch
-from torch.nn import CrossEntropyLoss
-from transformers import LayoutLMTokenizer
-from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
-from transformers import LayoutLMForTokenClassification
-from transformers.optimization import Adafactor
-from tqdm import tqdm
-import numpy as np
-from seqeval.metrics import (
-    classification_report,
-    f1_score,
-    precision_score,
-    recall_score,
-)
+from pathlib import Path
 
+import numpy as np
+import torch
+from sklearn_crfsuite import metrics
+from torch.nn import CrossEntropyLoss
+from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+from tqdm import tqdm
+from transformers import LayoutLMForTokenClassification, LayoutLMTokenizer
+from transformers.optimization import Adafactor
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -24,58 +21,28 @@ np.random.seed(1234)
 
 class FunsdDataset(Dataset):
     def __init__(self, args, tokenizer, labels, pad_token_label_id, mode):
-        if args.local_rank not in [-1, 0] and mode == "train":
-            torch.distributed.barrier()  # Make sure only the first
-            # process in distributed
-            # training process the
-            # dataset, and the others
-            # will use the cache
-
-        # Load data features from cache or dataset file
-        cached_features_file = os.path.join(
-            args.data_dir,
-            "cached_{}_{}_{}".format(
-                mode,
-                list(filter(None, args.model_name_or_path.split("/"))).pop(),
-                str(args.max_seq_length),
-            ),
+        logger.info("Creating features from dataset file at %s", args.data_dir)
+        examples = read_examples_from_file(args.data_dir, mode)
+        features = convert_examples_to_features(
+            examples,
+            labels,
+            args.max_seq_length,
+            tokenizer,
+            cls_token_at_end=bool(args.model_type in ["xlnet"]),
+            # xlnet has a cls token at the end
+            cls_token=tokenizer.cls_token,
+            cls_token_segment_id=2 if args.model_type in ["xlnet"] else 0,
+            sep_token=tokenizer.sep_token,
+            sep_token_extra=bool(args.model_type in ["roberta"]),
+            # roberta uses an extra separator b/w pairs of
+            # sentences,
+            # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
+            pad_on_left=bool(args.model_type in ["xlnet"]),
+            # pad on the left for xlnet
+            pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
+            pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
+            pad_token_label_id=pad_token_label_id,
         )
-        if os.path.exists(cached_features_file) and not args.overwrite_cache:
-            logger.info("Loading features from cached file %s", cached_features_file)
-            features = torch.load(cached_features_file)
-        else:
-            logger.info("Creating features from dataset file at %s", args.data_dir)
-            examples = read_examples_from_file(args.data_dir, mode)
-            features = convert_examples_to_features(
-                examples,
-                labels,
-                args.max_seq_length,
-                tokenizer,
-                cls_token_at_end=bool(args.model_type in ["xlnet"]),
-                # xlnet has a cls token at the end
-                cls_token=tokenizer.cls_token,
-                cls_token_segment_id=2 if args.model_type in ["xlnet"] else 0,
-                sep_token=tokenizer.sep_token,
-                sep_token_extra=bool(args.model_type in ["roberta"]),
-                # roberta uses an extra separator b/w pairs of
-                # sentences,
-                # cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
-                pad_on_left=bool(args.model_type in ["xlnet"]),
-                # pad on the left for xlnet
-                pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
-                pad_token_segment_id=4 if args.model_type in ["xlnet"] else 0,
-                pad_token_label_id=pad_token_label_id,
-            )
-            # if args.local_rank in [-1, 0]:
-            # logger.info("Saving features into cached file %s", cached_features_file)
-            # torch.save(features, cached_features_file)
-
-        if args.local_rank == 0 and mode == "train":
-            torch.distributed.barrier()  # Make sure only the first
-            # process in distributed
-            # training process the
-            # dataset, and the others
-            # will use the cache
 
         self.features = features
         # Convert to Tensors and build dataset
@@ -388,167 +355,207 @@ def convert_examples_to_features(
     return features
 
 
-def get_labels(path):
-    with open(path, "r") as f:
-        labels = f.read().splitlines()
-    if "O" not in labels:
-        labels = ["O"] + labels
-    return labels
-
-
-labels = get_labels("data/labels.txt")
-num_labels = len(labels)
-label_map = {i: label for i, label in enumerate(labels)}
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("-d", "--data-dir", default="data", type=Path)
+parser.add_argument(
+    "-m", "--model-name-or-path", default="microsoft/layoutlm-base-uncased"
+)
+parser.add_argument("--max-seq-length", default=512, type=int)
+parser.add_argument("-t", "--model-type", default="layoutlm")
+parser.add_argument("-n", "--nepoch", default=3, type=int)
+parser.add_argument("-s", "--scores", default="layoutlmscores.csv", type=Path)
+args = parser.parse_args()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+tokenizer = LayoutLMTokenizer.from_pretrained("microsoft/layoutlm-base-uncased")
 # Use cross entropy ignore index as padding label id so that only real label ids contribute to the loss later
 pad_token_label_id = CrossEntropyLoss().ignore_index
 
+scores = {"test_macro_f1": []}
+folds = sorted(args.data_dir.iterdir())
+for folddir in folds:
+    if not folddir.is_dir():
+        continue
+    if not folddir.name.startswith("fold"):
+        continue
+    fold = int(folddir.name[4:])
+    logger.info("Training fold %d", fold)
 
-args = {
-    "local_rank": -1,
-    "overwrite_cache": True,
-    "data_dir": "data",
-    "model_name_or_path": "microsoft/layoutlm-base-uncased",
-    "max_seq_length": 512,
-    "model_type": "layoutlm",
-}
+    def get_labels(path):
+        with open(path, "r") as f:
+            labels = f.read().splitlines()
+        if "O" not in labels:
+            labels = ["O"] + labels
+        return labels
 
+    labels = get_labels(folddir / "labels.txt")
+    num_labels = len(labels)
+    label_map = {i: label for i, label in enumerate(labels)}
 
-# class to turn the keys of a dict into attributes (thanks Stackoverflow)
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
+    # We created our own dataset following the FUNSD conventions (see make_funsd_data.py)
+    args.data_dir = folddir
+    train_dataset = FunsdDataset(
+        args, tokenizer, labels, pad_token_label_id, mode="train"
+    )
+    train_sampler = RandomSampler(train_dataset)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=2)
 
+    eval_dataset = FunsdDataset(
+        args, tokenizer, labels, pad_token_label_id, mode="test"
+    )
+    eval_sampler = SequentialSampler(eval_dataset)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=2)
 
-args = AttrDict(args)
+    model = LayoutLMForTokenClassification.from_pretrained(
+        "microsoft/layoutlm-base-uncased", num_labels=num_labels
+    )
+    model.to(device)
 
-tokenizer = LayoutLMTokenizer.from_pretrained("microsoft/layoutlm-base-uncased")
+    # optimizer = Adafactor(model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
+    optimizer = Adafactor(
+        model.parameters(),
+        lr=5e-5,
+        relative_step=False,
+        scale_parameter=False,
+        warmup_init=False,
+    )
 
-# We created our own dataset following the FUNSD conventions (see make_funsd_data.py)
-train_dataset = FunsdDataset(args, tokenizer, labels, pad_token_label_id, mode="train")
-train_sampler = RandomSampler(train_dataset)
-train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=2)
+    global_step = 0
+    t_total = len(train_dataloader) * args.nepoch  # total number of training steps
 
-eval_dataset = FunsdDataset(args, tokenizer, labels, pad_token_label_id, mode="test")
-eval_sampler = SequentialSampler(eval_dataset)
-eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=2)
+    # put the model in training mode
+    model.train()
+    for _epoch in range(args.nepoch):
+        for batch in tqdm(train_dataloader, desc="Training"):
+            input_ids = batch[0].to(device)
+            bbox = batch[4].to(device)
+            attention_mask = batch[1].to(device)
+            token_type_ids = batch[2].to(device)
+            labels = batch[3].to(device)
 
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-model = LayoutLMForTokenClassification.from_pretrained(
-    "microsoft/layoutlm-base-uncased", num_labels=num_labels
-)
-model.to(device)
-
-
-# optimizer = Adafactor(model.parameters(), scale_parameter=True, relative_step=True, warmup_init=True, lr=None)
-optimizer = Adafactor(
-    model.parameters(),
-    lr=5e-5,
-    relative_step=False,
-    scale_parameter=False,
-    warmup_init=False,
-)
-
-
-global_step = 0
-num_train_epochs = 5
-t_total = len(train_dataloader) * num_train_epochs  # total number of training steps
-
-# put the model in training mode
-model.train()
-for _epoch in range(num_train_epochs):
-    for batch in tqdm(train_dataloader, desc="Training"):
-        input_ids = batch[0].to(device)
-        bbox = batch[4].to(device)
-        attention_mask = batch[1].to(device)
-        token_type_ids = batch[2].to(device)
-        labels = batch[3].to(device)
-
-        # forward pass
-        outputs = model(
-            input_ids=input_ids,
-            bbox=bbox,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            labels=labels,
-        )
-        loss = outputs.loss
-
-        # print loss every 50 steps
-        if global_step % 50 == 0:
-            print(f"Loss after {global_step} steps: {loss.item()}")
-
-        # backward pass to get the gradients
-        loss.backward()
-
-        # print("Gradients on classification head:")
-        # print(model.classifier.weight.grad[6,:].sum())
-
-        # update
-        optimizer.step()
-        optimizer.zero_grad()
-        global_step += 1
-
-eval_loss = 0.0
-nb_eval_steps = 0
-preds = None
-out_label_ids = None
-
-# put model in evaluation mode
-model.eval()
-for batch in tqdm(eval_dataloader, desc="Evaluating"):
-    with torch.no_grad():
-        input_ids = batch[0].to(device)
-        bbox = batch[4].to(device)
-        attention_mask = batch[1].to(device)
-        token_type_ids = batch[2].to(device)
-        labels = batch[3].to(device)
-
-        # forward pass
-        outputs = model(
-            input_ids=input_ids,
-            bbox=bbox,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            labels=labels,
-        )
-        # get the loss and logits
-        tmp_eval_loss = outputs.loss
-        logits = outputs.logits
-
-        eval_loss += tmp_eval_loss.item()
-        nb_eval_steps += 1
-
-        # compute the predictions
-        if preds is None:
-            preds = logits.detach().cpu().numpy()
-            out_label_ids = labels.detach().cpu().numpy()
-        else:
-            preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-            out_label_ids = np.append(
-                out_label_ids, labels.detach().cpu().numpy(), axis=0
+            # forward pass
+            outputs = model(
+                input_ids=input_ids,
+                bbox=bbox,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                labels=labels,
             )
+            loss = outputs.loss
 
-# compute average evaluation loss
-eval_loss = eval_loss / nb_eval_steps
-preds = np.argmax(preds, axis=2)
+            # print loss every 50 steps
+            if global_step % 50 == 0:
+                logger.info(f"Loss after {global_step} steps: {loss.item()}")
 
-out_label_list = [[] for _ in range(out_label_ids.shape[0])]
-preds_list = [[] for _ in range(out_label_ids.shape[0])]
+            # backward pass to get the gradients
+            loss.backward()
 
-for i in range(out_label_ids.shape[0]):
-    for j in range(out_label_ids.shape[1]):
-        if out_label_ids[i, j] != pad_token_label_id:
-            out_label_list[i].append(label_map[out_label_ids[i][j]])
-            preds_list[i].append(label_map[preds[i][j]])
+            # print("Gradients on classification head:")
+            # print(model.classifier.weight.grad[6,:].sum())
 
-results = {
-    "loss": eval_loss,
-    "precision": precision_score(out_label_list, preds_list),
-    "recall": recall_score(out_label_list, preds_list),
-    "f1": f1_score(out_label_list, preds_list),
-}
-print(results)
+            # update
+            optimizer.step()
+            optimizer.zero_grad()
+            global_step += 1
+
+    eval_loss = 0.0
+    nb_eval_steps = 0
+    preds = None
+    out_label_ids = None
+
+    # put model in evaluation mode
+    model.eval()
+    for batch in tqdm(eval_dataloader, desc="Evaluating"):
+        with torch.no_grad():
+            input_ids = batch[0].to(device)
+            bbox = batch[4].to(device)
+            attention_mask = batch[1].to(device)
+            token_type_ids = batch[2].to(device)
+            labels = batch[3].to(device)
+
+            # forward pass
+            outputs = model(
+                input_ids=input_ids,
+                bbox=bbox,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                labels=labels,
+            )
+            # get the loss and logits
+            tmp_eval_loss = outputs.loss
+            logits = outputs.logits
+
+            eval_loss += tmp_eval_loss.item()
+            nb_eval_steps += 1
+
+            # compute the predictions
+            if preds is None:
+                preds = logits.detach().cpu().numpy()
+                out_label_ids = labels.detach().cpu().numpy()
+            else:
+                preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
+                out_label_ids = np.append(
+                    out_label_ids, labels.detach().cpu().numpy(), axis=0
+                )
+
+    # compute average evaluation loss
+    eval_loss = eval_loss / nb_eval_steps
+    preds = np.argmax(preds, axis=2)
+
+    y_true = [[] for _ in range(out_label_ids.shape[0])]
+    y_pred = [[] for _ in range(out_label_ids.shape[0])]
+
+    for i in range(out_label_ids.shape[0]):
+        for j in range(out_label_ids.shape[1]):
+            if out_label_ids[i, j] != pad_token_label_id:
+                y_true[i].append(label_map[out_label_ids[i][j]])
+                y_pred[i].append(label_map[preds[i][j]])
+    eval_labels = [
+        "B-Alinea",
+        "B-Amendement",
+        "B-Article",
+        "B-Chapitre",
+        "B-Liste",
+        "B-Pied",
+        "B-Section",
+        "B-SousSection",
+        "B-TOC",
+        "B-Tete",
+        "B-Titre",
+    ]
+
+    macro_f1 = metrics.flat_f1_score(
+        y_true, y_pred, labels=eval_labels, average="macro", zero_division=0.0
+    )
+    scores["test_macro_f1"].append(macro_f1)
+    logger.info("fold %d ALL %f", fold, macro_f1)
+    for name in eval_labels:
+        label_f1 = metrics.flat_f1_score(
+            y_true, y_pred, labels=[name], average="micro", zero_division=0.0
+        )
+        scores.setdefault(name, []).append(label_f1)
+        logger.info("fold %d %s %f", fold, name, label_f1)
+
+with open(args.scores, "wt") as outfh:
+    fieldnames = [
+        "Label",
+        "Average",
+        *range(1, len(scores["test_macro_f1"]) + 1),
+    ]
+    writer = csv.DictWriter(outfh, fieldnames=fieldnames)
+    writer.writeheader()
+
+    def makerow(name, scores):
+        row = {"Label": name, "Average": np.mean(scores)}
+        for idx, score in enumerate(scores):
+            row[idx + 1] = score
+        return row
+
+    row = makerow("ALL", scores["test_macro_f1"])
+    writer.writerow(row)
+    logger.info("average ALL %f", row["Average"])
+    for name in eval_labels:
+        row = makerow(name, scores[name])
+        writer.writerow(row)
+        logger.info("average %s %f", row["Label"], row["Average"])
+
 model.save_pretrained("layoutlm-alexi")
