@@ -70,7 +70,7 @@ def make_argparse():
         "--outfile",
         help="Fichier destination pour modele",
         type=Path,
-        default="rnn.model",
+        default="rnn.pt",
     )
     parser.add_argument(
         "-s",
@@ -215,9 +215,15 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
     )
     veclen = len(train_data[0][0][0][1])
     device = torch.device(args.device)
-    my_network = RNN(
-        featdims, feat2id, veclen, len(id2label), hidden_size=args.hidden_size
-    )
+    config = {
+        "feat2id": feat2id,
+        "id2label": id2label,
+        "featdims": featdims,
+        "veclen": veclen,
+        "n_labels": len(id2label),
+        "hidden_size": args.hidden_size,
+    }
+    my_network = RNN(**config)
     optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
     loss_function = nn.CrossEntropyLoss(
         weight=torch.FloatTensor(
@@ -237,11 +243,7 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
             ExponentialLR(gamma=args.gamma),
         ],
     )
-    torch.save(my_network, args.outfile)
-    config = {
-        "feat2id": feat2id,
-        "id2label": id2label,
-    }
+    torch.save(my_network.state_dict(), args.outfile)
     with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
         json.dump(config, outfh, ensure_ascii=False, indent=2)
 

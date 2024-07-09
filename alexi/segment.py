@@ -550,6 +550,7 @@ class RNN(nn.Module):
         hidden_size=64,
         num_layer=1,
         bidirectional=True,
+        **_kwargs,
     ):
         super().__init__()
         self.hidden_state = None

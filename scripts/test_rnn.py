@@ -6,9 +6,6 @@ import logging
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from poutyne import Model
 from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader
 
@@ -18,7 +15,7 @@ from alexi.segment import load_rnn_data, pad_collate_fn_predict, RNN
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-m", "--model", help="Fichier modele", default="rnn.model", type=Path
+        "-m", "--model", help="Fichier modele", default="rnn.pt", type=Path
     )
     parser.add_argument(
         "--device", default="cuda:0", help="Device pour rouler la prediction"
@@ -46,23 +43,18 @@ def main():
         collate_fn=pad_collate_fn_predict,
     )
     device = torch.device(args.device)
-    my_network = torch.load(args.model)
-    # FIXME: Poutyne considered not useful for prediction
-    model = Model(
-        my_network,
-        optim.Adam(my_network.parameters()),  # FIXME: Obviously not used
-        nn.CrossEntropyLoss(),
-        device=device,
-    )
-    out = model.predict_generator(test_loader, concatenate_returns=False)
+    model = RNN(**config)
+    model.load_state_dict(torch.load(args.model))
+    model.eval()
+    model.to(device)
     predictions = []
     lengths = [len(tokens) for tokens, _ in sorted_test_data]
-    for batch in out:
-        # numpy.transpose != torch.transpose because Reasons
-        batch = batch.transpose((0, 2, 1)).argmax(-1)
-        for length, row in zip(lengths, batch):
+    for batch in test_loader:
+        out = model(*(t.to(device) for t in batch))
+        out = out.transpose(1, -1).argmax(-1).cpu()
+        for length, row in zip(lengths, out):
             predictions.append(row[:length])
-        del lengths[: len(batch)]
+        del lengths[: len(out)]
     y_pred = [[id2label[x] for x in page] for page in predictions]
     y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
     eval_labels = sorted(
