@@ -8,7 +8,14 @@ from typing import Iterable
 import sklearn_crfsuite as crfsuite  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import Segmenteur, load, page2features, page2labels, split_pages
+from alexi.segment import (
+    Segmenteur,
+    load,
+    page2features,
+    page2labels,
+    split_pages,
+    filter_tab,
+)
 
 
 def make_argparse():
@@ -40,7 +47,7 @@ def main():
     parser = make_argparse()
     args = parser.parse_args()
     crf = Segmenteur(model=args.model)
-    test_set = split_pages(load(args.csvs))
+    test_set = split_pages(filter_tab(load(args.csvs)))
     test(crf.crf, test_set, crf.features, crf.labels, crf.n)
 
 

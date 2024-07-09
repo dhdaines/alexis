@@ -4,12 +4,21 @@ import csv
 import itertools
 import operator
 import re
+from collections import Counter
 from enum import Enum
 from os import PathLike
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Sequence, Union
 
 import joblib  # type: ignore
+import torch
+from torch import nn
+from torch.nn.utils.rnn import (
+    PackedSequence,
+    pack_padded_sequence,
+    pad_packed_sequence,
+    pad_sequence,
+)
 
 from alexi.convert import FIELDNAMES
 from alexi.format import line_breaks
@@ -303,6 +312,300 @@ def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
             for row in reader:
                 row["path"] = str(p)
                 yield row
+
+
+def make_fontname(fontname):
+    a, plus, b = fontname.partition("+")
+    if plus:
+        return b
+    return fontname
+
+
+def add_deltas(page):
+    prev = {}
+    for w in page:
+        for f in list(f for f in w if f.startswith("v:")):
+            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
+            prev[f] = w[f]
+    prev = {}
+    for w in page:
+        for f in list(f for f in w if f.endswith(":delta")):
+            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
+            prev[f] = w[f]
+
+
+def make_rnn_features(csvs):
+    iobs = load(csvs)
+    for p in split_pages(filter_tab(iobs)):
+        features = list(
+            dict(w.split("=", maxsplit=2) for w in feats)
+            for feats in textpluslayoutplusstructure_features(p)
+        )
+        for f, w in zip(features, p):
+            f["line:left"] = float(f["line:left"]) / float(w["page_width"])
+            f["line:top"] = float(f["line:top"]) / float(w["page_height"])
+            f["v:top"] = float(w["top"]) / float(w["page_height"])
+            f["v:left"] = float(w["x0"]) / float(w["page_width"])
+            f["v:top"] = float(w["top"]) / float(w["page_height"])
+            f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
+                w["page_width"]
+            )
+            f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
+                w["page_height"]
+            )
+
+        add_deltas(features)
+        labels = list(page2labels(p))
+        yield features, labels
+
+
+FEATNAMES = [
+    "lower",
+    "rgb",
+    "mctag",
+    "uppercase",
+    "title",
+    "punc",
+    "endpunc",
+    "numeric",
+    "bold",
+    "italic",
+    "toc",
+    "header",
+    "head:table",
+    "head:chapitre",
+    "head:annexe",
+    "line:height",
+    "line:indent",
+    "line:gap",
+    "first",
+    "last",
+]
+
+VECNAMES = [
+    "line:left",
+    "line:top",
+    "v:left",
+    "v:top",
+    "v:right",
+    "v:bottom",
+    "v:left:delta",
+    "v:top:delta",
+    "v:right:delta",
+    "v:bottom:delta",
+    "v:left:delta:delta",
+    "v:top:delta:delta",
+    "v:right:delta:delta",
+    "v:bottom:delta:delta",
+]
+
+
+def make_page_feats(feat2id, page):
+    return [
+        (
+            [feat2id[name].get(feats[name], 0) for name in FEATNAMES],
+            [float(feats[name]) for name in VECNAMES],
+        )
+        for feats in page
+    ]
+
+
+def make_page_labels(label2id, page):
+    return [label2id[tag] for tag in page]
+
+
+def make_rnn_data(csvs: Iterable[Path], word_dim: int = 32, feat_dim: int = 8):
+    """Creer le jeu de donnees pour entrainer un modele RNN."""
+    X, y = zip(*make_rnn_features(csvs))
+    label_counts = Counter(itertools.chain.from_iterable(y))
+    id2label = sorted(label_counts.keys(), reverse=True)
+    label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
+    feat2id = {name: {"": 0} for name in FEATNAMES}
+    for feats in itertools.chain.from_iterable(X):
+        for name, ids in feat2id.items():
+            if feats[name] not in ids:
+                ids[feats[name]] = len(ids)
+
+    all_data = [
+        (
+            make_page_feats(feat2id, page),
+            make_page_labels(label2id, labels),
+        )
+        for page, labels in zip(X, y)
+    ]
+    # FIXME: Should go in train_rnn
+    featdims = dict(
+        (name, word_dim) if name == "lower" else (name, feat_dim) for name in FEATNAMES
+    )
+
+    return all_data, featdims, feat2id, label_counts, id2label
+
+
+def load_rnn_data(csvs: Iterable[Path], feat2id, id2label):
+    """Creer le jeu de donnees pour entrainer un modele RNN."""
+    X, y = zip(*make_rnn_features(csvs))
+
+    label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
+    all_data = [
+        (
+            make_page_feats(feat2id, page),
+            make_page_labels(label2id, labels),
+        )
+        for page, labels in zip(X, y)
+    ]
+    return all_data
+
+
+def batch_sort_key(example):
+    features, labels = example
+    return -len(labels)
+
+
+def pad_collate_fn(batch):
+    batch.sort(key=batch_sort_key)
+    # Don't use a list comprehension here so we can better understand
+    sequences_features = []
+    sequences_vectors = []
+    sequences_labels = []
+    lengths = []
+    for example in batch:
+        features, labels = example
+        feats, vector = zip(*features)
+        assert len(labels) == len(feats)
+        assert len(labels) == len(vector)
+        sequences_features.append(torch.LongTensor(feats))
+        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_labels.append(torch.LongTensor(labels))
+        lengths.append(len(labels))
+    lengths = torch.LongTensor(lengths)
+    padded_sequences_features = pad_sequence(
+        sequences_features, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_features = pack_padded_sequence(
+        padded_sequences_features, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_vectors = pad_sequence(
+        sequences_vectors, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_vectors = pack_padded_sequence(
+        padded_sequences_vectors, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_labels = pad_sequence(
+        sequences_labels, batch_first=True, padding_value=-100
+    )
+    mask = torch.ne(padded_sequences_labels, -100)
+    return (
+        (pack_padded_sequences_features, pack_padded_sequences_vectors, mask),
+        padded_sequences_labels,
+    )
+
+
+def pad_collate_fn_predict(batch):
+    # Require data to be externally sorted by length for prediction
+    # (otherwise we have no idea which output corresponds to which input! WTF Poutyne!)
+    # Don't use a list comprehension here so we can better understand
+    sequences_features = []
+    sequences_vectors = []
+    sequences_labels = []
+    lengths = []
+    for example in batch:
+        features, labels = example
+        feats, vector = zip(*features)
+        assert len(labels) == len(feats)
+        assert len(labels) == len(vector)
+        sequences_features.append(torch.LongTensor(feats))
+        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_labels.append(torch.LongTensor(labels))
+        lengths.append(len(labels))
+    max_len = max(lengths)
+    len_lens = len(lengths)
+    lengths = torch.LongTensor(lengths).cpu()
+    # ought to be built into torch...
+    # https://stackoverflow.com/questions/53403306/how-to-batch-convert-sentence-lengths-to-masks-in-pytorch
+    mask = torch.arange(max_len).expand(len_lens, max_len) < lengths.unsqueeze(1)
+    padded_sequences_features = pad_sequence(
+        sequences_features, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_features = pack_padded_sequence(
+        padded_sequences_features, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_vectors = pad_sequence(
+        sequences_vectors, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_vectors = pack_padded_sequence(
+        padded_sequences_vectors, lengths.cpu(), batch_first=True
+    )
+    return (pack_padded_sequences_features, pack_padded_sequences_vectors, mask)
+
+
+class RNN(nn.Module):
+    def __init__(
+        self,
+        featdims,
+        feat2id,
+        veclen,
+        n_labels,
+        hidden_size=64,
+        num_layer=1,
+        bidirectional=True,
+    ):
+        super().__init__()
+        self.hidden_state = None
+        self.embedding_layers = {}
+        self.featdims = featdims
+        for name in featdims:
+            self.embedding_layers[name] = nn.Embedding(
+                len(feat2id[name]),
+                featdims[name],
+                padding_idx=0,
+            )
+            self.add_module(f"embedding_{name}", self.embedding_layers[name])
+        dimension = sum(featdims.values()) + veclen
+        self.lstm_layer = nn.LSTM(
+            input_size=dimension,
+            hidden_size=hidden_size,
+            num_layers=num_layer,
+            bidirectional=bidirectional,
+            batch_first=True,
+        )
+        self.output_layer = nn.Linear(
+            hidden_size * (2 if bidirectional else 1), n_labels
+        )
+
+    def forward(
+        self,
+        features: PackedSequence | torch.Tensor,
+        vectors: PackedSequence | torch.Tensor,
+        _mask: torch.Tensor,
+    ):
+        inputs: PackedSequence | torch.Tensor
+        # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
+        if isinstance(features, PackedSequence):
+            stack = [
+                self.embedding_layers[name](features.data[:, idx])
+                for idx, name in enumerate(self.featdims)
+            ]
+            stack.append(vectors.data)
+            inputs = torch.nn.utils.rnn.PackedSequence(
+                torch.hstack(stack), features.batch_sizes
+            )
+        else:
+            stack = [
+                self.embedding_layers[name](features[:, idx])
+                for idx, name in enumerate(self.featdims)
+            ]
+            stack.append(vectors)
+            inputs = torch.hstack(stack)
+        lstm_out, self.hidden_state = self.lstm_layer(inputs)
+        if isinstance(lstm_out, PackedSequence):
+            lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
+        tag_space = self.output_layer(lstm_out)
+        tag_space = tag_space.transpose(
+            -1, 1
+        )  # We need to transpose since it's a sequence (but why?!)
+        return tag_space
 
 
 class Segmenteur:

@@ -2,9 +2,8 @@
 
 import argparse
 import csv
-import itertools
+import json
 import logging
-from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -14,21 +13,18 @@ import torch.optim as optim
 from poutyne import EarlyStopping, ExponentialLR, Model, ModelCheckpoint, set_seeds
 from sklearn.model_selection import KFold
 from sklearn_crfsuite import metrics
-from torch.nn.utils.rnn import PackedSequence, pad_packed_sequence
 from torch.utils.data import DataLoader, Subset
 
-from scripts.train_rnn_crf import (
-    make_all_data,
-    make_dataset,
-    pad_collate_fn,
-    pad_collate_fn_predict,
-)
+from alexi.segment import make_rnn_data, pad_collate_fn, pad_collate_fn_predict, RNN
 
 
 def make_argparse():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "csvs", nargs="+", help="Fichiers CSV d'entrainement", type=Path
+    )
+    parser.add_argument(
+        "--device", default="cuda:0", help="Device pour rouler l'entrainement"
     )
     parser.add_argument(
         "--nepoch", default=100, type=int, help="Nombre maximal d'epochs d'entrainement"
@@ -65,15 +61,16 @@ def make_argparse():
     parser.add_argument(
         "-x",
         "--cross-validation-folds",
-        default=4,
+        default=1,
         type=int,
-        help="Faire la validation croisée pour évaluer le modèle.",
+        help="Faire la validation croisée pour évaluer le modèle si plus que 1.",
     )
     parser.add_argument(
         "-o",
         "--outfile",
         help="Fichier destination pour modele",
-        default="rnnmodel.pkl",
+        type=Path,
+        default="rnn.model",
     )
     parser.add_argument(
         "-s",
@@ -84,133 +81,17 @@ def make_argparse():
     return parser
 
 
-class MyNetwork(nn.Module):
-    def __init__(
-        self,
-        featdims,
-        feat2id,
-        veclen,
-        n_labels,
-        hidden_size=64,
-        num_layer=1,
-        bidirectional=True,
-    ):
-        super().__init__()
-        self.hidden_state = None
-        self.embedding_layers = {}
-        self.featdims = featdims
-        for name in featdims:
-            self.embedding_layers[name] = nn.Embedding(
-                len(feat2id[name]),
-                featdims[name],
-                padding_idx=0,
-            )
-            self.add_module(f"embedding_{name}", self.embedding_layers[name])
-        dimension = sum(featdims.values()) + veclen
-        self.lstm_layer = nn.LSTM(
-            input_size=dimension,
-            hidden_size=hidden_size,
-            num_layers=num_layer,
-            bidirectional=bidirectional,
-            batch_first=True,
-        )
-        self.output_layer = nn.Linear(
-            hidden_size * (2 if bidirectional else 1), n_labels
-        )
-
-    def forward(
-        self,
-        features: PackedSequence | torch.Tensor,
-        vectors: PackedSequence | torch.Tensor,
-        _mask: torch.Tensor,
-    ):
-        # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
-        if isinstance(features, PackedSequence):
-            stack = [
-                self.embedding_layers[name](features.data[:, idx])
-                for idx, name in enumerate(self.featdims)
-            ]
-            stack.append(vectors.data)
-            inputs = torch.nn.utils.rnn.PackedSequence(
-                torch.hstack(stack), features.batch_sizes
-            )
-        else:
-            stack = [
-                self.embedding_layers[name](inputs[:, idx])
-                for idx, name in enumerate(self.featdims)
-            ]
-            stack.append(vectors)
-            inputs = torch.hstack(stack)
-        lstm_out, self.hidden_state = self.lstm_layer(inputs)
-        if isinstance(lstm_out, PackedSequence):
-            lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
-        tag_space = self.output_layer(lstm_out)
-        tag_space = tag_space.transpose(
-            -1, 1
-        )  # We need to transpose since it's a sequence (but why?!)
-        return tag_space
-
-
-def main():
-    parser = make_argparse()
-    args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
-
-    cuda_device = 0
-    device = torch.device(
-        "cuda:%d" % cuda_device if torch.cuda.is_available() else "cpu"
-    )
-    set_seeds(args.seed)
-
-    X, y = zip(*make_dataset(args.csvs))
-    vecnames = [
-        "line:left",
-        "line:top",
-        "v:left",
-        "v:top",
-        "v:right",
-        "v:bottom",
-        "v:left:delta",
-        "v:top:delta",
-        "v:right:delta",
-        "v:bottom:delta",
-        "v:left:delta:delta",
-        "v:top:delta:delta",
-        "v:right:delta:delta",
-        "v:bottom:delta:delta",
-    ]
-    featdims = {
-        "lower": args.word_dim,
-        "rgb": args.feat_dim,
-        "mctag": args.feat_dim,
-        "uppercase": args.feat_dim,
-        "title": args.feat_dim,
-        "punc": args.feat_dim,
-        "endpunc": args.feat_dim,
-        "numeric": args.feat_dim,
-        "bold": args.feat_dim,
-        "italic": args.feat_dim,
-        "toc": args.feat_dim,
-        "header": args.feat_dim,
-        "head:table": args.feat_dim,
-        "head:chapitre": args.feat_dim,
-        "head:annexe": args.feat_dim,
-        "line:height": args.feat_dim,
-        "line:indent": args.feat_dim,
-        "line:gap": args.feat_dim,
-        "first": args.feat_dim,
-        "last": args.feat_dim,
-    }
-    all_data, feat2id, id2label = make_all_data(X, y, featdims, vecnames)
+def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
     kf = KFold(
         n_splits=args.cross_validation_folds, shuffle=True, random_state=args.seed
     )
     scores = {"test_macro_f1": []}
-    label_counts = Counter(itertools.chain.from_iterable(y))
-    labels = sorted(
+    eval_labels = sorted(
         x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
     )
     veclen = len(all_data[0][0][0][1])
+    device = torch.device(args.device)
+
     for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
         train_data = Subset(all_data, train_idx)
         train_loader = DataLoader(
@@ -224,7 +105,7 @@ def main():
             dev_data, batch_size=args.batch_size, collate_fn=pad_collate_fn
         )
 
-        my_network = MyNetwork(
+        my_network = RNN(
             featdims, feat2id, veclen, len(id2label), hidden_size=args.hidden_size
         )
         optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
@@ -233,6 +114,8 @@ def main():
             # weight=torch.FloatTensor([label_weights.get(x, 1.0) for x in id2label])
             weight=torch.FloatTensor(
                 [
+                    # NOTE: This is cheating slightly since
+                    # label_counts comes from the entire dataset
                     (args.bscale if x[0] == "B" else 1.0) / label_counts[x]
                     for x in id2label
                 ]
@@ -253,7 +136,7 @@ def main():
                 ExponentialLR(gamma=args.gamma),
                 ModelCheckpoint(
                     monitor="val_fscore_macro",
-                    filename=args.outfile,
+                    filename=str(args.outfile),
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
@@ -288,11 +171,11 @@ def main():
         y_pred = [[id2label[x] for x in page] for page in predictions]
         y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
         macro_f1 = metrics.flat_f1_score(
-            y_true, y_pred, labels=labels, average="macro", zero_division=0.0
+            y_true, y_pred, labels=eval_labels, average="macro", zero_division=0.0
         )
         scores["test_macro_f1"].append(macro_f1)
         print("fold", fold + 1, "ALL", macro_f1)
-        for name in labels:
+        for name in eval_labels:
             label_f1 = metrics.flat_f1_score(
                 y_true, y_pred, labels=[name], average="micro", zero_division=0.0
             )
@@ -317,10 +200,68 @@ def main():
         row = makerow("ALL", scores["test_macro_f1"])
         writer.writerow(row)
         print("average", "ALL", row["Average"])
-        for name in labels:
+        for name in eval_labels:
             row = makerow(name, scores[name])
             writer.writerow(row)
             print("average", row["Label"], row["Average"])
+
+
+def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
+    train_loader = DataLoader(
+        train_data,
+        batch_size=args.batch_size,
+        shuffle=True,
+        collate_fn=pad_collate_fn,
+    )
+    veclen = len(train_data[0][0][0][1])
+    device = torch.device(args.device)
+    my_network = RNN(
+        featdims, feat2id, veclen, len(id2label), hidden_size=args.hidden_size
+    )
+    optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
+    loss_function = nn.CrossEntropyLoss(
+        weight=torch.FloatTensor(
+            [(args.bscale if x[0] == "B" else 1.0) / label_counts[x] for x in id2label]
+        )
+    )
+    model = Model(
+        my_network,
+        optimizer,
+        loss_function,
+        device=device,
+    )
+    model.fit_generator(
+        train_loader,
+        epochs=args.nepoch,
+        callbacks=[
+            ExponentialLR(gamma=args.gamma),
+        ],
+    )
+    torch.save(my_network, args.outfile)
+    config = {
+        "feat2id": feat2id,
+        "id2label": id2label,
+    }
+    with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
+        json.dump(config, outfh, ensure_ascii=False, indent=2)
+
+
+def main():
+    parser = make_argparse()
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
+    set_seeds(args.seed)
+
+    all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(args.csvs)
+
+    print("Vocabulary size:")
+    for feat, vals in feat2id.items():
+        print(f"\t{feat}: {len(vals)}")
+
+    if args.cross_validation_folds == 1:
+        run_training(args, all_data, featdims, feat2id, label_counts, id2label)
+    else:
+        run_cv(args, all_data, featdims, feat2id, label_counts, id2label)
 
 
 if __name__ == "__main__":
