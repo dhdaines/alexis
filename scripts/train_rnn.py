@@ -94,7 +94,6 @@ class MyNetwork(nn.Module):
         hidden_size=64,
         num_layer=1,
         bidirectional=True,
-        dropout=0,
     ):
         super().__init__()
         self.hidden_state = None
@@ -114,7 +113,6 @@ class MyNetwork(nn.Module):
             num_layers=num_layer,
             bidirectional=bidirectional,
             batch_first=True,
-            dropout=dropout,
         )
         self.output_layer = nn.Linear(
             hidden_size * (2 if bidirectional else 1), n_labels
