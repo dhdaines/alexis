@@ -27,7 +27,7 @@ def test_iob():
 
 
 def test_analyse():
-    with open(TRAINDIR / "zonage_sections.csv", "rt") as infh:
+    with open(TRAINDIR / "patches" / "zonage_sections.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         analyseur = Analyseur("zonage_sections", reader)
         doc = analyseur()
@@ -87,7 +87,7 @@ ZONES = {
 
 
 def test_analyse_zonage():
-    with open(TRAINDIR / "zonage_zones.csv", "rt") as infh:
+    with open(TRAINDIR / "patches" / "zonage_zones.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         analyseur = Analyseur("zonage_zones", reader)
         doc = analyseur()

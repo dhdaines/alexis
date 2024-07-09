@@ -10,7 +10,7 @@ TRAINDIR = Path(__file__).parent.parent / "data"
 
 
 def test_format_html():
-    with open(TRAINDIR / "zonage_sections.csv", "rt") as infh:
+    with open(TRAINDIR / "patches" / "zonage_sections.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         analyseur = Analyseur("zonage_sections", reader)
         doc = analyseur()

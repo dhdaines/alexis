@@ -53,7 +53,7 @@ class MockTokenizer:
 
 
 def test_retokenize():
-    with open(DATADIR / "zonage_titre.csv", "rt") as infh:
+    with open(DATADIR / "patches" / "zonage_titre.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         iobs = list(reader)
         tokenizer = MockTokenizer()

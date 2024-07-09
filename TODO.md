@@ -80,6 +80,9 @@ Segmentation results
         - can possibly be solved by initializing the transition
           weights with something non-random (I think the AllenNLP
           implementation also does this)
+  - LayoutLM
+    - pretrained on wrong language
+    - layout features possibly suboptimal for this task
 - Things yet to be tried
   - better CRF implementation (AllenNLP modules lite)
   - pre-trained or pre-computed word embeddings
