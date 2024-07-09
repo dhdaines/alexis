@@ -36,12 +36,11 @@ Segmentation
   - Heuristic pre-chunking as described below
   - Either tokenize from chars (above) or use first embedding per word
   - Probably project 768 dimensions down to something smaller
-- Do prediction with Transformers
-  - not expecting this to work very well due to sequence length limits
-  - what happens if we split a page in the middle of a paragraph?
-  - or in the middle of a word?
-  - could do a heuristic based pre-chunking (e.g. on a "large
-    enough" vertical whitespace)
+- Do prediction with Transformers (LayoutLM) DONE
+  - heuristic chunking based on line gap (not indent) DONE
+- Do prediction with Transformers (CamemBERT)
+- Do prediction with Transformers (CamemBERT + vector feats)
+
 
 Segmentation results
 ====================
@@ -52,13 +51,19 @@ Segmentation results
   - scale all the things by page size (slightly less good than by
     abs(max(feats)) but probably more robust)
   - upweight B- tags by 2.0
-  - taking the best model using f1_macro
+  - weight all tags by frequence (works even better than B- * 2.0)
+  - taking the best model using f1_macro (can't do for full training
+    unless we sample a dev set!)
 - Inconclusive
   - GRU or plain RNN with lower learning rate
     - LSTM is maybe overparameterized?
     - Improves label accuracy quite a lot but mean F1 not really
     - This seems to be a consequence of lower learning rate not cell typpe
   - wider word embeddings (maybe or maybe not, doing grid search...)
+  - LayoutLM
+    - pretrained on wrong language
+    - layout features possibly suboptimal for this task
+    - but need to synchronize evaluation metrics to be sure!
 - Things that did not help
   - CamemBERT tokenizer doesn't work well for CRFs, possibly due to:
     - all subwords have the same position, so layout features are wrong
@@ -80,9 +85,6 @@ Segmentation results
         - can possibly be solved by initializing the transition
           weights with something non-random (I think the AllenNLP
           implementation also does this)
-  - LayoutLM
-    - pretrained on wrong language
-    - layout features possibly suboptimal for this task
 - Things yet to be tried
   - better CRF implementation (AllenNLP modules lite)
   - pre-trained or pre-computed word embeddings
