@@ -48,6 +48,7 @@ def make_argparse():
     parser.add_argument(
         "--hidden-size", default=80, type=int, help="Largeur de la couche cachee"
     )
+    parser.add_argument("--early-stopping", action="store_true", help="Arret anticipe")
     parser.add_argument(
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
     )
@@ -128,28 +129,34 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             batch_metrics=["accuracy", "f1"],
             device=device,
         )
-        model.fit_generator(
-            train_loader,
-            dev_loader,
-            epochs=args.nepoch,
-            callbacks=[
-                ExponentialLR(gamma=args.gamma),
+        callbacks = [ExponentialLR(gamma=args.gamma)]
+        if args.early_stopping:
+            callbacks.append(
                 ModelCheckpoint(
                     monitor="val_fscore_macro",
-                    filename=args.outfile.with_stem(args.outfile.stem + f"_fold{fold}"),
+                    filename=str(
+                        args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
+                    ),
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
                     keep_only_last_best=True,
                     verbose=True,
-                ),
+                )
+            )
+            callbacks.append(
                 EarlyStopping(
                     monitor="val_fscore_macro",
                     mode="max",
                     patience=args.patience,
                     verbose=True,
-                ),
-            ],
+                )
+            )
+        model.fit_generator(
+            train_loader,
+            dev_loader,
+            epochs=args.nepoch,
+            callbacks=callbacks,
         )
         ordering, sorted_test_data = zip(
             *sorted(enumerate(dev_data), reverse=True, key=lambda x: len(x[1][0]))
