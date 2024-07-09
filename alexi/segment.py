@@ -638,28 +638,15 @@ class RNNSegmenteur:
         self.model.to(device)
 
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
-        words = list(words)
-        dataset = load_rnn_data(words, self.config["feat2id"], self.config["id2label"])
-        ordering, sorted_data = zip(
-            *sorted(enumerate(dataset), reverse=True, key=lambda x: len(x[1][0]))
-        )
-        loader = DataLoader(
-            sorted_data,
-            batch_size=32,
-            collate_fn=pad_collate_fn_predict,
-        )
-        predictions = []
-        lengths = [len(tokens) for tokens, _ in sorted_data]
-        for batch in loader:
-            out = self.model(*(t.to(self.device) for t in batch))
-            out = out.transpose(1, -1).argmax(-1).cpu()
-            for length, row in zip(lengths, out):
-                predictions.append(row[:length])
-            del lengths[: len(out)]
-        predictions = sorted(zip(ordering, predictions))
-        pred = itertools.chain.from_iterable(
-            (self.config["id2label"][x] for x in page) for idx, page in predictions
-        )
-        for label, word in zip(pred, words):
-            word["segment"] = label
-            yield word
+        for p in split_pages(words):
+            page, _labels = make_rnn_features(p)
+            features = make_page_feats(self.config["feat2id"], page)
+            feats, vector = zip(*features)
+            out = self.model(
+                torch.LongTensor(feats, device=self.device),
+                torch.FloatTensor(vector, device=self.device),
+                torch.ones(len(feats), device=self.device),
+            )
+            for label_id, word in zip(out.argmax(-1).cpu(), p):
+                word["segment"] = self.config["id2label"][label_id.item()]
+                yield word

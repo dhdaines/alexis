@@ -136,7 +136,7 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
                 ExponentialLR(gamma=args.gamma),
                 ModelCheckpoint(
                     monitor="val_fscore_macro",
-                    filename=str(args.outfile),
+                    filename=args.outfile.with_stem(args.outfile.stem + f"_fold{fold}"),
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
