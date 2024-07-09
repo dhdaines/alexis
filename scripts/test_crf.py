@@ -14,7 +14,6 @@ from alexi.segment import (
     page2features,
     page2labels,
     split_pages,
-    filter_tab,
 )
 
 
@@ -47,7 +46,7 @@ def main():
     parser = make_argparse()
     args = parser.parse_args()
     crf = Segmenteur(model=args.model)
-    test_set = split_pages(filter_tab(load(args.csvs)))
+    test_set = split_pages(load(args.csvs))
     test(crf.crf, test_set, crf.features, crf.labels, crf.n)
 
 

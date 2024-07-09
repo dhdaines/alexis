@@ -19,7 +19,7 @@ from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Identificateur
 from alexi.link import Resolver
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
-from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
+from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur, RNNSegmenteur
 from alexi.types import T_obj
 
 LOGGER = logging.getLogger("extract")
@@ -39,7 +39,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Ne pas utiliser le CSV de référence",
         action="store_true",
     )
-    parser.add_argument("--segment-model", help="Modele CRF", type=Path)
+    parser.add_argument("--segment-model", help="Modele CRF/RNN", type=Path)
     parser.add_argument(
         "--label-model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
     )
@@ -340,7 +340,10 @@ class Extracteur:
         self.outdir = outdir
         self.crf_s = Identificateur()
         if segment_model is not None:
-            self.crf = Segmenteur(segment_model)
+            if segment_model.suffix == ".pt":
+                self.crf = RNNSegmenteur(segment_model)
+            else:
+                self.crf = Segmenteur(segment_model)
             self.crf_n = None
         else:
             self.crf = Segmenteur(DEFAULT_SEGMENT_MODEL)

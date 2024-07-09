@@ -9,7 +9,7 @@ import torch
 from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader
 
-from alexi.segment import load_rnn_data, pad_collate_fn_predict, RNN
+from alexi.segment import load, load_rnn_data, pad_collate_fn_predict, RNN
 
 
 def make_argparse():
@@ -33,7 +33,7 @@ def main():
         config = json.load(infh)
         id2label = config["id2label"]
         feat2id = config["feat2id"]
-    all_data = load_rnn_data(args.csvs, feat2id, id2label)
+    all_data = load_rnn_data(load(args.csvs), feat2id, id2label)
     ordering, sorted_test_data = zip(
         *sorted(enumerate(all_data), reverse=True, key=lambda x: len(x[1][0]))
     )

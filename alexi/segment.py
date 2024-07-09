@@ -2,6 +2,7 @@
 
 import csv
 import itertools
+import json
 import operator
 import re
 from collections import Counter
@@ -13,6 +14,7 @@ from typing import Any, Callable, Iterable, Iterator, Sequence, Union
 import joblib  # type: ignore
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import (
     PackedSequence,
     pack_padded_sequence,
@@ -27,6 +29,7 @@ from alexi.types import T_obj
 FEATNAMES = [name for name in FIELDNAMES if name not in ("segment", "sequence")]
 DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
+DEFAULT_RNN_MODEL = Path(__file__).parent / "models" / "rnn.pt"
 FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
 
 if False:
@@ -334,29 +337,27 @@ def add_deltas(page):
             prev[f] = w[f]
 
 
-def make_rnn_features(csvs):
-    iobs = load(csvs)
-    for p in split_pages(filter_tab(iobs)):
-        features = list(
-            dict(w.split("=", maxsplit=2) for w in feats)
-            for feats in textpluslayoutplusstructure_features(p)
+def make_rnn_features(page):
+    features = list(
+        dict((name, val) for name, _, val in (w.partition("=") for w in feats))
+        for feats in textpluslayoutplusstructure_features(page)
+    )
+    for f, w in zip(features, page):
+        f["line:left"] = float(f["line:left"]) / float(w["page_width"])
+        f["line:top"] = float(f["line:top"]) / float(w["page_height"])
+        f["v:top"] = float(w["top"]) / float(w["page_height"])
+        f["v:left"] = float(w["x0"]) / float(w["page_width"])
+        f["v:top"] = float(w["top"]) / float(w["page_height"])
+        f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
+            w["page_width"]
         )
-        for f, w in zip(features, p):
-            f["line:left"] = float(f["line:left"]) / float(w["page_width"])
-            f["line:top"] = float(f["line:top"]) / float(w["page_height"])
-            f["v:top"] = float(w["top"]) / float(w["page_height"])
-            f["v:left"] = float(w["x0"]) / float(w["page_width"])
-            f["v:top"] = float(w["top"]) / float(w["page_height"])
-            f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
-                w["page_width"]
-            )
-            f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
-                w["page_height"]
-            )
+        f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
+            w["page_height"]
+        )
 
-        add_deltas(features)
-        labels = list(page2labels(p))
-        yield features, labels
+    add_deltas(features)
+    labels = list(page2labels(page))
+    return features, labels
 
 
 FEATNAMES = [
@@ -411,12 +412,12 @@ def make_page_feats(feat2id, page):
 
 
 def make_page_labels(label2id, page):
-    return [label2id[tag] for tag in page]
+    return [label2id.get(tag, 0) for tag in page]
 
 
 def make_rnn_data(csvs: Iterable[Path], word_dim: int = 32, feat_dim: int = 8):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
-    X, y = zip(*make_rnn_features(csvs))
+    X, y = zip(*(make_rnn_features(p) for p in split_pages(filter_tab(load(csvs)))))
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
@@ -441,17 +442,16 @@ def make_rnn_data(csvs: Iterable[Path], word_dim: int = 32, feat_dim: int = 8):
     return all_data, featdims, feat2id, label_counts, id2label
 
 
-def load_rnn_data(csvs: Iterable[Path], feat2id, id2label):
+def load_rnn_data(iobs: Iterable[T_obj], feat2id, id2label):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
-    X, y = zip(*make_rnn_features(csvs))
-
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
+    pages = (make_rnn_features(p) for p in split_pages(iobs))
     all_data = [
         (
             make_page_feats(feat2id, page),
             make_page_labels(label2id, labels),
         )
-        for page, labels in zip(X, y)
+        for page, labels in pages
     ]
     return all_data
 
@@ -622,5 +622,44 @@ class Segmenteur:
             for p in split_pages(c1)
         )
         for label, word in zip(pred, c2):
+            word["segment"] = label
+            yield word
+
+
+class RNNSegmenteur:
+    def __init__(self, model: PathLike = DEFAULT_RNN_MODEL, device="cpu"):
+        model = Path(model)
+        self.device = torch.device(device)
+        with open(model.with_suffix(".json"), "rt") as infh:
+            self.config = json.load(infh)
+        self.model = RNN(**self.config)
+        self.model.load_state_dict(torch.load(model))
+        self.model.eval()
+        self.model.to(device)
+
+    def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+        words = list(words)
+        dataset = load_rnn_data(words, self.config["feat2id"], self.config["id2label"])
+        ordering, sorted_data = zip(
+            *sorted(enumerate(dataset), reverse=True, key=lambda x: len(x[1][0]))
+        )
+        loader = DataLoader(
+            sorted_data,
+            batch_size=32,
+            collate_fn=pad_collate_fn_predict,
+        )
+        predictions = []
+        lengths = [len(tokens) for tokens, _ in sorted_data]
+        for batch in loader:
+            out = self.model(*(t.to(self.device) for t in batch))
+            out = out.transpose(1, -1).argmax(-1).cpu()
+            for length, row in zip(lengths, out):
+                predictions.append(row[:length])
+            del lengths[: len(out)]
+        predictions = sorted(zip(ordering, predictions))
+        pred = itertools.chain.from_iterable(
+            (self.config["id2label"][x] for x in page) for idx, page in predictions
+        )
+        for label, word in zip(pred, words):
             word["segment"] = label
             yield word
