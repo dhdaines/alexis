@@ -109,7 +109,7 @@ def index_main(args: argparse.Namespace):
 
 def search_main(args: argparse.Namespace):
     """Lancer une recherche sur l'index"""
-    search(args.indexdir, args.query)
+    search(args.indexdir, args.query, args.nresults)
 
 
 def make_argparse() -> argparse.ArgumentParser:
@@ -202,7 +202,7 @@ def make_argparse() -> argparse.ArgumentParser:
         "--outdir",
         help="Repertoire destination pour l'index",
         type=Path,
-        default="indexdir",
+        default="export/_idx",
     )
     index.add_argument("indir", help="Repertoire avec les fichiers extraits", type=Path)
     index.set_defaults(func=index_main)
@@ -213,7 +213,10 @@ def make_argparse() -> argparse.ArgumentParser:
         "--indexdir",
         help="Repertoire source pour l'index",
         type=Path,
-        default="indexdir",
+        default="export/_idx",
+    )
+    search.add_argument(
+        "-n", "--nresults", help="Nombre de résultats affichés", type=int, default=10
     )
     search.add_argument("query", help="Requête", nargs="+")
     search.set_defaults(func=search_main)

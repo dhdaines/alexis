@@ -8,7 +8,7 @@ import itertools
 import logging
 from operator import attrgetter
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Iterator
 
 import pypdfium2 as pdfium  # type: ignore
 import pypdfium2.raw as pdfium_c  # type: ignore
@@ -19,6 +19,7 @@ from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Identificateur
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
+from alexi.types import T_obj
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -118,12 +119,26 @@ def annotate_pdf(
     pdf.save(outpath)
 
 
+def spread_i(iobs: Iterable[T_obj]) -> Iterator[T_obj]:
+    """Rétablir les noms des blocs sur les étiquettes I."""
+    itor = iter(iobs)
+    prev = next(itor)
+    yield prev
+    for cur in itor:
+        bio, sep, name = prev["segment"].partition("-")
+        if cur["segment"] == "I":
+            cur["segment"] = f"I-{name}"
+        yield cur
+        prev = cur
+
+
 def main(args: argparse.Namespace) -> None:
     """Ajouter des anotations à un PDF selon l'extraction ALEXI"""
+    pages = [int(x.strip()) for x in args.pages.split(",")]
+    pages.sort()
     if args.csv is not None:
         with open(args.csv, "rt", encoding="utf-8-sig") as infh:
             iob = list(csv.DictReader(infh))
-        pages = []
     else:
         if args.segment_model is not None:
             crf = Segmenteur(args.segment_model)
@@ -133,15 +148,13 @@ def main(args: argparse.Namespace) -> None:
             crf_n = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
         crf_s = Identificateur(args.label_model)
         conv = Converteur(args.doc)
-        pages = [int(x.strip()) for x in args.pages.split(",")]
-        pages.sort()
         feats = conv.extract_words(pages)
         if conv.tree is None:
             LOGGER.warning("Structure logique absente: %s", args.doc)
             segs = crf_n(feats)
         else:
             segs = crf(feats)
-        iob = list(crf_s(segs))
+        iob = list(spread_i(crf_s(segs)))
         with open(args.out.with_suffix(".csv"), "wt") as outfh:
             write_csv(iob, outfh)
     annotate_pdf(args.doc, pages, iob, args.out.with_suffix(".pdf"))
