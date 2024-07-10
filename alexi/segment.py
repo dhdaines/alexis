@@ -237,11 +237,29 @@ def bonly(_, word):
         return "I"
     return "-".join((bio, name))
 
+TITRES = { "Article", "Chapitre", "Section", "SousSection", "Titre" }
+
+def tonly(_, word):
+    tag = word.get("segment", "O")
+    bio, sep, name = tag.partition("-")
+    if not name:
+        return tag
+    if name in TITRES:
+        return tag
+    return "O"
+
+def iobonly(_, word):
+    tag = word.get("segment", "O")
+    bio, _sep, _name = tag.partition("-")
+    return bio
+
 
 LabelFunc = Callable[[int, dict[str, Any]], str]
 LABELS: dict[str, LabelFunc] = {
     "literal": lambda _, x: x.get("segment", "O"),
     "bonly": bonly,
+    "tonly": tonly,
+    "iobonly": iobonly,
 }
 
 
@@ -337,10 +355,11 @@ def add_deltas(page):
             prev[f] = w[f]
 
 
-def make_rnn_features(page):
+def make_rnn_features(page: Iterable[T_obj], features: str = "text+layout+structure",
+                        labels: str = "literal"):
     features = list(
         dict((name, val) for name, _, val in (w.partition("=") for w in feats))
-        for feats in textpluslayoutplusstructure_features(page)
+        for feats in page2features(page, features)
     )
     for f, w in zip(features, page):
         f["line:left"] = float(f["line:left"]) / float(w["page_width"])
@@ -356,7 +375,7 @@ def make_rnn_features(page):
         )
 
     add_deltas(features)
-    labels = list(page2labels(page))
+    labels = list(page2labels(page, labels))
     return features, labels
 
 
@@ -415,9 +434,11 @@ def make_page_labels(label2id, page):
     return [label2id.get(tag, 0) for tag in page]
 
 
-def make_rnn_data(csvs: Iterable[Path], word_dim: int = 32, feat_dim: int = 8):
+def make_rnn_data(csvs: Iterable[Path], word_dim: int = 32, feat_dim: int = 8,
+                features: str = "text+layout_structure", labels: str = "literal"):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
-    X, y = zip(*(make_rnn_features(p) for p in split_pages(filter_tab(load(csvs)))))
+    X, y = zip(*(make_rnn_features(p, features=features, labels=labels)
+             for p in split_pages(filter_tab(load(csvs)))))
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))

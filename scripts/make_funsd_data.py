@@ -141,14 +141,15 @@ def write_fold(
                 # code wants (even though it's going to tokenize it
                 # again...)
                 for word in segment.detokenize(seg, tokenizer):
-                    labels.add(word["segment"])
+                    label = segment.tonly(0, word)
+                    labels.add(label)
                     bbox = [
                         int(float(word[f]) / maxdim * 1000)
                         for f in "x0 top x1 bottom".split()
                     ]
                     assert all(x <= 1000 for x in bbox)
                     box = " ".join(str(f) for f in bbox)
-                    print("\t".join((word["text"], word["segment"])), file=txtfh)
+                    print("\t".join((word["text"], label)), file=txtfh)
                     print(
                         "\t".join((word["text"], box)),
                         file=boxfh,
@@ -196,7 +197,7 @@ def main():
     kf = KFold(n_splits=4, shuffle=True, random_state=args.seed)
     for fold, (train_idx, dev_idx) in enumerate(kf.split(pages)):
         foldir = args.outdir / f"fold{fold + 1}"
-        foldir.mkdir()
+        foldir.mkdir(parents=True, exist_ok=True)
         labels = write_fold(
             (pages[x] for x in train_idx),
             tokenizer,

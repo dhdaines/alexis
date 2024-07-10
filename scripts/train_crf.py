@@ -35,7 +35,7 @@ def make_argparse():
     parser.add_argument(
         "--niter", default=200, type=int, help="Nombre d'iterations d'entrainement"
     )
-    parser.add_argument("--features", default="vsl", help="Extracteur de traits")
+    parser.add_argument("--features", default="text+layout+structure", help="Extracteur de traits")
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
     parser.add_argument(
@@ -73,7 +73,7 @@ def run_cv(args: argparse.Namespace, params: dict, X, y):
     LOGGER.info("Running cross-validation in %d folds", args.cross_validation_folds)
     counts: dict[str, int] = {}
     for c in itertools.chain.from_iterable(y):
-        if c.startswith("B-"):
+        if args.labels == "iobonly" or c.startswith("B-"):
             count = counts.setdefault(c, 0)
             counts[c] = count + 1
     labels = []

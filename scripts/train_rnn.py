@@ -27,7 +27,7 @@ def make_argparse():
         "--device", default="cuda:0", help="Device pour rouler l'entrainement"
     )
     parser.add_argument(
-        "--nepoch", default=100, type=int, help="Nombre maximal d'epochs d'entrainement"
+        "--nepoch", default=45, type=int, help="Nombre maximal d'epochs d'entrainement"
     )
     parser.add_argument("--batch-size", default=32, type=int, help="Taille du batch")
     parser.add_argument(
@@ -53,6 +53,8 @@ def make_argparse():
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
     )
     parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
+    parser.add_argument("--features", default="text+layout+structure", help="Extracteur de traits")
+    parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument(
         "--min-count",
         default=10,
@@ -87,9 +89,12 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         n_splits=args.cross_validation_folds, shuffle=True, random_state=args.seed
     )
     scores = {"test_macro_f1": []}
-    eval_labels = sorted(
-        x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
-    )
+    if args.labels == "iobonly":
+        eval_labels = sorted(label_counts.keys())
+    else:
+        eval_labels = sorted(
+            x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
+        )
     veclen = len(all_data[0][0][0][1])
     device = torch.device(args.device)
 
@@ -261,7 +266,8 @@ def main():
     logging.basicConfig(level=logging.INFO)
     set_seeds(args.seed)
 
-    all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(args.csvs)
+    all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(args.csvs,
+                features=args.features, labels=args.labels)
 
     print("Vocabulary size:")
     for feat, vals in feat2id.items():
