@@ -15,8 +15,8 @@ from tqdm import tqdm
 from transformers import (
     LayoutLMForTokenClassification,
     LayoutLMTokenizer,
-    TokenClassifierOutput,
 )
+from transformers.modeling_outputs import TokenClassifierOutput
 from transformers.optimization import Adafactor
 
 logger = logging.getLogger(__name__)
@@ -335,7 +335,7 @@ def convert_examples_to_features(
         assert len(label_ids) == max_seq_length
         assert len(token_boxes) == max_seq_length
 
-        if ex_index < 5:
+        if False:  # ex_index < 5:
             logger.info("*** Example ***")
             logger.info("guid: %s", example.guid)
             logger.info("tokens: %s", " ".join([str(x) for x in tokens]))
@@ -480,10 +480,10 @@ for folddir in folds:
     eval_sampler = SequentialSampler(eval_dataset)
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=2)
 
-    model = LayoutLMForTokenClassification.from_pretrained(
+    model = MyLayoutLMForTokenClassification.from_pretrained(
         "microsoft/layoutlm-base-uncased",
         num_labels=num_labels,
-        label_weights=torch.FloatTensor([1.0 / label_counts[x] for x in labels]),
+        label_weights=torch.FloatTensor([1.0 / label_counts[x] for x in labels]).to(device),
     )
     model.to(device)
 
