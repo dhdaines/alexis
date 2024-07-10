@@ -587,16 +587,10 @@ for folddir in folds:
                 y_true[i].append(label_map[out_label_ids[i][j]])
                 y_pred[i].append(label_map[preds[i][j]])
     eval_labels = [
-        "B-Alinea",
-        "B-Amendement",
         "B-Article",
         "B-Chapitre",
-        "B-Liste",
-        "B-Pied",
         "B-Section",
         "B-SousSection",
-        "B-TOC",
-        "B-Tete",
         "B-Titre",
     ]
 
