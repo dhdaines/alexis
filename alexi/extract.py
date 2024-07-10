@@ -554,9 +554,12 @@ def main(args) -> None:
     )
     docs = []
     for path in args.docs:
-        doc = extracteur(path)
-        if doc is not None:
-            docs.append(doc)
+        try:
+            doc = extracteur(path)
+            if doc is not None:
+                docs.append(doc)
+        except Exception as e:
+            LOGGER.error("Échec d'extraction de %s: %s", path, e)
     extracteur.output_doctree(docs)
     for doc in docs:
         extracteur.output_html(doc)
