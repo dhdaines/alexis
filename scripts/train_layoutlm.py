@@ -2,7 +2,9 @@ import argparse
 import csv
 import logging
 import os
+from collections import Counter
 from pathlib import Path
+from typing import Optional, Union, Tuple
 
 import numpy as np
 import torch
@@ -10,7 +12,11 @@ from sklearn_crfsuite import metrics
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 from tqdm import tqdm
-from transformers import LayoutLMForTokenClassification, LayoutLMTokenizer
+from transformers import (
+    LayoutLMForTokenClassification,
+    LayoutLMTokenizer,
+    TokenClassifierOutput,
+)
 from transformers.optimization import Adafactor
 
 logger = logging.getLogger(__name__)
@@ -355,6 +361,66 @@ def convert_examples_to_features(
     return features
 
 
+class MyLayoutLMForTokenClassification(LayoutLMForTokenClassification):
+    def __init__(self, config, label_weights):
+        super().__init__(config)
+        self.label_weights = label_weights
+
+    # Just copy the code ... not very robust
+    def forward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        bbox: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, TokenClassifierOutput]:
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+
+        outputs = self.layoutlm(
+            input_ids=input_ids,
+            bbox=bbox,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        sequence_output = outputs[0]
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss(weight=self.label_weights)
+
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else output
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("-d", "--data-dir", default="data", type=Path)
 parser.add_argument(
@@ -387,8 +453,17 @@ for folddir in folds:
             labels = ["O"] + labels
         return labels
 
+    def count_labels(path):
+        with open(path, "rt") as infh:
+            return Counter(
+                spam.split(maxsplit=2)[1] for spam in infh if not spam.isspace()
+            )
+
     labels = get_labels(folddir / "labels.txt")
+    # FIXME: This is really redundant
+    label_counts = count_labels(folddir / "train.txt")
     num_labels = len(labels)
+    # FIXME: This is so dumb! It does nothing a list wouldn't do!
     label_map = {i: label for i, label in enumerate(labels)}
 
     # We created our own dataset following the FUNSD conventions (see make_funsd_data.py)
@@ -406,7 +481,9 @@ for folddir in folds:
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=2)
 
     model = LayoutLMForTokenClassification.from_pretrained(
-        "microsoft/layoutlm-base-uncased", num_labels=num_labels
+        "microsoft/layoutlm-base-uncased",
+        num_labels=num_labels,
+        label_weights=torch.FloatTensor([1.0 / label_counts[x] for x in labels]),
     )
     model.to(device)
 
