@@ -3,6 +3,7 @@ import itertools
 from collections import Counter
 from pathlib import Path
 
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -351,7 +352,9 @@ def main():
     kf = KFold(n_splits=4, shuffle=True, random_state=seed)
     scores = {"test_macro_f1": []}
     label_counts = Counter(itertools.chain.from_iterable(y))
-    label_weights = [1.0 / label_counts[x] for x in id2label]
+    label_norm = sum(label_counts.values())
+    label_weights = [1.0 + math.log(label_norm / label_counts[x]) for x in id2label]
+    # label_weights = [2.0 if x == "B-Article" else 1.0 for x in id2label]
     labels = sorted(x for x in label_counts if x[0] == "B" and label_counts[x] >= 10)
     veclen = len(all_data[0][0][0][1])
     for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
