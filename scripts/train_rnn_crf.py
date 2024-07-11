@@ -17,11 +17,190 @@ from torch.nn.utils.rnn import (
     pad_sequence,
 )
 from torch.utils.data import DataLoader, Subset
-from bi_lstm_crf import CRF
+from allennlp_light.modules.conditional_random_field.conditional_random_field import (
+    allowed_transitions,
+)
+from allennlp_light.modules.conditional_random_field import (
+    ConditionalRandomFieldWeightEmission,
+)
 
 from alexi import segment
 
 DATA = list((Path(__file__).parent.parent / "data").glob("*.csv"))
+
+
+def make_fontname(fontname):
+    a, plus, b = fontname.partition("+")
+    if plus:
+        return b
+    return fontname
+
+
+def add_deltas(page):
+    prev = {}
+    for w in page:
+        for f in list(f for f in w if f.startswith("v:")):
+            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
+            prev[f] = w[f]
+    prev = {}
+    for w in page:
+        for f in list(f for f in w if f.endswith(":delta")):
+            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
+            prev[f] = w[f]
+
+
+def make_dataset(csvs):
+    iobs = segment.load(csvs)
+    for p in segment.split_pages(segment.filter_tab(iobs)):
+        features = list(
+            dict(w.split("=", maxsplit=2) for w in feats)
+            for feats in segment.textpluslayoutplusstructure_features(p)
+        )
+        for f, w in zip(features, p):
+            f["line:left"] = float(f["line:left"]) / float(w["page_width"])
+            f["line:top"] = float(f["line:top"]) / float(w["page_height"])
+            f["v:top"] = float(w["top"]) / float(w["page_height"])
+            f["v:left"] = float(w["x0"]) / float(w["page_width"])
+            f["v:top"] = float(w["top"]) / float(w["page_height"])
+            f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
+                w["page_width"]
+            )
+            f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
+                w["page_height"]
+            )
+
+        add_deltas(features)
+        labels = list(segment.page2labels(p))
+        yield features, labels
+
+
+def make_page_feats(feat2id, page, featdims, vecnames):
+    return [
+        (
+            [feat2id[name][feats[name]] for name in featdims],
+            [float(feats[name]) for name in vecnames],
+        )
+        for feats in page
+    ]
+
+
+def make_page_labels(label2id, page):
+    return [label2id[tag] for tag in page]
+
+
+def make_all_data(X, y, featdims, vecnames):
+    labelset = set(itertools.chain.from_iterable(y))
+    id2label = sorted(labelset, reverse=True)
+    label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
+    feat2id = {name: {"": 0} for name in featdims}
+    for feats in itertools.chain.from_iterable(X):
+        for name, ids in feat2id.items():
+            if feats[name] not in ids:
+                ids[feats[name]] = len(ids)
+    print("Vocabulary size:")
+    for feat, vals in feat2id.items():
+        print(f"\t{feat}: {len(vals)}")
+
+    all_data = [
+        (
+            make_page_feats(feat2id, page, featdims, vecnames),
+            make_page_labels(label2id, labels),
+        )
+        for page, labels in zip(X, y)
+    ]
+    veclen = len(all_data[0][0][0][1])
+    vecmax = np.zeros(veclen)
+    for page, _ in all_data:
+        for _, vector in page:
+            vecmax = np.maximum(vecmax, np.abs(vector))
+    # print("Scaling:")
+    # for feat, val in zip(vecnames, vecmax):
+    #     print(f"\t{feat}: {val}")
+    return all_data, feat2id, id2label
+
+
+def batch_sort_key(example):
+    features, labels = example
+    return -len(labels)
+
+
+def pad_collate_fn(batch):
+    batch.sort(key=batch_sort_key)
+    # Don't use a list comprehension here so we can better understand
+    sequences_features = []
+    sequences_vectors = []
+    sequences_labels = []
+    lengths = []
+    for example in batch:
+        features, labels = example
+        feats, vector = zip(*features)
+        assert len(labels) == len(feats)
+        assert len(labels) == len(vector)
+        sequences_features.append(torch.LongTensor(feats))
+        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_labels.append(torch.LongTensor(labels))
+        lengths.append(len(labels))
+    lengths = torch.LongTensor(lengths)
+    padded_sequences_features = pad_sequence(
+        sequences_features, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_features = pack_padded_sequence(
+        padded_sequences_features, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_vectors = pad_sequence(
+        sequences_vectors, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_vectors = pack_padded_sequence(
+        padded_sequences_vectors, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_labels = pad_sequence(
+        sequences_labels, batch_first=True, padding_value=-100
+    )
+    mask = torch.ne(padded_sequences_labels, -100)
+    return (
+        (pack_padded_sequences_features, pack_padded_sequences_vectors, mask),
+        padded_sequences_labels,
+    )
+
+
+def pad_collate_fn_predict(batch):
+    # Require data to be externally sorted by length for prediction
+    # (otherwise we have no idea which output corresponds to which input! WTF Poutyne!)
+    # Don't use a list comprehension here so we can better understand
+    sequences_features = []
+    sequences_vectors = []
+    sequences_labels = []
+    lengths = []
+    for example in batch:
+        features, labels = example
+        feats, vector = zip(*features)
+        assert len(labels) == len(feats)
+        assert len(labels) == len(vector)
+        sequences_features.append(torch.LongTensor(feats))
+        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
+        sequences_vectors.append(torch.FloatTensor(vector))
+        sequences_labels.append(torch.LongTensor(labels))
+        lengths.append(len(labels))
+    max_len = max(lengths)
+    len_lens = len(lengths)
+    lengths = torch.LongTensor(lengths).cpu()
+    # ought to be built into torch...
+    # https://stackoverflow.com/questions/53403306/how-to-batch-convert-sentence-lengths-to-masks-in-pytorch
+    mask = torch.arange(max_len).expand(len_lens, max_len) < lengths.unsqueeze(1)
+    padded_sequences_features = pad_sequence(
+        sequences_features, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_features = pack_padded_sequence(
+        padded_sequences_features, lengths.cpu(), batch_first=True
+    )
+    padded_sequences_vectors = pad_sequence(
+        sequences_vectors, batch_first=True, padding_value=0
+    )
+    pack_padded_sequences_vectors = pack_padded_sequence(
+        padded_sequences_vectors, lengths.cpu(), batch_first=True
+    )
+    return (pack_padded_sequences_features, pack_padded_sequences_vectors, mask)
 
 
 class MyNetwork(nn.Module):
@@ -30,7 +209,8 @@ class MyNetwork(nn.Module):
         featdims,
         feat2id,
         veclen,
-        n_labels,
+        labels,
+        label_weights,
         hidden_size=64,
         num_layer=1,
         bidirectional=True,
@@ -56,7 +236,14 @@ class MyNetwork(nn.Module):
             batch_first=True,
             dropout=dropout,
         )
-        self.crf_layer = CRF(hidden_size * (2 if bidirectional else 1), n_labels)
+        self.linear_layer = nn.Linear(
+            hidden_size * (2 if bidirectional else 1), len(labels)
+        )
+        self.crf_layer = ConditionalRandomFieldWeightEmission(
+            num_tags=len(labels),
+            label_weights=label_weights,
+            constraints=allowed_transitions("BIO", dict(enumerate(labels))),
+        )
 
     def forward(
         self,
@@ -84,8 +271,10 @@ class MyNetwork(nn.Module):
         lstm_out, self.hidden_state = self.lstm_layer(inputs)
         if isinstance(lstm_out, PackedSequence):
             lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
-        _scores, labels = self.crf_layer(lstm_out, mask)
-        return lstm_out, labels, mask
+        logits = self.linear_layer(lstm_out)
+        paths = self.crf_layer.viterbi_tags(logits, mask)
+        labels, _scores = zip(*paths)
+        return logits, labels, mask
 
 
 class MyCRFLoss:
@@ -94,9 +283,9 @@ class MyCRFLoss:
 
     def __call__(self, returns, y_true):
         logits, _labels, mask = returns
-        # Annoyingly, CRF requires masked labels to be valid indices
+        # CRF requires masked labels to be valid indices
         y_true[~mask] = 0
-        return self.crf.loss(logits, y_true, mask)
+        return -self.crf(logits, y_true, mask)
 
 
 def my_accuracy(y_pred, y_true):
@@ -162,6 +351,7 @@ def main():
     kf = KFold(n_splits=4, shuffle=True, random_state=seed)
     scores = {"test_macro_f1": []}
     label_counts = Counter(itertools.chain.from_iterable(y))
+    label_weights = [1.0 / label_counts[x] for x in id2label]
     labels = sorted(x for x in label_counts if x[0] == "B" and label_counts[x] >= 10)
     veclen = len(all_data[0][0][0][1])
     for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
@@ -174,8 +364,15 @@ def main():
             dev_data, batch_size=batch_size, collate_fn=pad_collate_fn
         )
 
-        my_network = MyNetwork(featdims, feat2id, veclen, len(id2label), hidden_size=80)
-        optimizer = optim.Adam(my_network.parameters(), lr=0.1)
+        my_network = MyNetwork(
+            featdims,
+            feat2id,
+            veclen,
+            id2label,
+            label_weights=label_weights,
+            hidden_size=80,
+        )
+        optimizer = optim.Adam(my_network.parameters(), lr=0.01)
         loss_function = MyCRFLoss(my_network.crf_layer)
         model = Model(
             my_network,
@@ -189,10 +386,10 @@ def main():
             dev_loader,
             epochs=100,
             callbacks=[
-                ExponentialLR(gamma=0.9),
+                ExponentialLR(gamma=0.99),
                 ModelCheckpoint(
                     monitor="val_my_accuracy",
-                    filename="rnnmodel.pkl",
+                    filename="rnncrf.pt",
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
