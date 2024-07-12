@@ -14,12 +14,17 @@ from typing import Any, Callable, Iterable, Iterator, Sequence, Union
 import joblib  # type: ignore
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import (
     PackedSequence,
     pack_padded_sequence,
     pad_packed_sequence,
     pad_sequence,
+)
+from allennlp_light.modules.conditional_random_field.conditional_random_field import (
+    allowed_transitions,
+)
+from allennlp_light.modules.conditional_random_field import (
+    ConditionalRandomFieldWeightEmission,
 )
 
 from alexi.convert import FIELDNAMES
@@ -237,7 +242,9 @@ def bonly(_, word):
         return "I"
     return "-".join((bio, name))
 
-TITRES = { "Article", "Chapitre", "Section", "SousSection", "Titre" }
+
+TITRES = {"Article", "Chapitre", "Section", "SousSection", "Titre"}
+
 
 def tonly(_, word):
     tag = word.get("segment", "O")
@@ -247,6 +254,7 @@ def tonly(_, word):
     if name in TITRES:
         return tag
     return "O"
+
 
 def iobonly(_, word):
     tag = word.get("segment", "O")
@@ -355,8 +363,11 @@ def add_deltas(page):
             prev[f] = w[f]
 
 
-def make_rnn_features(page: Iterable[T_obj], features: str = "text+layout+structure",
-                        labels: str = "literal"):
+def make_rnn_features(
+    page: Iterable[T_obj],
+    features: str = "text+layout+structure",
+    labels: str = "literal",
+):
     features = list(
         dict((name, val) for name, _, val in (w.partition("=") for w in feats))
         for feats in page2features(page, features)
@@ -434,11 +445,20 @@ def make_page_labels(label2id, page):
     return [label2id.get(tag, 0) for tag in page]
 
 
-def make_rnn_data(csvs: Iterable[Path], word_dim: int = 32, feat_dim: int = 8,
-                features: str = "text+layout_structure", labels: str = "literal"):
+def make_rnn_data(
+    csvs: Iterable[Path],
+    word_dim: int = 32,
+    feat_dim: int = 8,
+    features: str = "text+layout_structure",
+    labels: str = "literal",
+):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
-    X, y = zip(*(make_rnn_features(p, features=features, labels=labels)
-             for p in split_pages(filter_tab(load(csvs)))))
+    X, y = zip(
+        *(
+            make_rnn_features(p, features=features, labels=labels)
+            for p in split_pages(filter_tab(load(csvs)))
+        )
+    )
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
@@ -628,6 +648,80 @@ class RNN(nn.Module):
             -1, 1
         )  # We need to transpose since it's a sequence (but why?!)
         return tag_space
+
+
+class RNNCRF(nn.Module):
+    def __init__(
+        self,
+        featdims,
+        feat2id,
+        veclen,
+        labels,
+        label_weights,
+        hidden_size=64,
+        num_layer=1,
+        bidirectional=True,
+        dropout=0,
+    ):
+        super().__init__()
+        self.hidden_state = None
+        self.embedding_layers = {}
+        self.featdims = featdims
+        for name in featdims:
+            self.embedding_layers[name] = nn.Embedding(
+                len(feat2id[name]),
+                featdims[name],
+                padding_idx=0,
+            )
+            self.add_module(f"embedding_{name}", self.embedding_layers[name])
+        dimension = sum(featdims.values()) + veclen
+        self.lstm_layer = nn.LSTM(
+            input_size=dimension,
+            hidden_size=hidden_size,
+            num_layers=num_layer,
+            bidirectional=bidirectional,
+            batch_first=True,
+            dropout=dropout,
+        )
+        self.linear_layer = nn.Linear(
+            hidden_size * (2 if bidirectional else 1), len(labels)
+        )
+        self.crf_layer = ConditionalRandomFieldWeightEmission(
+            num_tags=len(labels),
+            label_weights=label_weights,
+            constraints=allowed_transitions("BIO", dict(enumerate(labels))),
+        )
+
+    def forward(
+        self,
+        features: PackedSequence | torch.Tensor,
+        vectors: PackedSequence | torch.Tensor,
+        mask: torch.Tensor,
+    ):
+        # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
+        if isinstance(features, PackedSequence):
+            stack = [
+                self.embedding_layers[name](features.data[:, idx])
+                for idx, name in enumerate(self.featdims)
+            ]
+            stack.append(vectors.data)
+            inputs = torch.nn.utils.rnn.PackedSequence(
+                torch.hstack(stack), features.batch_sizes
+            )
+        else:
+            stack = [
+                self.embedding_layers[name](inputs[:, idx])
+                for idx, name in enumerate(self.featdims)
+            ]
+            stack.append(vectors)
+            inputs = torch.hstack(stack)
+        lstm_out, self.hidden_state = self.lstm_layer(inputs)
+        if isinstance(lstm_out, PackedSequence):
+            lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
+        logits = self.linear_layer(lstm_out)
+        paths = self.crf_layer.viterbi_tags(logits, mask)
+        labels, _scores = zip(*paths)
+        return logits, labels, mask
 
 
 class Segmenteur:

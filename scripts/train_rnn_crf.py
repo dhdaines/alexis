@@ -3,27 +3,21 @@ import itertools
 from collections import Counter
 from pathlib import Path
 
-import math
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
-from poutyne import EarlyStopping, ExponentialLR, Model, ModelCheckpoint, set_seeds
+from poutyne import (
+    EarlyStopping,
+    ExponentialLR,
+    Model,
+    ModelCheckpoint,
+    set_seeds,
+    Accuracy,
+    F1,
+)
 from sklearn.model_selection import KFold
 from sklearn_crfsuite import metrics
-from torch.nn.utils.rnn import (
-    PackedSequence,
-    pack_padded_sequence,
-    pad_packed_sequence,
-    pad_sequence,
-)
 from torch.utils.data import DataLoader, Subset
-from allennlp_light.modules.conditional_random_field.conditional_random_field import (
-    allowed_transitions,
-)
-from allennlp_light.modules.conditional_random_field import (
-    ConditionalRandomFieldWeightEmission,
-)
 
 from alexi import segment
 
@@ -120,164 +114,6 @@ def make_all_data(X, y, featdims, vecnames):
     return all_data, feat2id, id2label
 
 
-def batch_sort_key(example):
-    features, labels = example
-    return -len(labels)
-
-
-def pad_collate_fn(batch):
-    batch.sort(key=batch_sort_key)
-    # Don't use a list comprehension here so we can better understand
-    sequences_features = []
-    sequences_vectors = []
-    sequences_labels = []
-    lengths = []
-    for example in batch:
-        features, labels = example
-        feats, vector = zip(*features)
-        assert len(labels) == len(feats)
-        assert len(labels) == len(vector)
-        sequences_features.append(torch.LongTensor(feats))
-        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
-        sequences_vectors.append(torch.FloatTensor(vector))
-        sequences_labels.append(torch.LongTensor(labels))
-        lengths.append(len(labels))
-    lengths = torch.LongTensor(lengths)
-    padded_sequences_features = pad_sequence(
-        sequences_features, batch_first=True, padding_value=0
-    )
-    pack_padded_sequences_features = pack_padded_sequence(
-        padded_sequences_features, lengths.cpu(), batch_first=True
-    )
-    padded_sequences_vectors = pad_sequence(
-        sequences_vectors, batch_first=True, padding_value=0
-    )
-    pack_padded_sequences_vectors = pack_padded_sequence(
-        padded_sequences_vectors, lengths.cpu(), batch_first=True
-    )
-    padded_sequences_labels = pad_sequence(
-        sequences_labels, batch_first=True, padding_value=-100
-    )
-    mask = torch.ne(padded_sequences_labels, -100)
-    return (
-        (pack_padded_sequences_features, pack_padded_sequences_vectors, mask),
-        padded_sequences_labels,
-    )
-
-
-def pad_collate_fn_predict(batch):
-    # Require data to be externally sorted by length for prediction
-    # (otherwise we have no idea which output corresponds to which input! WTF Poutyne!)
-    # Don't use a list comprehension here so we can better understand
-    sequences_features = []
-    sequences_vectors = []
-    sequences_labels = []
-    lengths = []
-    for example in batch:
-        features, labels = example
-        feats, vector = zip(*features)
-        assert len(labels) == len(feats)
-        assert len(labels) == len(vector)
-        sequences_features.append(torch.LongTensor(feats))
-        # sequences_vectors.append(torch.FloatTensor(np.array(vector) / vecmax))
-        sequences_vectors.append(torch.FloatTensor(vector))
-        sequences_labels.append(torch.LongTensor(labels))
-        lengths.append(len(labels))
-    max_len = max(lengths)
-    len_lens = len(lengths)
-    lengths = torch.LongTensor(lengths).cpu()
-    # ought to be built into torch...
-    # https://stackoverflow.com/questions/53403306/how-to-batch-convert-sentence-lengths-to-masks-in-pytorch
-    mask = torch.arange(max_len).expand(len_lens, max_len) < lengths.unsqueeze(1)
-    padded_sequences_features = pad_sequence(
-        sequences_features, batch_first=True, padding_value=0
-    )
-    pack_padded_sequences_features = pack_padded_sequence(
-        padded_sequences_features, lengths.cpu(), batch_first=True
-    )
-    padded_sequences_vectors = pad_sequence(
-        sequences_vectors, batch_first=True, padding_value=0
-    )
-    pack_padded_sequences_vectors = pack_padded_sequence(
-        padded_sequences_vectors, lengths.cpu(), batch_first=True
-    )
-    return (pack_padded_sequences_features, pack_padded_sequences_vectors, mask)
-
-
-class MyNetwork(nn.Module):
-    def __init__(
-        self,
-        featdims,
-        feat2id,
-        veclen,
-        labels,
-        label_weights,
-        hidden_size=64,
-        num_layer=1,
-        bidirectional=True,
-        dropout=0,
-    ):
-        super().__init__()
-        self.hidden_state = None
-        self.embedding_layers = {}
-        self.featdims = featdims
-        for name in featdims:
-            self.embedding_layers[name] = nn.Embedding(
-                len(feat2id[name]),
-                featdims[name],
-                padding_idx=0,
-            )
-            self.add_module(f"embedding_{name}", self.embedding_layers[name])
-        dimension = sum(featdims.values()) + veclen
-        self.lstm_layer = nn.LSTM(
-            input_size=dimension,
-            hidden_size=hidden_size,
-            num_layers=num_layer,
-            bidirectional=bidirectional,
-            batch_first=True,
-            dropout=dropout,
-        )
-        self.linear_layer = nn.Linear(
-            hidden_size * (2 if bidirectional else 1), len(labels)
-        )
-        self.crf_layer = ConditionalRandomFieldWeightEmission(
-            num_tags=len(labels),
-            label_weights=label_weights,
-            constraints=allowed_transitions("BIO", dict(enumerate(labels))),
-        )
-
-    def forward(
-        self,
-        features: PackedSequence | torch.Tensor,
-        vectors: PackedSequence | torch.Tensor,
-        mask: torch.Tensor,
-    ):
-        # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
-        if isinstance(features, PackedSequence):
-            stack = [
-                self.embedding_layers[name](features.data[:, idx])
-                for idx, name in enumerate(self.featdims)
-            ]
-            stack.append(vectors.data)
-            inputs = torch.nn.utils.rnn.PackedSequence(
-                torch.hstack(stack), features.batch_sizes
-            )
-        else:
-            stack = [
-                self.embedding_layers[name](inputs[:, idx])
-                for idx, name in enumerate(self.featdims)
-            ]
-            stack.append(vectors)
-            inputs = torch.hstack(stack)
-        lstm_out, self.hidden_state = self.lstm_layer(inputs)
-        if isinstance(lstm_out, PackedSequence):
-            lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
-        logits = self.linear_layer(lstm_out)
-        paths = self.crf_layer.viterbi_tags(logits, mask)
-        labels, _scores = zip(*paths)
-        return logits, labels, mask
-
-
 class MyCRFLoss:
     def __init__(self, crf):
         self.crf = crf
@@ -289,15 +125,23 @@ class MyCRFLoss:
         return -self.crf(logits, y_true, mask)
 
 
-def my_accuracy(y_pred, y_true):
-    """poutyne's "accuracy" is totally useless here"""
-    _score, y_pred, y_mask = y_pred
-    n_labels = 0
-    n_true = 0
-    for pred, true, _mask in zip(y_pred, y_true, y_mask):
-        n_labels += len(pred)  # it is not padded
-        n_true += torch.eq(torch.Tensor(pred), true[: len(pred)].cpu()).sum()
-    return n_true / n_labels * 100
+def CRFMetric(cls, *args, **kwargs):
+    metric = cls(*args, **kwargs)
+
+    def crf_forward(y_pred, y_true):
+        _score, preds, mask = y_pred
+        # For some unknown reason poutyne expects logits/probabilities and not labels here
+        n_labels = y_true.max() + 1
+        fake_logits = torch.zeros(y_true.shape + (n_labels,), device=y_true.device)
+        for idx, labels in enumerate(preds):
+            fake_logits[idx, range(len(labels)), labels] = 1.0
+        # Have to set masked labels back to the ignore index
+        y_true[~mask] = metric.ignore_index
+        # Also the shape is weird because pytorch is weird
+        return cls.forward(metric, fake_logits.transpose(1, -1), y_true)
+
+    metric.forward = crf_forward
+    return metric
 
 
 def main():
@@ -352,22 +196,26 @@ def main():
     kf = KFold(n_splits=4, shuffle=True, random_state=seed)
     scores = {"test_macro_f1": []}
     label_counts = Counter(itertools.chain.from_iterable(y))
-    label_norm = sum(label_counts.values())
-    label_weights = [1.0 + math.log(label_norm / label_counts[x]) for x in id2label]
-    # label_weights = [2.0 if x == "B-Article" else 1.0 for x in id2label]
+    label_norm = min(label_counts.values())
+    # Label weights must be at least 1.0 for learning to work (for whatever reason)
+    label_weights = [1.0 + label_norm / label_counts[x] for x in id2label]
+    # label_weights = [1.0 for x in id2label]
     labels = sorted(x for x in label_counts if x[0] == "B" and label_counts[x] >= 10)
     veclen = len(all_data[0][0][0][1])
     for fold, (train_idx, dev_idx) in enumerate(kf.split(all_data)):
         train_data = Subset(all_data, train_idx)
         train_loader = DataLoader(
-            train_data, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn
+            train_data,
+            batch_size=batch_size,
+            shuffle=True,
+            collate_fn=segment.pad_collate_fn,
         )
         dev_data = Subset(all_data, dev_idx)
         dev_loader = DataLoader(
-            dev_data, batch_size=batch_size, collate_fn=pad_collate_fn
+            dev_data, batch_size=batch_size, collate_fn=segment.pad_collate_fn
         )
 
-        my_network = MyNetwork(
+        my_network = segment.RNNCRF(
             featdims,
             feat2id,
             veclen,
@@ -381,7 +229,7 @@ def main():
             my_network,
             optimizer,
             loss_function,
-            batch_metrics=[my_accuracy],
+            batch_metrics=[CRFMetric(Accuracy), CRFMetric(F1)],
             device=device,
         )
         model.fit_generator(
@@ -391,7 +239,7 @@ def main():
             callbacks=[
                 ExponentialLR(gamma=0.99),
                 ModelCheckpoint(
-                    monitor="val_my_accuracy",
+                    monitor="val_fscore_macro",
                     filename="rnncrf.pt",
                     mode="max",
                     save_best_only=True,
@@ -400,7 +248,10 @@ def main():
                     verbose=True,
                 ),
                 EarlyStopping(
-                    monitor="val_my_accuracy", mode="max", patience=10, verbose=True
+                    monitor="val_fscore_macro",
+                    mode="max",
+                    patience=10,
+                    verbose=True,
                 ),
             ],
         )
@@ -408,7 +259,9 @@ def main():
             *sorted(enumerate(dev_data), reverse=True, key=lambda x: len(x[1][0]))
         )
         test_loader = DataLoader(
-            sorted_test_data, batch_size=batch_size, collate_fn=pad_collate_fn_predict
+            sorted_test_data,
+            batch_size=batch_size,
+            collate_fn=segment.pad_collate_fn_predict,
         )
         out = model.predict_generator(test_loader, concatenate_returns=False)
         predictions = []

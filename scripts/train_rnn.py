@@ -53,7 +53,9 @@ def make_argparse():
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
     )
     parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
-    parser.add_argument("--features", default="text+layout+structure", help="Extracteur de traits")
+    parser.add_argument(
+        "--features", default="text+layout+structure", help="Extracteur de traits"
+    )
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument(
         "--min-count",
@@ -266,8 +268,9 @@ def main():
     logging.basicConfig(level=logging.INFO)
     set_seeds(args.seed)
 
-    all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(args.csvs,
-                features=args.features, labels=args.labels)
+    all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
+        args.csvs, features=args.features, labels=args.labels
+    )
 
     print("Vocabulary size:")
     for feat, vals in feat2id.items():
