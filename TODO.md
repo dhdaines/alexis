@@ -51,6 +51,8 @@ Segmentation results
 ====================
 
 - Things that helped
+  - RNN helps overall, particularly on unseen data (using the
+    "patches" as a test set)
   - use all the manually created features and embed them with >=4 dimensions
   - deltas and delta-deltas
   - scale all the things by page size (slightly less good than by
@@ -60,6 +62,7 @@ Segmentation results
   - taking the best model using f1_macro (can't do for full training
     unless we sample a dev set!)
   - ensemble of cross-validation folds (allows early stopping as well)
+    - in *theory* dropout would give us this benefit too
 - Inconclusive
   - GRU or plain RNN with lower learning rate
     - LSTM is maybe overparameterized?
@@ -79,6 +82,7 @@ Segmentation results
   - much narrower LSTM
   - dropout on LSTM layers
   - extra feedforward layer
+  - dropout on extra feedforward layer
   - wider word embeddings
   - CRF output layer
     - Training is *much* slower

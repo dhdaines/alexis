@@ -633,9 +633,8 @@ class RNN(nn.Module):
                 for idx, name in enumerate(self.featdims)
             ]
             stack.append(vectors.data)
-            inputs = torch.nn.utils.rnn.PackedSequence(
-                torch.hstack(stack), features.batch_sizes
-            )
+            inputs = torch.hstack(stack)
+            inputs = torch.nn.utils.rnn.PackedSequence(inputs, features.batch_sizes)
         else:
             stack = [
                 self.embedding_layers[name](features[:, idx])
@@ -653,41 +652,28 @@ class RNN(nn.Module):
         return tag_space
 
 
-class RNNCRF(nn.Module):
+class RNNCRF(RNN):
     def __init__(
         self,
         featdims,
         feat2id,
         veclen,
         id2label,
-        label_weights,
+        label_weights=None,
         hidden_size=64,
         num_layer=1,
         bidirectional=True,
-        dropout=0,
+        **_kwargs,
     ):
-        super().__init__()
-        self.hidden_state = None
-        self.embedding_layers = {}
-        self.featdims = featdims
-        for name in featdims:
-            self.embedding_layers[name] = nn.Embedding(
-                len(feat2id[name]),
-                featdims[name],
-                padding_idx=0,
-            )
-            self.add_module(f"embedding_{name}", self.embedding_layers[name])
-        dimension = sum(featdims.values()) + veclen
-        self.lstm_layer = nn.LSTM(
-            input_size=dimension,
-            hidden_size=hidden_size,
-            num_layers=num_layer,
-            bidirectional=bidirectional,
-            batch_first=True,
-            dropout=dropout,
-        )
-        self.linear_layer = nn.Linear(
-            hidden_size * (2 if bidirectional else 1), len(id2label)
+        super().__init__(
+            featdims,
+            feat2id,
+            veclen,
+            id2label,
+            label_weights,
+            hidden_size,
+            num_layer,
+            bidirectional,
         )
         self.crf_layer = ConditionalRandomFieldWeightTrans(
             num_tags=len(id2label),
@@ -701,27 +687,8 @@ class RNNCRF(nn.Module):
         vectors: PackedSequence | torch.Tensor,
         mask: torch.Tensor,
     ):
-        # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
-        if isinstance(features, PackedSequence):
-            stack = [
-                self.embedding_layers[name](features.data[:, idx])
-                for idx, name in enumerate(self.featdims)
-            ]
-            stack.append(vectors.data)
-            inputs = torch.nn.utils.rnn.PackedSequence(
-                torch.hstack(stack), features.batch_sizes
-            )
-        else:
-            stack = [
-                self.embedding_layers[name](inputs[:, idx])
-                for idx, name in enumerate(self.featdims)
-            ]
-            stack.append(vectors)
-            inputs = torch.hstack(stack)
-        lstm_out, self.hidden_state = self.lstm_layer(inputs)
-        if isinstance(lstm_out, PackedSequence):
-            lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
-        logits = self.linear_layer(lstm_out)
+        tag_space = super().forward(features, vectors, mask)
+        logits = tag_space.transpose(-1, 1)  # We need to transpose it back because wtf
         paths = self.crf_layer.viterbi_tags(logits, mask)
         labels, _scores = zip(*paths)
         return logits, labels, mask
