@@ -9,7 +9,7 @@ import torch
 from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader
 
-from alexi.segment import load, load_rnn_data, pad_collate_fn_predict, RNN
+from alexi.segment import load, load_rnn_data, pad_collate_fn_predict, RNN, RNNCRF
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -48,18 +48,25 @@ def main():
             collate_fn=pad_collate_fn_predict,
         )
         device = torch.device(args.device)
-        model = RNN(**config)
+        if "crf" in args.model.name:
+            model = RNNCRF(**config)
+        else:
+            model = RNN(**config)
         model.load_state_dict(torch.load(fold))
         model.eval()
         model.to(device)
         fold_predictions = []
         lengths = [len(tokens) for tokens, _ in sorted_test_data]
         for batch in test_loader:
-            out = model(*(t.to(device) for t in batch))
-            out = out.transpose(1, -1).argmax(-1).cpu()
-            for length, row in zip(lengths, out):
-                fold_predictions.append(row[:length])
-            del lengths[: len(out)]
+            if "crf" in args.model.name:
+                _logits, labels, _mask = model(*(t.to(device) for t in batch))
+                fold_predictions.extend(torch.LongTensor(x) for x in labels)
+            else:
+                out = model(*(t.to(device) for t in batch))
+                out = out.transpose(1, -1).argmax(-1).cpu()
+                for length, row in zip(lengths, out):
+                    fold_predictions.append(row[:length])
+                del lengths[: len(out)]
         multi_predictions.append(fold_predictions)
     predictions = []
     for page in zip(*multi_predictions):
@@ -73,7 +80,9 @@ def main():
         ["O", *(c for c in id2label if c.startswith("B-"))],
         key=lambda name: (name[1:], name[0]),
     )
-    report = metrics.flat_classification_report(y_true, y_pred, labels=eval_labels)
+    report = metrics.flat_classification_report(
+        y_true, y_pred, labels=eval_labels, zero_division=0.0
+    )
     print(report)
 
 
