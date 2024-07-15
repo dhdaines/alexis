@@ -297,11 +297,7 @@ def main():
     )
     # Note that label weights are apparently in exponential space, so
     # a "positive" weight is > 1.0 (unlike with CrossEntropyLoss)
-
-    # The choice of normalizer is sort of arbirary, you could also do:
-    # label_norm = min(label_counts.values())  # or max, sum, etc...
-    label_norm = 1.0
-    label_weights = [math.exp(label_norm / label_counts[x]) for x in id2label]
+    label_weights = [math.exp(1.0 / label_counts[x]) for x in id2label]
 
     print("Vocabulary size:")
     for feat, vals in feat2id.items():

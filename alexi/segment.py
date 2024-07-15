@@ -25,6 +25,8 @@ from allennlp_light.modules.conditional_random_field.conditional_random_field im
 )
 from allennlp_light.modules.conditional_random_field import (
     ConditionalRandomFieldWeightEmission,
+    ConditionalRandomFieldWeightTrans,
+    ConditionalRandomFieldWeightLannoy,
 )
 
 from alexi.convert import FIELDNAMES
@@ -687,7 +689,7 @@ class RNNCRF(nn.Module):
         self.linear_layer = nn.Linear(
             hidden_size * (2 if bidirectional else 1), len(id2label)
         )
-        self.crf_layer = ConditionalRandomFieldWeightEmission(
+        self.crf_layer = ConditionalRandomFieldWeightTrans(
             num_tags=len(id2label),
             label_weights=label_weights,
             constraints=allowed_transitions("BIO", dict(enumerate(id2label))),
