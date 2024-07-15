@@ -97,6 +97,11 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         eval_labels = sorted(
             x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
         )
+    # NOTE: This is cheating slightly since label_counts comes from
+    # the entire dataset
+    label_weights = [
+        (args.bscale if x[0] == "B" else 1.0) / label_counts[x] for x in id2label
+    ]
     veclen = len(all_data[0][0][0][1])
     device = torch.device(args.device)
 
@@ -112,23 +117,16 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         dev_loader = DataLoader(
             dev_data, batch_size=args.batch_size, collate_fn=pad_collate_fn
         )
-
-        my_network = RNN(
-            featdims, feat2id, veclen, len(id2label), hidden_size=args.hidden_size
-        )
+        config = {
+            "feat2id": feat2id,
+            "id2label": id2label,
+            "featdims": featdims,
+            "veclen": veclen,
+            "hidden_size": args.hidden_size,
+        }
+        my_network = RNN(**config)
         optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
-        loss_function = nn.CrossEntropyLoss(
-            # weight=torch.FloatTensor([10 if x[0] == "B" else 1 for x in id2label])
-            # weight=torch.FloatTensor([label_weights.get(x, 1.0) for x in id2label])
-            weight=torch.FloatTensor(
-                [
-                    # NOTE: This is cheating slightly since
-                    # label_counts comes from the entire dataset
-                    (args.bscale if x[0] == "B" else 1.0) / label_counts[x]
-                    for x in id2label
-                ]
-            )
-        )
+        loss_function = nn.CrossEntropyLoss(weight=torch.FloatTensor(label_weights))
         model = Model(
             my_network,
             optimizer,
@@ -136,14 +134,15 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             batch_metrics=["accuracy", "f1"],
             device=device,
         )
+        foldfile = args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
+        with open(foldfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
+            json.dump(config, outfh, ensure_ascii=False, indent=2)
         callbacks = [ExponentialLR(gamma=args.gamma)]
         if args.early_stopping:
             callbacks.append(
                 ModelCheckpoint(
                     monitor="val_fscore_macro",
-                    filename=str(
-                        args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
-                    ),
+                    filename=str(foldfile),
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
@@ -195,6 +194,8 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             )
             scores.setdefault(name, []).append(label_f1)
             print("fold", fold + 1, name, label_f1)
+        if not args.early_stopping:
+            torch.save(my_network.state_dict(), foldfile)
 
     with open(args.scores, "wt") as outfh:
         fieldnames = [
@@ -228,22 +229,22 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
         collate_fn=pad_collate_fn,
     )
     veclen = len(train_data[0][0][0][1])
+    label_weights = [
+        (args.bscale if x[0] == "B" else 1.0) / label_counts[x] for x in id2label
+    ]
     device = torch.device(args.device)
     config = {
         "feat2id": feat2id,
         "id2label": id2label,
         "featdims": featdims,
         "veclen": veclen,
-        "n_labels": len(id2label),
         "hidden_size": args.hidden_size,
     }
+    with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
+        json.dump(config, outfh, ensure_ascii=False, indent=2)
     my_network = RNN(**config)
     optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
-    loss_function = nn.CrossEntropyLoss(
-        weight=torch.FloatTensor(
-            [(args.bscale if x[0] == "B" else 1.0) / label_counts[x] for x in id2label]
-        )
-    )
+    loss_function = nn.CrossEntropyLoss(weight=torch.FloatTensor(label_weights))
     model = Model(
         my_network,
         optimizer,
@@ -258,8 +259,6 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
         ],
     )
     torch.save(my_network.state_dict(), args.outfile)
-    with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
-        json.dump(config, outfh, ensure_ascii=False, indent=2)
 
 
 def main():

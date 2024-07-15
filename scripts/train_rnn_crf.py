@@ -8,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from poutyne import (
     EarlyStopping,
@@ -51,9 +50,6 @@ def make_argparse():
         "--gamma", default=0.99, type=float, help="Coefficient de reduction du LR"
     )
     parser.add_argument(
-        "--bscale", default=1.0, type=float, help="Facteur applique aux debuts de bloc"
-    )
-    parser.add_argument(
         "--hidden-size", default=80, type=int, help="Largeur de la couche cachee"
     )
     parser.add_argument("--early-stopping", action="store_true", help="Arret anticipe")
@@ -83,7 +79,7 @@ def make_argparse():
         "--outfile",
         help="Fichier destination pour modele",
         type=Path,
-        default="rnn.pt",
+        default="rnn_crf.pt",
     )
     parser.add_argument(
         "-s",
@@ -129,16 +125,16 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         n_splits=args.cross_validation_folds, shuffle=True, random_state=args.seed
     )
     scores = {"test_macro_f1": []}
-    label_norm = min(label_counts.values())
-    # Label weights must be at least 1.0 for learning to work (for whatever reason)
-    label_weights = [1.0 + label_norm / label_counts[x] for x in id2label]
-    # label_weights = [1.0 for x in id2label]
     if args.labels == "iobonly":
         eval_labels = sorted(label_counts.keys())
     else:
         eval_labels = sorted(
             x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
         )
+    label_norm = min(label_counts.values())
+    # Label weights must be at least 1.0 for learning to work (for whatever reason)
+    label_weights = [1.0 + label_norm / label_counts[x] for x in id2label]
+    # label_weights = [1.0 for x in id2label]
     veclen = len(all_data[0][0][0][1])
     device = torch.device(args.device)
 
@@ -154,15 +150,18 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         dev_loader = DataLoader(
             dev_data, batch_size=args.batch_size, collate_fn=pad_collate_fn
         )
-
-        my_network = RNNCRF(
-            featdims,
-            feat2id,
-            veclen,
-            id2label,
-            label_weights=label_weights,
-            hidden_size=80,
-        )
+        config = {
+            "feat2id": feat2id,
+            "id2label": id2label,
+            "featdims": featdims,
+            "veclen": veclen,
+            "label_weights": label_weights,
+            "hidden_size": args.hidden_size,
+        }
+        foldfile = args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
+        with open(foldfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
+            json.dump(config, outfh, ensure_ascii=False, indent=2)
+        my_network = RNNCRF(**config)
         optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
         loss_function = MyCRFLoss(my_network.crf_layer)
         model = Model(
@@ -177,9 +176,7 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             callbacks.append(
                 ModelCheckpoint(
                     monitor="val_fscore_macro",
-                    filename=str(
-                        args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
-                    ),
+                    filename=str(foldfile),
                     mode="max",
                     save_best_only=True,
                     restore_best=True,
@@ -211,13 +208,9 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         )
         out = model.predict_generator(test_loader, concatenate_returns=False)
         predictions = []
-        lengths = [len(tokens) for tokens, _ in sorted_test_data]
         for batch in out:
-            # numpy.transpose != torch.transpose because Reasons
-            batch = batch.transpose((0, 2, 1)).argmax(-1)
-            for length, row in zip(lengths, batch):
-                predictions.append(row[:length])
-            del lengths[: len(batch)]
+            _logits, tags, _mask = batch
+            predictions.extend(tags)
         y_pred = [[id2label[x] for x in page] for page in predictions]
         y_true = [[id2label[x] for x in page] for _, page in sorted_test_data]
         macro_f1 = metrics.flat_f1_score(
@@ -231,6 +224,8 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             )
             scores.setdefault(name, []).append(label_f1)
             print("fold", fold + 1, name, label_f1)
+        if not args.early_stopping:
+            torch.save(my_network.state_dict(), foldfile)
 
     with open(args.scores, "wt") as outfh:
         fieldnames = [
@@ -263,20 +258,22 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
         shuffle=True,
         collate_fn=pad_collate_fn,
     )
-    veclen = len(train_data[0][0][0][1])
-    device = torch.device(args.device)
     label_norm = min(label_counts.values())
     # Label weights must be at least 1.0 for learning to work (for whatever reason)
     label_weights = [1.0 + label_norm / label_counts[x] for x in id2label]
     # label_weights = [1.0 for x in id2label]
+    veclen = len(train_data[0][0][0][1])
+    device = torch.device(args.device)
     config = {
-        "featdims": featdims,
         "feat2id": feat2id,
+        "id2label": id2label,
+        "featdims": featdims,
         "veclen": veclen,
-        "labels": id2label,
         "label_weights": label_weights,
         "hidden_size": args.hidden_size,
     }
+    with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
+        json.dump(config, outfh, ensure_ascii=False, indent=2)
     my_network = RNNCRF(**config)
     optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
     loss_function = MyCRFLoss(my_network.crf_layer)
@@ -294,8 +291,6 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
         ],
     )
     torch.save(my_network.state_dict(), args.outfile)
-    with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
-        json.dump(config, outfh, ensure_ascii=False, indent=2)
 
 
 def main():

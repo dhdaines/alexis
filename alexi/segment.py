@@ -587,7 +587,8 @@ class RNN(nn.Module):
         featdims,
         feat2id,
         veclen,
-        n_labels,
+        id2label,
+        label_weights=None,
         hidden_size=64,
         num_layer=1,
         bidirectional=True,
@@ -613,7 +614,7 @@ class RNN(nn.Module):
             batch_first=True,
         )
         self.output_layer = nn.Linear(
-            hidden_size * (2 if bidirectional else 1), n_labels
+            hidden_size * (2 if bidirectional else 1), len(id2label)
         )
 
     def forward(
@@ -656,7 +657,7 @@ class RNNCRF(nn.Module):
         featdims,
         feat2id,
         veclen,
-        labels,
+        id2label,
         label_weights,
         hidden_size=64,
         num_layer=1,
@@ -684,12 +685,12 @@ class RNNCRF(nn.Module):
             dropout=dropout,
         )
         self.linear_layer = nn.Linear(
-            hidden_size * (2 if bidirectional else 1), len(labels)
+            hidden_size * (2 if bidirectional else 1), len(id2label)
         )
         self.crf_layer = ConditionalRandomFieldWeightEmission(
-            num_tags=len(labels),
+            num_tags=len(id2label),
             label_weights=label_weights,
-            constraints=allowed_transitions("BIO", dict(enumerate(labels))),
+            constraints=allowed_transitions("BIO", dict(enumerate(id2label))),
         )
 
     def forward(
