@@ -38,7 +38,9 @@ def test(
     labels.add("O")
     y_pred = crf.predict(X_test)
     sorted_labels = sorted(labels, key=lambda name: (name[1:], name[0]))
-    report = metrics.flat_classification_report(y_test, y_pred, labels=sorted_labels)
+    report = metrics.flat_classification_report(
+        y_test, y_pred, labels=sorted_labels, zero_division=0.0
+    )
     print(report)
 
 
