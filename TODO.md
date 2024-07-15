@@ -34,7 +34,7 @@ Segmentation
 - Ensemble RNN DONE
 - Viterbi decoding (with allowed transitions only) on RNN outputs or
   ensemble RNNs
-  - Could *probably* train a CRF on these, even
+  - Could *possibly* train a CRF to do this, in fact
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings
@@ -56,7 +56,7 @@ Segmentation results
   - scale all the things by page size (slightly less good than by
     abs(max(feats)) but probably more robust)
   - upweight B- tags by 2.0
-  - weight all tags by frequence (works even better than B- * 2.0)
+  - weight all tags by inverse frequency (works even better than B- * 2.0)
   - taking the best model using f1_macro (can't do for full training
     unless we sample a dev set!)
   - ensemble of cross-validation folds (allows early stopping as well)
@@ -65,7 +65,6 @@ Segmentation results
     - LSTM is maybe overparameterized?
     - Improves label accuracy quite a lot but mean F1 not really
     - This seems to be a consequence of lower learning rate not cell typpe
-  - wider word embeddings (maybe or maybe not, doing grid search...)
   - LayoutLM
     - pretrained on wrong language
     - layout features possibly suboptimal for this task
@@ -80,13 +79,20 @@ Segmentation results
   - much narrower LSTM
   - dropout on LSTM layers
   - extra feedforward layer
+  - wider word embeddings
   - CRF output layer
     - Training is *much* slower
-    - Raw accuracy is slightly better
-    - Macro-F1 not as good - imbalanced data issue?
+    - Raw accuracy is consistently a bit better.  It is a better model.
+    - Macro-F1 though is not as good
+      - Imbalanced data is an issue and weighting is more difficult
+      - Definitely weight transitions and emissions (helps)
+      - Have to weight "up", can't weight "down"
+      - Weighting by exp(1.0 / count) better than nothing
+      - Weighting by exp(1.0 / B-count) not helpful
+      - Weighting by exp(1.0 / (B-count + I-count)) not helpful
+      - Weighting by mean / count...
 - Things yet to be tried
   - pre-trained or pre-computed word embeddings
-  - hyperparameter t00ning
   - label smoothing
   - feedforward layer before RNN
   - dropout in other places

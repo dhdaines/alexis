@@ -86,7 +86,7 @@ def make_argparse():
         "-s",
         "--scores",
         help="Fichier destination pour évaluations",
-        default="rnnscores.csv",
+        default="rnncrfscores.csv",
     )
     return parser
 
@@ -295,8 +295,7 @@ def main():
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
         args.csvs, features=args.features, labels=args.labels
     )
-    # Note that label weights are apparently in exponential space, so
-    # a "positive" weight is > 1.0 (unlike with CrossEntropyLoss)
+    # Note that weights must be greater than 1.0 for training to work
     label_weights = [math.exp(1.0 / label_counts[x]) for x in id2label]
 
     print("Vocabulary size:")
