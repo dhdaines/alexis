@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import logging
+import math
 from pathlib import Path
 
 import numpy as np
@@ -120,7 +121,7 @@ def CRFMetric(cls, *args, **kwargs):
     return metric
 
 
-def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
+def run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2label):
     kf = KFold(
         n_splits=args.cross_validation_folds, shuffle=True, random_state=args.seed
     )
@@ -131,10 +132,6 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         eval_labels = sorted(
             x for x in label_counts if x[0] == "B" and label_counts[x] >= args.min_count
         )
-    label_norm = min(label_counts.values())
-    # Label weights must be at least 1.0 for learning to work (for whatever reason)
-    label_weights = [1.0 + label_norm / label_counts[x] for x in id2label]
-    # label_weights = [1.0 for x in id2label]
     veclen = len(all_data[0][0][0][1])
     device = torch.device(args.device)
 
@@ -251,17 +248,13 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             print("average", row["Label"], row["Average"])
 
 
-def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
+def run_training(args, train_data, featdims, feat2id, label_weights, id2label):
     train_loader = DataLoader(
         train_data,
         batch_size=args.batch_size,
         shuffle=True,
         collate_fn=pad_collate_fn,
     )
-    label_norm = min(label_counts.values())
-    # Label weights must be at least 1.0 for learning to work (for whatever reason)
-    label_weights = [1.0 + label_norm / label_counts[x] for x in id2label]
-    # label_weights = [1.0 for x in id2label]
     veclen = len(train_data[0][0][0][1])
     device = torch.device(args.device)
     config = {
@@ -302,15 +295,22 @@ def main():
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
         args.csvs, features=args.features, labels=args.labels
     )
+    # Note that label weights are apparently in exponential space, so
+    # a "positive" weight is > 1.0 (unlike with CrossEntropyLoss)
+
+    # The choice of normalizer is sort of arbirary, you could also do:
+    # label_norm = min(label_counts.values())  # or max, sum, etc...
+    label_norm = 1.0
+    label_weights = [math.exp(label_norm / label_counts[x]) for x in id2label]
 
     print("Vocabulary size:")
     for feat, vals in feat2id.items():
         print(f"\t{feat}: {len(vals)}")
 
     if args.cross_validation_folds == 1:
-        run_training(args, all_data, featdims, feat2id, label_counts, id2label)
+        run_training(args, all_data, featdims, feat2id, label_weights, id2label)
     else:
-        run_cv(args, all_data, featdims, feat2id, label_counts, id2label)
+        run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2label)
 
 
 if __name__ == "__main__":

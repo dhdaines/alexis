@@ -122,6 +122,7 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             "id2label": id2label,
             "featdims": featdims,
             "veclen": veclen,
+            "label_weights": label_weights,  # Unused here but included to match RNNCRF
             "hidden_size": args.hidden_size,
         }
         my_network = RNN(**config)
@@ -238,6 +239,7 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
         "id2label": id2label,
         "featdims": featdims,
         "veclen": veclen,
+        "label_weights": label_weights,  # Unused here but included to match RNNCRF
         "hidden_size": args.hidden_size,
     }
     with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:

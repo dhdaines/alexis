@@ -31,7 +31,12 @@ Segmentation
   - Do extraction and qualitative evaluation
     - sort for batch processing then unsort afterwards
 - CRF output layer DONE
+- Ensemble RNN DONE
+- Viterbi decoding (with allowed transitions only) on RNN outputs or
+  ensemble RNNs
+  - Could *probably* train a CRF on these, even
 - Tokenize from chars
+  - Add functionality to pdfplumber
 - Use Transformers for embeddings
   - Heuristic pre-chunking as described below
   - Either tokenize from chars (above) or use first embedding per word
@@ -54,6 +59,7 @@ Segmentation results
   - weight all tags by frequence (works even better than B- * 2.0)
   - taking the best model using f1_macro (can't do for full training
     unless we sample a dev set!)
+  - ensemble of cross-validation folds (allows early stopping as well)
 - Inconclusive
   - GRU or plain RNN with lower learning rate
     - LSTM is maybe overparameterized?
@@ -75,18 +81,10 @@ Segmentation results
   - dropout on LSTM layers
   - extra feedforward layer
   - CRF output layer
-    - training becomes very unstable and macro f1 is really bad
-    - probably due to:
-      - very imbalanced classes (lots of I, very little O or B)
-        - can possibly be solved using AllenNLP implementation
-      - very long sequences (another aspect of the same problem)
-        - path score for a long sequence will converge to 0 if
-          transition weights are too small
-        - can possibly be solved by initializing the transition
-          weights with something non-random (I think the AllenNLP
-          implementation also does this)
+    - Training is *much* slower
+    - Raw accuracy is slightly better
+    - Macro-F1 not as good - imbalanced data issue?
 - Things yet to be tried
-  - better CRF implementation (AllenNLP modules lite)
   - pre-trained or pre-computed word embeddings
   - hyperparameter t00ning
   - label smoothing

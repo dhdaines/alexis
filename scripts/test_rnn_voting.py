@@ -1,7 +1,6 @@
 """Tester un RNN"""
 
 import argparse
-from collections import Counter
 import json
 import logging
 from pathlib import Path
@@ -62,7 +61,6 @@ def main():
                 fold_predictions.append(row[:length])
             del lengths[: len(out)]
         multi_predictions.append(fold_predictions)
-    # FIXME: There is surely a way to do this Fast with torch
     predictions = []
     for page in zip(*multi_predictions):
         assert all(len(y) == len(page[0]) for y in page)
