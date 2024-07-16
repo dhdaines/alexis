@@ -81,7 +81,6 @@ def make_argparse():
         "-s",
         "--scores",
         help="Fichier destination pour évaluations",
-        default="rnnscores.csv",
     )
     return parser
 
@@ -272,6 +271,8 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     set_seeds(args.seed)
+    if args.scores is None:
+        args.scores = args.outfile.with_suffix(".csv")
 
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
         args.csvs, features=args.features, labels=args.labels

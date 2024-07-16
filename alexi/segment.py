@@ -20,9 +20,6 @@ from torch.nn.utils.rnn import (
     pad_packed_sequence,
     pad_sequence,
 )
-from allennlp_light.modules.conditional_random_field.conditional_random_field import (
-    allowed_transitions,
-)
 from allennlp_light.modules.conditional_random_field import (
     ConditionalRandomFieldWeightEmission,
     ConditionalRandomFieldWeightTrans,
@@ -489,7 +486,7 @@ def load_rnn_data(
     iobs: Iterable[T_obj],
     feat2id,
     id2label,
-    features: str = "text+layout_structure",
+    features: str = "text+layout+structure",
     labels: str = "literal",
 ):
     """Creer le jeu de donnees pour tester un modele RNN."""
@@ -713,6 +710,7 @@ class RNNCRF(RNN):
         hidden_size=64,
         num_layer=1,
         bidirectional=True,
+        constrain=False,
         **_kwargs,
     ):
         super().__init__(
@@ -728,8 +726,7 @@ class RNNCRF(RNN):
         self.crf_layer = ConditionalRandomFieldWeightTrans(
             num_tags=len(id2label),
             label_weights=label_weights,
-            constraints=bio_transitions(id2label),
-            include_start_end_transitions=False,
+            constraints=bio_transitions(id2label) if constrain else None,
         )
 
     def forward(

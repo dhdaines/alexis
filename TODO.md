@@ -63,6 +63,13 @@ Segmentation results
     unless we sample a dev set!)
   - ensemble of cross-validation folds (allows early stopping as well)
     - in *theory* dropout would give us this benefit too
+  - Training CRF on top of pre-trained RNN
+    - very minimal benefit, but a benefit nonetheless
+    - could probably get away with doing this one single epoch
+    - to freeze or not to freeze?
+      - freezing gives better results, quicker
+      - not sure if freezing post-LSTM layer is useful or not
+      - should definitely cache outputs for freezing training (how?)
 - Inconclusive
   - GRU or plain RNN with lower learning rate
     - LSTM is maybe overparameterized?
@@ -84,9 +91,9 @@ Segmentation results
   - extra feedforward layer
   - dropout on extra feedforward layer
   - wider word embeddings
-  - CRF output layer
+  - CRF output layer (trained end-to-end)
     - Training is *much* slower
-    - Raw accuracy is consistently a bit better.  It is a better model.
+    - Raw accuracy is consistently a bit better.
     - Macro-F1 though is not as good (over B- tags)
       - Imbalanced data is an issue and weighting is more difficult
       - Definitely weight transitions and emissions (helps)
@@ -103,6 +110,8 @@ Segmentation results
         correct Bs in the process
       - Confirmed, Viterbi with --labels bonly gives (nearly) same
         results as non-Viterbi
+  - Training RNN-CRF with --labels bonly
+    - Not sure why since it does help for discrete CRF?!
 - Things yet to be tried
   - pre-trained or pre-computed word embeddings
   - label smoothing

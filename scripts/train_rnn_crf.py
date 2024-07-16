@@ -89,7 +89,19 @@ def make_argparse():
         "-s",
         "--scores",
         help="Fichier destination pour évaluations",
-        default="rnncrfscores.csv",
+    )
+    parser.add_argument(
+        "-i",
+        "--init-model",
+        help="Fichier modele pour initialisation",
+        default="rnn.pt",
+        type=Path,
+    )
+    parser.add_argument(
+        "--freeze", action="store_true", help="Geler les parametres initialisees"
+    )
+    parser.add_argument(
+        "--constrain", action="store_true", help="Interdire les transitions impossibles"
     )
     return parser
 
@@ -122,6 +134,13 @@ def CRFMetric(cls, *args, **kwargs):
 
     metric.forward = crf_forward
     return metric
+
+
+def freeze_rnn(my_network):
+    for layer in my_network.embedding_layers.values():
+        layer.requires_grad_(False)
+    my_network.lstm_layer.requires_grad_(False)
+    my_network.output_layer.requires_grad_(False)
 
 
 def run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2label):
@@ -159,11 +178,20 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2la
             "hidden_size": args.hidden_size,
             "features": args.features,
             "labels": args.labels,
+            "constrain": args.constrain,
         }
         foldfile = args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
         with open(foldfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
             json.dump(config, outfh, ensure_ascii=False, indent=2)
         my_network = RNNCRF(**config)
+        if args.init_model:
+            fold_init = args.init_model.with_stem(
+                args.init_model.stem + f"_fold{fold+1}"
+            )
+            state_dict = torch.load(fold_init)
+            my_network.load_state_dict(state_dict, strict=False)
+            if args.freeze:
+                freeze_rnn(my_network)
         optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
         loss_function = MyCRFLoss(my_network.crf_layer)
         model = Model(
@@ -271,10 +299,16 @@ def run_training(args, train_data, featdims, feat2id, label_weights, id2label):
         "hidden_size": args.hidden_size,
         "features": args.features,
         "labels": args.labels,
+        "constrain": args.constrain,
     }
     with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
         json.dump(config, outfh, ensure_ascii=False, indent=2)
     my_network = RNNCRF(**config)
+    if args.init_model:
+        state_dict = torch.load(args.init_model)
+        my_network.load_state_dict(state_dict, strict=False)
+        if args.freeze:
+            freeze_rnn(my_network)
     optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
     loss_function = MyCRFLoss(my_network.crf_layer)
     model = Model(
@@ -298,6 +332,8 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     set_seeds(args.seed)
+    if args.scores is None:
+        args.scores = args.outfile.with_suffix(".csv")
 
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
         args.csvs, features=args.features, labels=args.labels
