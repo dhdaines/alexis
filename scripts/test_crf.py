@@ -8,7 +8,13 @@ from typing import Iterable
 import sklearn_crfsuite as crfsuite  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import Segmenteur, load, page2features, page2labels, split_pages
+from alexi.segment import (
+    Segmenteur,
+    load,
+    page2features,
+    page2labels,
+    split_pages,
+)
 
 
 def make_argparse():
@@ -32,7 +38,9 @@ def test(
     labels.add("O")
     y_pred = crf.predict(X_test)
     sorted_labels = sorted(labels, key=lambda name: (name[1:], name[0]))
-    report = metrics.flat_classification_report(y_test, y_pred, labels=sorted_labels)
+    report = metrics.flat_classification_report(
+        y_test, y_pred, labels=sorted_labels, zero_division=0.0
+    )
     print(report)
 
 

@@ -18,8 +18,10 @@ dependencies = [
     "pdfplumber",
     "scikit-learn",
     "sklearn-crfsuite",
+    "tokenizers",
     "lunr[languages]",
     "unidecode",
+    "torch",
 ]
 [project.optional-dependencies]
 dev = [
@@ -31,6 +33,8 @@ dev = [
   "coverage",
   "pytest",
   "pytest-cov",
+  "poutyne",
+  "allennlp-light",
 ]
 
 [project.scripts]
@@ -50,9 +54,6 @@ addopts = "--cov=alexi --cov-report html"
 
 [tool.hatch.envs.default]
 features = [ "dev" ]
-post-install-commands = [
-  "mypy --install-types --non-interactive alexi",
-]
 
 [tool.hatch.envs.default.scripts]
 test = [
@@ -62,24 +63,20 @@ lint = [
   "black --check alexi",
   "isort --profile black --check-only alexi test",
   "flake8 --color=never alexi test",
-  "mypy alexi",
+  "mypy --non-interactive --install-types alexi",
 ]
 format = [
   "black alexi test",
   "isort alexi test",
 ]
 train = [
-"""python scripts/train_crf.py \\
-    --features text+layout --labels bonly \\
-    --outfile alexi/models/crf.vl.joblib.gz \\
-    data/*.csv""",
-"""python scripts/train_crf.py \\
-    --features text+layout+structure --labels bonly \\
-    --outfile alexi/models/crf.joblib.gz \\
-    data/*.csv""",
+"""python scripts/train_rnn.py --nepoch 45 -o alexi/models/rnn.pt \\
+          data/*.csv data/patches/*.csv""",
+"""python scripts/train_rnn_crf.py --nepoch 1 --freeze -i alexi/models/rnn.pt \\
+          -o alexi/models/rnn_crf.pt data/*.csv data/patches/*.csv""",
 """python scripts/train_crf_seq.py \\
     --outfile alexi/models/crfseq.joblib.gz \\
-    data/*.csv""",
+    data/*.csv data/patches/*.csv""",
 ]
 
 [tool.isort]

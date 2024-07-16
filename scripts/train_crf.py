@@ -6,7 +6,6 @@ import itertools
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Iterator
 
 import joblib  # type: ignore
 import numpy as np
@@ -15,7 +14,15 @@ from sklearn.metrics import make_scorer  # type: ignore
 from sklearn.model_selection import KFold, cross_validate  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import load, page2features, page2labels, split_pages
+from alexi.segment import (
+    load,
+    page2features,
+    page2labels,
+    split_pages,
+    filter_tab,
+    retokenize,
+)
+from tokenizers import Tokenizer
 
 LOGGER = logging.getLogger("train-crf")
 
@@ -28,11 +35,8 @@ def make_argparse():
     parser.add_argument(
         "--niter", default=200, type=int, help="Nombre d'iterations d'entrainement"
     )
-    parser.add_argument("--features", default="vsl", help="Extracteur de traits")
+    parser.add_argument("--features", default="text+layout+structure", help="Extracteur de traits")
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
-    parser.add_argument(
-        "--train-dev", action="store_true", help="Ajouter dev set au train set"
-    )
     parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
     parser.add_argument(
         "--c1", default=0.25, type=float, help="Coefficient de regularisation L1"
@@ -56,17 +60,10 @@ def make_argparse():
     )
     parser.add_argument("-o", "--outfile", help="Fichier destination pour modele")
     parser.add_argument("-s", "--scores", help="Fichier destination pour évaluations")
+    parser.add_argument(
+        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
+    )
     return parser
-
-
-def filter_tab(words: Iterable[dict]) -> Iterator[dict]:
-    """Enlever les mots dans des tableaux car on va s'en occuper autrement."""
-    for w in words:
-        if "Tableau" in w["segment"]:
-            continue
-        if "Table" in w["tagstack"]:
-            continue
-        yield w
 
 
 def run_cv(args: argparse.Namespace, params: dict, X, y):
@@ -76,7 +73,7 @@ def run_cv(args: argparse.Namespace, params: dict, X, y):
     LOGGER.info("Running cross-validation in %d folds", args.cross_validation_folds)
     counts: dict[str, int] = {}
     for c in itertools.chain.from_iterable(y):
-        if c.startswith("B-"):
+        if args.labels == "iobonly" or c.startswith("B-"):
             count = counts.setdefault(c, 0)
             counts[c] = count + 1
     labels = []
@@ -146,8 +143,11 @@ def main():
     parser = make_argparse()
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    data = load(args.csvs)
-    pages = list(split_pages(filter_tab(data)))
+    data = filter_tab(load(args.csvs))
+    if args.tokenize:
+        tokenizer = Tokenizer.from_pretrained("camembert-base")
+        data = retokenize(data, tokenizer)
+    pages = list(split_pages(data))
     X = [page2features(s, args.features, args.n) for s in pages]
     y = [page2labels(s, args.labels) for s in pages]
     params = {

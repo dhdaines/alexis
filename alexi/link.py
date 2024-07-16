@@ -71,6 +71,8 @@ class Resolver:
         return self.resolve_internal(text, srcpath, doc)
 
     def resolve_zonage(self, text: str, srcpath: str) -> Optional[str]:
+        if self.metadata.get("zonage") is None:
+            return None
         m = MILIEU_RE.search(text)
         if m is None:
             return None
