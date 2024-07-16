@@ -27,6 +27,7 @@ jobs:
     - name: Install
       run: |
         python3 -m pip install --upgrade pip
+        python3 -m pip install torch --index-url https://download.pytorch.org/whl/cpu
         python3 -m pip install -e .
     - name: Cache downloads
       id: cache-downloads
@@ -49,7 +50,7 @@ jobs:
         done
     - name: Extract
       run: |
-        alexi -v extract -m download/index.json download/*.pdf
+        alexi -v extract --model alexi/models/rnn_crf.pt -m download/index.json download/*.pdf
     - name: Index
       run: |
         alexi -v index export
