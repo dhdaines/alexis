@@ -18,6 +18,7 @@ concurrency:
 # Install much smaller CPU version of PyTorch
 env:
   PIP_INDEX_URL: https://download.pytorch.org/whl/cpu
+  PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
 
 jobs:
   deploy:
