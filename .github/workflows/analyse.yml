@@ -50,7 +50,7 @@ jobs:
         done
     - name: Extract
       run: |
-        alexi -v extract --model alexi/models/rnn_crf.pt -m download/index.json download/*.pdf
+        alexi -v extract --segment-model alexi/models/rnn_crf.pt -m download/index.json download/*.pdf
     - name: Index
       run: |
         alexi -v index export
