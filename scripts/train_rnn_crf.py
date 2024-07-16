@@ -51,6 +51,9 @@ def make_argparse():
         "--gamma", default=0.99, type=float, help="Coefficient de reduction du LR"
     )
     parser.add_argument(
+        "--bscale", default=1.0, type=float, help="Facteur applique aux debuts de bloc"
+    )
+    parser.add_argument(
         "--hidden-size", default=80, type=int, help="Largeur de la couche cachee"
     )
     parser.add_argument("--early-stopping", action="store_true", help="Arret anticipe")
@@ -154,6 +157,8 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2la
             "veclen": veclen,
             "label_weights": label_weights,
             "hidden_size": args.hidden_size,
+            "features": args.features,
+            "labels": args.labels,
         }
         foldfile = args.outfile.with_stem(args.outfile.stem + f"_fold{fold+1}")
         with open(foldfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
@@ -264,6 +269,8 @@ def run_training(args, train_data, featdims, feat2id, label_weights, id2label):
         "veclen": veclen,
         "label_weights": label_weights,
         "hidden_size": args.hidden_size,
+        "features": args.features,
+        "labels": args.labels,
     }
     with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
         json.dump(config, outfh, ensure_ascii=False, indent=2)
@@ -296,7 +303,10 @@ def main():
         args.csvs, features=args.features, labels=args.labels
     )
     # Note that weights must be greater than 1.0 for training to work
-    label_weights = [math.exp(1.0 / label_counts[x]) for x in id2label]
+    label_weights = [
+        (args.bscale if x[0] == "B" else 1.0) * math.exp(1.0 / label_counts[x])
+        for x in id2label
+    ]
 
     print("Vocabulary size:")
     for feat, vals in feat2id.items():

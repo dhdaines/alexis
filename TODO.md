@@ -87,14 +87,22 @@ Segmentation results
   - CRF output layer
     - Training is *much* slower
     - Raw accuracy is consistently a bit better.  It is a better model.
-    - Macro-F1 though is not as good
+    - Macro-F1 though is not as good (over B- tags)
       - Imbalanced data is an issue and weighting is more difficult
       - Definitely weight transitions and emissions (helps)
       - Have to weight "up", can't weight "down"
       - Weighting by exp(1.0 / count) better than nothing
       - Weighting by exp(1.0 / B-count) not helpful
       - Weighting by exp(1.0 / (B-count + I-count)) not helpful
-      - Weighting by mean / count...
+    - Applying Viterbi to RNN output shows why
+      - Sequence constraints favour accuracy of I over B
+      - Weighted RNN training favours correct Bs, but Is can change
+        mid-sequence, which we don't care about
+      - Decoding with constraints forces B and I to agree, improving
+        overall acccuracy by fixing incorrect Is but flipping some
+        correct Bs in the process
+      - Confirmed, Viterbi with --labels bonly gives (nearly) same
+        results as non-Viterbi
 - Things yet to be tried
   - pre-trained or pre-computed word embeddings
   - label smoothing

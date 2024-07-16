@@ -124,6 +124,8 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             "veclen": veclen,
             "label_weights": label_weights,  # Unused here but included to match RNNCRF
             "hidden_size": args.hidden_size,
+            "features": args.features,
+            "labels": args.labels,
         }
         my_network = RNN(**config)
         optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
@@ -241,6 +243,8 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
         "veclen": veclen,
         "label_weights": label_weights,  # Unused here but included to match RNNCRF
         "hidden_size": args.hidden_size,
+        "features": args.features,
+        "labels": args.labels,
     }
     with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
         json.dump(config, outfh, ensure_ascii=False, indent=2)

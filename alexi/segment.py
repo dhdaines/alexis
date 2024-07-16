@@ -473,9 +473,9 @@ def make_rnn_data(
     all_data = [
         (
             make_page_feats(feat2id, page),
-            make_page_labels(label2id, labels),
+            make_page_labels(label2id, tags),
         )
-        for page, labels in zip(X, y)
+        for page, tags in zip(X, y)
     ]
     # FIXME: Should go in train_rnn
     featdims = dict(
@@ -485,16 +485,25 @@ def make_rnn_data(
     return all_data, featdims, feat2id, label_counts, id2label
 
 
-def load_rnn_data(iobs: Iterable[T_obj], feat2id, id2label):
-    """Creer le jeu de donnees pour entrainer un modele RNN."""
+def load_rnn_data(
+    iobs: Iterable[T_obj],
+    feat2id,
+    id2label,
+    features: str = "text+layout_structure",
+    labels: str = "literal",
+):
+    """Creer le jeu de donnees pour tester un modele RNN."""
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-    pages = (make_rnn_features(p) for p in split_pages(iobs))
+    pages = (
+        make_rnn_features(p, features=features, labels=labels)
+        for p in split_pages(iobs)
+    )
     all_data = [
         (
             make_page_feats(feat2id, page),
-            make_page_labels(label2id, labels),
+            make_page_labels(label2id, tags),
         )
-        for page, labels in pages
+        for page, tags in pages
     ]
     return all_data
 
@@ -652,6 +661,47 @@ class RNN(nn.Module):
         return tag_space
 
 
+def bio_transitions(id2label):
+    labels_with_boundaries = list(id2label)
+    labels_with_boundaries.extend(("START", "END"))
+
+    allowed = []
+    for from_label_index, from_label in enumerate(labels_with_boundaries):
+        if from_label in ("START", "END"):
+            from_tag = from_label
+            from_entity = ""
+        else:
+            from_tag = from_label[0]
+            from_entity = from_label[1:]
+        for to_label_index, to_label in enumerate(labels_with_boundaries):
+            if to_label in ("START", "END"):
+                to_tag = to_label
+                to_entity = ""
+            else:
+                to_tag = to_label[0]
+                to_entity = to_label[1:]
+            if from_tag == "START":
+                if to_tag in ("O", "B"):
+                    allowed.append((from_label_index, to_label_index))
+            elif to_tag == "END":
+                if from_tag in ("O", "B", "I"):
+                    allowed.append((from_label_index, to_label_index))
+            elif any(
+                (
+                    # Can always transition to O or B-x
+                    to_tag in ("O", "B"),
+                    # Can only transition to I-x from B-x or I-x or from I to I
+                    to_tag == "I"
+                    and from_tag in ("B", "I")
+                    and from_entity == to_entity,
+                    # Can transition to I from B-x
+                    to_tag == "I" and from_tag == "B" and to_entity == "",
+                )
+            ):
+                allowed.append((from_label_index, to_label_index))
+    return allowed
+
+
 class RNNCRF(RNN):
     def __init__(
         self,
@@ -678,7 +728,8 @@ class RNNCRF(RNN):
         self.crf_layer = ConditionalRandomFieldWeightTrans(
             num_tags=len(id2label),
             label_weights=label_weights,
-            constraints=allowed_transitions("BIO", dict(enumerate(id2label))),
+            constraints=bio_transitions(id2label),
+            include_start_end_transitions=False,
         )
 
     def forward(
