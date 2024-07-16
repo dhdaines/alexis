@@ -779,7 +779,7 @@ class RNNSegmenteur(Segmenteur):
             self.model = RNNCRF(**self.config)
         else:
             self.model = RNN(**self.config)
-        self.model.load_state_dict(torch.load(model))
+        self.model.load_state_dict(torch.load(model, map_location=torch.device("cpu")))
         self.model.eval()
         self.model.to(device)
 
