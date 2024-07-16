@@ -15,6 +15,10 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+# Install much smaller CPU version of PyTorch
+env:
+  PIP_INDEX_URL: https://download.pytorch.org/whl/cpu
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -27,7 +31,6 @@ jobs:
     - name: Install
       run: |
         python3 -m pip install --upgrade pip
-        python3 -m pip install torch --index-url https://download.pytorch.org/whl/cpu
         python3 -m pip install -e .
     - name: Cache downloads
       id: cache-downloads

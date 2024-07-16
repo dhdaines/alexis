@@ -22,7 +22,7 @@ dependencies = [
     "lunr[languages]",
     "unidecode",
     "torch",
-    "allennlp-light",
+    "allennlp-light",  # it is not very light
 ]
 [project.optional-dependencies]
 dev = [

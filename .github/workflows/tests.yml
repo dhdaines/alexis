@@ -2,6 +2,10 @@ name: Tests
 
 on: [pull_request]
 
+# Install much smaller CPU version of PyTorch
+env:
+  PIP_INDEX_URL: https://download.pytorch.org/whl/cpu
+
 jobs:
   lint:
     runs-on: ubuntu-latest
