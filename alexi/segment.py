@@ -13,17 +13,15 @@ from typing import Any, Callable, Iterable, Iterator, Sequence, Union
 
 import joblib  # type: ignore
 import torch
+from allennlp_light.modules.conditional_random_field import (
+    ConditionalRandomFieldWeightTrans,
+)
 from torch import nn
 from torch.nn.utils.rnn import (
     PackedSequence,
     pack_padded_sequence,
     pad_packed_sequence,
     pad_sequence,
-)
-from allennlp_light.modules.conditional_random_field import (
-    ConditionalRandomFieldWeightEmission,
-    ConditionalRandomFieldWeightTrans,
-    ConditionalRandomFieldWeightLannoy,
 )
 
 from alexi.convert import FIELDNAMES
@@ -366,12 +364,12 @@ def make_rnn_features(
     page: Iterable[T_obj],
     features: str = "text+layout+structure",
     labels: str = "literal",
-):
-    features = list(
+) -> tuple[list[T_obj], list[str]]:
+    rnn_features = list(
         dict((name, val) for name, _, val in (w.partition("=") for w in feats))
-        for feats in page2features(page, features)
+        for feats in page2features(list(page), features)
     )
-    for f, w in zip(features, page):
+    for f, w in zip(rnn_features, page):
         f["line:left"] = float(f["line:left"]) / float(w["page_width"])
         f["line:top"] = float(f["line:top"]) / float(w["page_height"])
         f["v:top"] = float(w["top"]) / float(w["page_height"])
@@ -384,9 +382,9 @@ def make_rnn_features(
             w["page_height"]
         )
 
-    add_deltas(features)
-    labels = list(page2labels(page, labels))
-    return features, labels
+    add_deltas(rnn_features)
+    rnn_labels = list(page2labels(page, labels))
+    return rnn_features, rnn_labels
 
 
 FEATNAMES = [
@@ -769,7 +767,9 @@ class Segmenteur:
             yield word
 
 
-class RNNSegmenteur:
+class RNNSegmenteur(Segmenteur):
+    model: RNN
+
     def __init__(self, model: PathLike = DEFAULT_RNN_MODEL, device="cpu"):
         model = Path(model)
         self.device = torch.device(device)

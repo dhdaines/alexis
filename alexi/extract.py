@@ -19,7 +19,7 @@ from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Identificateur
 from alexi.link import Resolver
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
-from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur, RNNSegmenteur
+from alexi.segment import DEFAULT_MODEL_NOSTRUCT, RNNSegmenteur, Segmenteur
 from alexi.types import T_obj
 
 LOGGER = logging.getLogger("extract")
@@ -329,6 +329,8 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> dict[str, dict[str, str
 
 
 class Extracteur:
+    crf: Segmenteur
+
     def __init__(
         self,
         outdir: Path,

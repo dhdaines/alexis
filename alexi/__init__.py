@@ -23,7 +23,7 @@ from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from .label import Identificateur
 from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
-from .segment import Segmenteur, RNNSegmenteur
+from .segment import RNNSegmenteur, Segmenteur
 
 LOGGER = logging.getLogger("alexi")
 VERSION = "0.4.0"
@@ -59,6 +59,7 @@ def convert_main(args: argparse.Namespace):
 
 def segment_main(args: argparse.Namespace):
     """Segmenter un CSV"""
+    crf: Segmenteur
     if args.model.suffix == ".pt":
         crf = RNNSegmenteur(args.model)
     else:
