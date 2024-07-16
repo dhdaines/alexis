@@ -32,9 +32,8 @@ Segmentation
     - sort for batch processing then unsort afterwards
 - CRF output layer DONE
 - Ensemble RNN DONE
-- Viterbi decoding (with allowed transitions only) on RNN outputs or
-  ensemble RNNs
-  - Could *possibly* train a CRF to do this, in fact
+- Viterbi decoding (with allowed transitions only) on RNN outputs DONE
+  - Could *possibly* train a CRF to do this, in fact DONE
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings
@@ -59,17 +58,13 @@ Segmentation results
     abs(max(feats)) but probably more robust)
   - upweight B- tags by 2.0
   - weight all tags by inverse frequency (works even better than B- * 2.0)
-  - taking the best model using f1_macro (can't do for full training
-    unless we sample a dev set!)
+  - taking the best model using f1_macro (requires ensemble or dev set)
   - ensemble of cross-validation folds (allows early stopping as well)
-    - in *theory* dropout would give us this benefit too
+    - in *theory* dropout would give us this benefit too but no
   - Training CRF on top of pre-trained RNN
-    - very minimal benefit, but a benefit nonetheless
-    - could probably get away with doing this one single epoch
-    - to freeze or not to freeze?
-      - freezing gives better results, quicker
-      - not sure if freezing post-LSTM layer is useful or not
-      - should definitely cache outputs for freezing training (how?)
+    - Don't constrain transitions (see below)
+    - Do freeze all RNN parameters
+    - Can just do it for one epoch if you want (if not, save the RNN outputs...)
 - Inconclusive
   - GRU or plain RNN with lower learning rate
     - LSTM is maybe overparameterized?

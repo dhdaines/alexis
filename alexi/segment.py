@@ -642,6 +642,7 @@ class RNN(nn.Module):
             inputs = torch.hstack(stack)
             inputs = torch.nn.utils.rnn.PackedSequence(inputs, features.batch_sizes)
         else:
+            assert len(features.shape) == 2  # FIXME: support batches
             stack = [
                 self.embedding_layers[name](features[:, idx])
                 for idx, name in enumerate(self.featdims)
@@ -651,6 +652,9 @@ class RNN(nn.Module):
         lstm_out, self.hidden_state = self.lstm_layer(inputs)
         if isinstance(lstm_out, PackedSequence):
             lstm_out, _ = pad_packed_sequence(lstm_out, batch_first=True)
+        # Make it a "batch" on output
+        if len(lstm_out.shape) == 2:
+            lstm_out = lstm_out.unsqueeze(0)
         tag_space = self.output_layer(lstm_out)
         tag_space = tag_space.transpose(
             -1, 1
@@ -659,6 +663,7 @@ class RNN(nn.Module):
 
 
 def bio_transitions(id2label):
+    """Constrain transitions (this is not actually useful)"""
     labels_with_boundaries = list(id2label)
     labels_with_boundaries.extend(("START", "END"))
 
@@ -737,6 +742,11 @@ class RNNCRF(RNN):
     ):
         tag_space = super().forward(features, vectors, mask)
         logits = tag_space.transpose(-1, 1)  # We need to transpose it back because wtf
+        # Make it a "batch" or CRF gets quite irate
+        if len(logits.shape) == 2:
+            logits = logits.unsqueeze(0)
+        if len(mask.shape) == 1:
+            mask = mask.unsqueeze(0)
         paths = self.crf_layer.viterbi_tags(logits, mask)
         labels, _scores = zip(*paths)
         return logits, labels, mask
@@ -765,7 +775,10 @@ class RNNSegmenteur:
         self.device = torch.device(device)
         with open(model.with_suffix(".json"), "rt") as infh:
             self.config = json.load(infh)
-        self.model = RNN(**self.config)
+        if "crf" in model.name:
+            self.model = RNNCRF(**self.config)
+        else:
+            self.model = RNN(**self.config)
         self.model.load_state_dict(torch.load(model))
         self.model.eval()
         self.model.to(device)
@@ -775,11 +788,17 @@ class RNNSegmenteur:
             page, _labels = make_rnn_features(p)
             features = make_page_feats(self.config["feat2id"], page)
             feats, vector = zip(*features)
-            out = self.model(
+            batch = (
                 torch.LongTensor(feats, device=self.device),
                 torch.FloatTensor(vector, device=self.device),
                 torch.ones(len(feats), device=self.device),
             )
-            for label_id, word in zip(out.argmax(-1).cpu(), p):
-                word["segment"] = self.config["id2label"][label_id.item()]
+            out = self.model(*batch)
+            if isinstance(out, tuple):  # is a crf
+                _, (labelgen,), _ = out
+            else:
+                # Encore WTF
+                labelgen = out.transpose(1, -1).argmax(-1)[0].cpu()
+            for label_id, word in zip(labelgen, p):
+                word["segment"] = self.config["id2label"][label_id]
                 yield word
