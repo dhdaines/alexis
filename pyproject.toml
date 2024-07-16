@@ -22,6 +22,7 @@ dependencies = [
     "lunr[languages]",
     "unidecode",
     "torch",
+    "allennlp-light",
 ]
 [project.optional-dependencies]
 dev = [
@@ -34,7 +35,6 @@ dev = [
   "pytest",
   "pytest-cov",
   "poutyne",
-  "allennlp-light",
 ]
 
 [project.scripts]
