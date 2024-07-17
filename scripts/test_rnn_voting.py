@@ -8,8 +8,16 @@ from pathlib import Path
 import torch
 from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader
+from tokenizers import Tokenizer
 
-from alexi.segment import load, load_rnn_data, pad_collate_fn_predict, RNN, RNNCRF
+from alexi.segment import (
+    load,
+    load_rnn_data,
+    pad_collate_fn_predict,
+    RNN,
+    RNNCRF,
+    retokenize,
+)
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -21,6 +29,9 @@ def make_argparse():
     )
     parser.add_argument(
         "--device", default="cuda:0", help="Device pour rouler la prediction"
+    )
+    parser.add_argument(
+        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
     )
     parser.add_argument("csvs", nargs="+", help="Fichiers CSV de test", type=Path)
     return parser
@@ -38,7 +49,13 @@ def main():
             config = json.load(infh)
             id2label = config["id2label"]
             feat2id = config["feat2id"]
-        all_data = load_rnn_data(load(args.csvs), feat2id, id2label)
+        words = load(args.csvs)
+        if args.tokenize:
+            tokenizer = Tokenizer.from_pretrained("camembert-base")
+            words = retokenize(words, tokenizer, drop=True)
+        all_data = load_rnn_data(
+            words, feat2id, id2label, config["features"], config["labels"]
+        )
         ordering, sorted_test_data = zip(
             *sorted(enumerate(all_data), reverse=True, key=lambda x: len(x[1][0]))
         )

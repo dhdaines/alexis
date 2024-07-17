@@ -292,43 +292,26 @@ def filter_tab(words: Iterable[T_obj]) -> Iterator[T_obj]:
         yield w
 
 
-def retokenize(words: Iterable[T_obj], tokenizer: "Tokenizer") -> Iterator[T_obj]:
-    """Refaire la tokenisation en alignant les traits et etiquettes.
-
-    Notez que parce que le positionnement de chaque sous-mot sera
-    identique aux autres, les modeles de mise en page risquent de ne
-    pas bien marcher.  Il serait preferable d'appliquer la
-    tokenisation directement sur les caracteres.
-    """
+def retokenize(
+    words: Iterable[T_obj], tokenizer: "Tokenizer", drop: bool = False
+) -> Iterator[T_obj]:
+    """Refaire la tokenisation en alignant les traits et etiquettes."""
     for widx, w in enumerate(words):
         e = tokenizer.encode(w["text"], add_special_tokens=False)
         for tidx, (tok, tid) in enumerate(zip(e.tokens, e.ids)):
             wt = w.copy()
-            wt["text"] = tok
-            wt["word"] = w["text"]
+            wt["token"] = tok
             wt["word_id"] = widx
             wt["token_id"] = tid
-            # Change B to I for subtokens
             if tidx > 0:
+                if drop:
+                    continue
                 for ltype in "sequence", "segment":
                     if ltype in w:
                         label = w[ltype]
                         if label and label[0] == "B":
                             wt[ltype] = f"I-{label[2:]}"
             yield wt
-
-
-def detokenize(words: Iterable[T_obj], _tokenizer: "Tokenizer") -> Iterator[T_obj]:
-    """Defaire la retokenisation"""
-    widx = -1
-    for w in words:
-        if w["word_id"] != widx:
-            widx = w["word_id"]
-            w["text"] = w["word"]
-            del w["word"]
-            del w["word_id"]
-            del w["token_id"]
-            yield w
 
 
 def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
@@ -370,6 +353,7 @@ def make_rnn_features(
         for feats in page2features(list(page), features)
     )
     for f, w in zip(rnn_features, page):
+        f["token_id"] = w.get("token_id", "")
         f["line:left"] = float(f["line:left"]) / float(w["page_width"])
         f["line:top"] = float(f["line:top"]) / float(w["page_height"])
         f["v:top"] = float(w["top"]) / float(w["page_height"])
@@ -389,6 +373,7 @@ def make_rnn_features(
 
 FEATNAMES = [
     "lower",
+    "token_id",
     "rgb",
     "mctag",
     "uppercase",
@@ -448,14 +433,14 @@ def make_rnn_data(
     feat_dim: int = 8,
     features: str = "text+layout_structure",
     labels: str = "literal",
+    tokenizer: Union["Tokenizer", None] = None,
 ):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
-    X, y = zip(
-        *(
-            make_rnn_features(p, features=features, labels=labels)
-            for p in split_pages(filter_tab(load(csvs)))
-        )
-    )
+    words = filter_tab(load(csvs))
+    if tokenizer is not None:
+        words = retokenize(words, tokenizer, drop=True)
+    pages = split_pages(words)
+    X, y = zip(*(make_rnn_features(p, features=features, labels=labels) for p in pages))
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
@@ -731,6 +716,15 @@ class RNNCRF(RNN):
             label_weights=label_weights,
             constraints=bio_transitions(id2label) if constrain else None,
         )
+
+    def logits(
+        self,
+        features: PackedSequence | torch.Tensor,
+        vectors: PackedSequence | torch.Tensor,
+        mask: torch.Tensor,
+    ):
+        tag_space = super().forward(features, vectors, mask)
+        return (tag_space.transpose(-1, 1), mask)
 
     def forward(
         self,

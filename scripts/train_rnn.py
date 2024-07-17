@@ -16,6 +16,7 @@ from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader, Subset
 
 from alexi.segment import make_rnn_data, pad_collate_fn, pad_collate_fn_predict, RNN
+from tokenizers import Tokenizer
 
 
 def make_argparse():
@@ -81,6 +82,9 @@ def make_argparse():
         "-s",
         "--scores",
         help="Fichier destination pour évaluations",
+    )
+    parser.add_argument(
+        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
     )
     return parser
 
@@ -273,9 +277,12 @@ def main():
     set_seeds(args.seed)
     if args.scores is None:
         args.scores = args.outfile.with_suffix(".csv")
+    tokenizer = None
+    if args.tokenize:
+        tokenizer = Tokenizer.from_pretrained("camembert-base")
 
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
-        args.csvs, features=args.features, labels=args.labels
+        args.csvs, features=args.features, labels=args.labels, tokenizer=tokenizer
     )
 
     print("Vocabulary size:")
