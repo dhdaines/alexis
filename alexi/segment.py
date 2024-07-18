@@ -488,6 +488,8 @@ def make_rnn_data(
         for val, count in counts.most_common():
             if count < min_count:
                 break
+            if val == "":
+                continue
             ids[val] = len(ids)
     # FIXME: Should go in train_rnn
     featdims = dict(
@@ -653,6 +655,15 @@ class RNN(nn.Module):
         inputs: PackedSequence | torch.Tensor
         # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
         if isinstance(features, PackedSequence):
+            # for idx, name in enumerate(self.featdims):
+            #     print(
+            #         "WTF",
+            #         name,
+            #         features.data[:, idx].min(),
+            #         features.data[:, idx].max(),
+            #         features.data[:, idx],
+            #     )
+            #     _ = self.embedding_layers[name](features.data[:, idx])
             stack = [
                 self.embedding_layers[name](features.data[:, idx])
                 for idx, name in enumerate(self.featdims)
