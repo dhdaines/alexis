@@ -390,19 +390,17 @@ def make_rnn_features(
             # By definition a bullet comes first in the line
             if m and int(f["first"]):
                 bullets[pattern.name] = m.group(1)
-                feats["bullet"] = pattern.name
-            else:
-                feats["bullet"] = ""
+        feats["bullet"] = len(bullets) > 0
         sequential = 0
         if int(f["first"]):
             if "NUMERIC" in bullets:
                 num = int(bullets["NUMERIC"])
                 sequential = int(prevnum is None or num - prevnum == 1)
                 prevnum = num
-            # elif "LOWER" in bullets:
-            #    num = ord(bullets["LOWER"]) - ord("a")
-            #    sequential = int(prevnum is None or num - prevnum == 1)
-            #    prevnum = num
+            elif "LOWER" in bullets:
+                num = ord(bullets["LOWER"]) - ord("a")
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
             # print(bool(sequential), text)
         feats["sequential"] = sequential
         for name in BBOX_FEATS:
@@ -424,7 +422,6 @@ FEATNAMES = (
         "rgb",
         "mctag",
         "element",
-        "bullet",
     ]
     + BBOX_FEATS
     + DELTA_FEATS
@@ -444,6 +441,7 @@ VECNAMES = [
     "numeric",
     "bold",
     "italic",
+    "bullet",
 ]
 
 
