@@ -330,52 +330,59 @@ def make_fontname(fontname):
     return fontname
 
 
+BBOX_FEATS = ["x0", "x1", "top", "bottom"]
+DELTA_FEATS = [f"{f}:delta" for f in BBOX_FEATS]
+DELTA_DELTA_FEATS = [f"{f}:delta" for f in DELTA_FEATS]
+LINE_FEATS = ["line:indent", "line:gap", "line:height"]
+
+
 def add_deltas(page):
     prev = {}
     for w in page:
-        for f in list(f for f in w if f.startswith("v:")):
-            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
-            prev[f] = w[f]
+        for f in BBOX_FEATS:
+            delta = int(w[f]) - prev.setdefault(f, int(w[f]))
+            w[f"{f}:delta"] = str(round(delta / 10))
+            prev[f] = int(w[f])
     prev = {}
     for w in page:
-        for f in list(f for f in w if f.endswith(":delta")):
-            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
-            prev[f] = w[f]
+        for f in DELTA_FEATS:
+            delta = int(w[f]) - prev.setdefault(f, int(w[f]))
+            w[f"{f}:delta"] = str(round(delta / 10))
+            prev[f] = int(w[f])
 
 
 def make_rnn_features(
     page: Iterable[T_obj],
-    features: str = "text+layout+structure",
     labels: str = "literal",
 ) -> tuple[list[T_obj], list[str]]:
-    rnn_features = list(
+    crf_features = list(
         dict((name, val) for name, _, val in (w.partition("=") for w in feats))
-        for feats in page2features(list(page), features)
+        for feats in page2features(list(page), "layout")
     )
-    for f, w in zip(rnn_features, page):
-        f["token_id"] = w.get("token_id", "")
-        f["line:left"] = float(f["line:left"]) / float(w["page_width"])
-        f["line:top"] = float(f["line:top"]) / float(w["page_height"])
-        f["v:top"] = float(w["top"]) / float(w["page_height"])
-        f["v:left"] = float(w["x0"]) / float(w["page_width"])
-        f["v:top"] = float(w["top"]) / float(w["page_height"])
-        f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
-            w["page_width"]
-        )
-        f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
-            w["page_height"]
-        )
-
+    rnn_features = []
+    maxdim = max(float(page[0][x]) for x in ("page_width", "page_height"))
+    for f, w in zip(crf_features, page):
+        elements = w.get("tagstack", "Span").split(";")
+        feats = {
+            "lower": w["text"].lower(),
+            "fontname": make_fontname(w["fontname"]),
+            "rgb": w.get("rgb", "#000"),
+            "mctag": w.get("mctag", "P"),
+            "element": elements[-1],
+        }
+        for name in BBOX_FEATS:
+            val = float(w[name]) / maxdim * 100
+            feats[name] = str(round(val))
+        for name in LINE_FEATS:
+            val = float(f[name]) / maxdim * 100
+            feats[name] = str(round(val))
+        rnn_features.append(feats)
     add_deltas(rnn_features)
     rnn_labels = list(page2labels(page, labels))
     return rnn_features, rnn_labels
 
 
-FEATNAMES = [
-    "lower",
-    "token_id",
-    "rgb",
-    "mctag",
+OTHER = [
     "uppercase",
     "title",
     "punc",
@@ -388,35 +395,30 @@ FEATNAMES = [
     "head:table",
     "head:chapitre",
     "head:annexe",
-    "line:height",
-    "line:indent",
-    "line:gap",
     "first",
     "last",
 ]
+FEATNAMES = (
+    [
+        "lower",
+        "fontname",
+        "rgb",
+        "mctag",
+        "element",
+    ]
+    + BBOX_FEATS
+    + DELTA_FEATS
+    + DELTA_DELTA_FEATS
+    + LINE_FEATS
+)
 
-VECNAMES = [
-    "line:left",
-    "line:top",
-    "v:left",
-    "v:top",
-    "v:right",
-    "v:bottom",
-    "v:left:delta",
-    "v:top:delta",
-    "v:right:delta",
-    "v:bottom:delta",
-    "v:left:delta:delta",
-    "v:top:delta:delta",
-    "v:right:delta:delta",
-    "v:bottom:delta:delta",
-]
+VECNAMES = DELTA_DELTA_FEATS
 
 
-def make_page_feats(feat2id, page):
+def make_page_feats(feat2id, page, featdims):
     return [
         (
-            [feat2id[name].get(feats[name], 0) for name in FEATNAMES],
+            [feat2id[name].get(feats[name], 0) for name in featdims],
             [float(feats[name]) for name in VECNAMES],
         )
         for feats in page
@@ -431,36 +433,42 @@ def make_rnn_data(
     csvs: Iterable[Path],
     word_dim: int = 32,
     feat_dim: int = 8,
-    features: str = "text+layout_structure",
     labels: str = "literal",
     tokenizer: Union["Tokenizer", None] = None,
+    min_count: int = 5,
 ):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
     words = filter_tab(load(csvs))
     if tokenizer is not None:
         words = retokenize(words, tokenizer, drop=True)
     pages = split_pages(words)
-    X, y = zip(*(make_rnn_features(p, features=features, labels=labels) for p in pages))
+    X, y = zip(*(make_rnn_features(p, labels=labels) for p in pages))
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
     feat2id = {name: {"": 0} for name in FEATNAMES}
+    feat2count = {name: Counter() for name in FEATNAMES}
     for feats in itertools.chain.from_iterable(X):
-        for name, ids in feat2id.items():
-            if feats[name] not in ids:
-                ids[feats[name]] = len(ids)
-
-    all_data = [
-        (
-            make_page_feats(feat2id, page),
-            make_page_labels(label2id, tags),
-        )
-        for page, tags in zip(X, y)
-    ]
+        for name, val in feats.items():
+            if name in feat2count:
+                feat2count[name][val] += 1
+    for name, counts in feat2count.items():
+        ids = feat2id[name]
+        for val, count in counts.most_common():
+            if count < min_count:
+                break
+            ids[val] = len(ids)
     # FIXME: Should go in train_rnn
     featdims = dict(
         (name, word_dim) if name == "lower" else (name, feat_dim) for name in FEATNAMES
     )
+    all_data = [
+        (
+            make_page_feats(feat2id, page, featdims),
+            make_page_labels(label2id, tags),
+        )
+        for page, tags in zip(X, y)
+    ]
 
     return all_data, featdims, feat2id, label_counts, id2label
 
@@ -716,15 +724,6 @@ class RNNCRF(RNN):
             label_weights=label_weights,
             constraints=bio_transitions(id2label) if constrain else None,
         )
-
-    def logits(
-        self,
-        features: PackedSequence | torch.Tensor,
-        vectors: PackedSequence | torch.Tensor,
-        mask: torch.Tensor,
-    ):
-        tag_space = super().forward(features, vectors, mask)
-        return (tag_space.transpose(-1, 1), mask)
 
     def forward(
         self,
