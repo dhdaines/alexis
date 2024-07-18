@@ -366,7 +366,8 @@ def make_rnn_features(
         text = w["text"]
         fontname = make_fontname(w["fontname"])
         feats = {
-            "lower": w["text"].lower(),
+            "lower": text.lower(),
+            "token": w.get("token", ""),
             "fontname": fontname,
             "rgb": w.get("rgb", "#000"),
             "mctag": w.get("mctag", "P"),
@@ -453,21 +454,26 @@ def make_rnn_data(
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-    feat2id = {name: {"": 0} for name in FEATNAMES}
     feat2count = {name: Counter() for name in FEATNAMES}
+    if tokenizer is not None:
+        # FIXME: should use all tokens
+        feat2count["token"] = Counter()
     for feats in itertools.chain.from_iterable(X):
         for name, val in feats.items():
             if name in feat2count:
                 feat2count[name][val] += 1
+    if tokenizer is not None:
+        del feat2count["lower"]
+    feat2id = {}
     for name, counts in feat2count.items():
-        ids = feat2id[name]
+        ids = feat2id[name] = {"": 0}
         for val, count in counts.most_common():
             if count < min_count:
                 break
             ids[val] = len(ids)
     # FIXME: Should go in train_rnn
     featdims = dict(
-        (name, word_dim) if name == "lower" else (name, feat_dim) for name in FEATNAMES
+        (name, word_dim) if name == "lower" else (name, feat_dim) for name in feat2id
     )
     all_data = [
         (
