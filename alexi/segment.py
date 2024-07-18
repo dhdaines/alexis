@@ -334,6 +334,7 @@ BBOX_FEATS = ["x0", "x1", "top", "bottom"]
 DELTA_FEATS = [f"{f}:delta" for f in BBOX_FEATS]
 DELTA_DELTA_FEATS = [f"{f}:delta" for f in DELTA_FEATS]
 LINE_FEATS = ["line:indent", "line:gap", "line:height"]
+BULLET_FEATS = [f"bullet:{pattern.name.lower()}" for pattern in Bullet]
 
 
 def add_deltas(page):
@@ -366,21 +367,6 @@ def make_rnn_features(
         elements = w.get("tagstack", "Span").split(";")
         text = w["text"]
         fontname = make_fontname(w["fontname"])
-        # bullets = {}
-        # for pattern in Bullet:
-        #     m = pattern.value.match(text)
-        #     if m:
-        #         bullets[pattern.name] = m.group(1)
-        # if bullets:
-        #     print(text, bullets)
-        sequential = 0
-        if int(f["first"]):
-            spam = text.strip(".")
-            if spam.isnumeric():
-                num = int(spam)
-                sequential = int(prevnum is None or num - prevnum == 1)
-                prevnum = num
-                # print(bool(sequential), text)
         feats = {
             "lower": text.lower(),
             "token": w.get("token", ""),
@@ -390,7 +376,6 @@ def make_rnn_features(
             "element": elements[-1],
             "first": f["first"],
             "last": f["last"],
-            "sequential": sequential,
             "uppercase": text.isupper(),
             "title": text.istitle(),
             "punc": bool(PUNC.match(text)),
@@ -400,6 +385,32 @@ def make_rnn_features(
             "bold": ("bold" in fontname.lower()),
             "italic": ("italic" in fontname.lower()),
         }
+        bullets = {}
+        for pattern in Bullet:
+            m = pattern.value.match(text)
+            featname = f"bullet:{pattern.name.lower()}"
+            if m:
+                feats[featname] = bullets[pattern.name] = m.group(1)
+            else:
+                feats[featname] = ""
+        sequential = 0
+        if int(f["first"]):
+            if "NUMERIC" in bullets:
+                num = int(bullets["NUMERIC"])
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
+            elif "LOWER" in bullets:
+                num = ord(bullets["LOWER"]) - ord("a")
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
+            elif "UPPER" in bullets:
+                num = ord(bullets["UPPER"]) - ord("A")
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
+            else:
+                pass  # do not do roman numerals for now
+            # print(bool(sequential), text)
+        feats["sequential"] = sequential
         for name in BBOX_FEATS:
             val = float(w[name]) / maxdim * 100
             feats[name] = str(round(val))
@@ -420,6 +431,7 @@ FEATNAMES = (
         "mctag",
         "element",
     ]
+    + BULLET_FEATS
     + BBOX_FEATS
     + DELTA_FEATS
     + DELTA_DELTA_FEATS
@@ -491,6 +503,9 @@ def make_rnn_data(
             if val == "":
                 continue
             ids[val] = len(ids)
+        # Eliminate features with only one embedding
+        if len(ids) == 1:
+            del feat2id[name]
     # FIXME: Should go in train_rnn
     featdims = dict(
         (name, word_dim) if name == "lower" else (name, feat_dim) for name in feat2id
