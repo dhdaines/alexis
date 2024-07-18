@@ -334,7 +334,6 @@ BBOX_FEATS = ["x0", "x1", "top", "bottom"]
 DELTA_FEATS = [f"{f}:delta" for f in BBOX_FEATS]
 DELTA_DELTA_FEATS = [f"{f}:delta" for f in DELTA_FEATS]
 LINE_FEATS = ["line:indent", "line:gap", "line:height"]
-BULLET_FEATS = [f"bullet:{pattern.name.lower()}" for pattern in Bullet]
 
 
 def add_deltas(page):
@@ -388,21 +387,22 @@ def make_rnn_features(
         bullets = {}
         for pattern in Bullet:
             m = pattern.value.match(text)
-            featname = f"bullet:{pattern.name.lower()}"
-            if m:
-                feats[featname] = bullets[pattern.name] = m.group(1)
+            # By definition a bullet comes first in the line
+            if m and int(f["first"]):
+                bullets[pattern.name] = m.group(1)
+                feats["bullet"] = pattern.name
             else:
-                feats[featname] = ""
+                feats["bullet"] = ""
         sequential = 0
         if int(f["first"]):
             if "NUMERIC" in bullets:
                 num = int(bullets["NUMERIC"])
                 sequential = int(prevnum is None or num - prevnum == 1)
                 prevnum = num
-            elif "LOWER" in bullets:
-                num = ord(bullets["LOWER"]) - ord("a")
-                sequential = int(prevnum is None or num - prevnum == 1)
-                prevnum = num
+            # elif "LOWER" in bullets:
+            #    num = ord(bullets["LOWER"]) - ord("a")
+            #    sequential = int(prevnum is None or num - prevnum == 1)
+            #    prevnum = num
             # print(bool(sequential), text)
         feats["sequential"] = sequential
         for name in BBOX_FEATS:
@@ -424,8 +424,8 @@ FEATNAMES = (
         "rgb",
         "mctag",
         "element",
+        "bullet",
     ]
-    + BULLET_FEATS
     + BBOX_FEATS
     + DELTA_FEATS
     + DELTA_DELTA_FEATS
@@ -494,9 +494,8 @@ def make_rnn_data(
         for val, count in counts.most_common():
             if count < min_count:
                 break
-            if val == "":
-                continue
-            ids[val] = len(ids)
+            if val not in ids:
+                ids[val] = len(ids)
         # Eliminate features with only one embedding
         if len(ids) == 1:
             del feat2id[name]
