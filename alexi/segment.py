@@ -55,7 +55,7 @@ def sign(x: Union[int | float]) -> int:
     return 1
 
 
-def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+def structure_features(page: Iterable[T_obj]) -> Iterator[list[str]]:
     """Traits de structure logique pour entrainement d'un modèle."""
     for word in page:
         elements = set(word.get("tagstack", "Span").split(";"))
@@ -71,7 +71,7 @@ def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
         yield features
 
 
-def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+def layout_features(page: Iterable[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
     lines = list(line_breaks(page))
@@ -181,7 +181,7 @@ def text_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
         yield features
 
 
-def literal(page: Sequence[T_obj]) -> Iterator[list[str]]:
+def literal(page: Iterable[T_obj]) -> Iterator[list[str]]:
     for word in page:
         features = []
         for key in FEATNAMES:
@@ -357,18 +357,30 @@ def make_rnn_features(
 ) -> tuple[list[T_obj], list[str]]:
     crf_features = list(
         dict((name, val) for name, _, val in (w.partition("=") for w in feats))
-        for feats in page2features(list(page), "layout")
+        for feats in layout_features(page)
     )
     rnn_features = []
     maxdim = max(float(page[0][x]) for x in ("page_width", "page_height"))
     for f, w in zip(crf_features, page):
         elements = w.get("tagstack", "Span").split(";")
+        text = w["text"]
+        fontname = make_fontname(w["fontname"])
         feats = {
             "lower": w["text"].lower(),
-            "fontname": make_fontname(w["fontname"]),
+            "fontname": fontname,
             "rgb": w.get("rgb", "#000"),
             "mctag": w.get("mctag", "P"),
             "element": elements[-1],
+            "first": f["first"],
+            "last": f["last"],
+            "uppercase": text.isupper(),
+            "title": text.istitle(),
+            "punc": bool(PUNC.match(text)),
+            "endpunc": bool(ENDPUNC.match(text)),
+            "multipunc": bool(MULTIPUNC.match(text)),
+            "numeric": text.isnumeric(),
+            "bold": ("bold" in fontname.lower()),
+            "italic": ("italic" in fontname.lower()),
         }
         for name in BBOX_FEATS:
             val = float(w[name]) / maxdim * 100
@@ -382,22 +394,6 @@ def make_rnn_features(
     return rnn_features, rnn_labels
 
 
-OTHER = [
-    "uppercase",
-    "title",
-    "punc",
-    "endpunc",
-    "numeric",
-    "bold",
-    "italic",
-    "toc",
-    "header",
-    "head:table",
-    "head:chapitre",
-    "head:annexe",
-    "first",
-    "last",
-]
 FEATNAMES = (
     [
         "lower",
@@ -412,7 +408,18 @@ FEATNAMES = (
     + LINE_FEATS
 )
 
-VECNAMES = DELTA_DELTA_FEATS
+# Note that these are all binary
+VECNAMES = [
+    "first",
+    "last",
+    "uppercase",
+    "punc",
+    "endpunc",
+    "multipunc",
+    "numeric",
+    "bold",
+    "italic",
+]
 
 
 def make_page_feats(feat2id, page, featdims):

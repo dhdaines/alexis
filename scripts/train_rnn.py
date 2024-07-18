@@ -38,7 +38,7 @@ def make_argparse():
         "--feat-dim", default=8, type=int, help="Dimension des embeddings des traits"
     )
     parser.add_argument(
-        "--min-feat", default=2, type=int, help="Nombre minimal d'instances d'un trait"
+        "--min-feat", default=15, type=int, help="Nombre minimal d'instances d'un trait"
     )
     parser.add_argument(
         "--lr", default=0.01, type=float, help="Facteur d'apprentissage"
