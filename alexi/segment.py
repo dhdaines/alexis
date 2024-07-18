@@ -484,18 +484,15 @@ def load_rnn_data(
     iobs: Iterable[T_obj],
     feat2id,
     id2label,
-    features: str = "text+layout+structure",
+    featdims,
     labels: str = "literal",
 ):
     """Creer le jeu de donnees pour tester un modele RNN."""
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-    pages = (
-        make_rnn_features(p, features=features, labels=labels)
-        for p in split_pages(iobs)
-    )
+    pages = (make_rnn_features(p, labels=labels) for p in split_pages(iobs))
     all_data = [
         (
-            make_page_feats(feat2id, page),
+            make_page_feats(feat2id, page, featdims),
             make_page_labels(label2id, tags),
         )
         for page, tags in pages

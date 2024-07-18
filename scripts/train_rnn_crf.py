@@ -46,6 +46,9 @@ def make_argparse():
         "--feat-dim", default=8, type=int, help="Dimension des embeddings des traits"
     )
     parser.add_argument(
+        "--min-feat", default=15, type=int, help="Nombre minimal d'instances d'un trait"
+    )
+    parser.add_argument(
         "--lr", default=0.01, type=float, help="Facteur d'apprentissage"
     )
     parser.add_argument(
@@ -338,7 +341,12 @@ def main():
         tokenizer = Tokenizer.from_pretrained("camembert-base")
 
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
-        args.csvs, labels=args.labels, tokenizer=tokenizer
+        args.csvs,
+        labels=args.labels,
+        tokenizer=tokenizer,
+        min_count=args.min_feat,
+        word_dim=args.word_dim,
+        feat_dim=args.feat_dim,
     )
     # Note that weights must be greater than 1.0 for training to work
     label_weights = [
