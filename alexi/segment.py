@@ -361,10 +361,26 @@ def make_rnn_features(
     )
     rnn_features = []
     maxdim = max(float(page[0][x]) for x in ("page_width", "page_height"))
+    prevnum = None
     for f, w in zip(crf_features, page):
         elements = w.get("tagstack", "Span").split(";")
         text = w["text"]
         fontname = make_fontname(w["fontname"])
+        # bullets = {}
+        # for pattern in Bullet:
+        #     m = pattern.value.match(text)
+        #     if m:
+        #         bullets[pattern.name] = m.group(1)
+        # if bullets:
+        #     print(text, bullets)
+        sequential = 0
+        if int(f["first"]):
+            spam = text.strip(".")
+            if spam.isnumeric():
+                num = int(spam)
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
+                # print(bool(sequential), text)
         feats = {
             "lower": text.lower(),
             "token": w.get("token", ""),
@@ -374,6 +390,7 @@ def make_rnn_features(
             "element": elements[-1],
             "first": f["first"],
             "last": f["last"],
+            "sequential": sequential,
             "uppercase": text.isupper(),
             "title": text.istitle(),
             "punc": bool(PUNC.match(text)),
@@ -413,6 +430,7 @@ FEATNAMES = (
 VECNAMES = [
     "first",
     "last",
+    "sequential",
     "uppercase",
     "punc",
     "endpunc",
@@ -789,7 +807,9 @@ class RNNSegmenteur(Segmenteur):
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         for p in split_pages(words):
             page, _labels = make_rnn_features(p)
-            features = make_page_feats(self.config["feat2id"], page)
+            features = make_page_feats(
+                self.config["feat2id"], page, self.model.featdims
+            )
             feats, vector = zip(*features)
             batch = (
                 torch.LongTensor(feats, device=self.device),
