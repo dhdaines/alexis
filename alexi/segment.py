@@ -403,12 +403,6 @@ def make_rnn_features(
                 num = ord(bullets["LOWER"]) - ord("a")
                 sequential = int(prevnum is None or num - prevnum == 1)
                 prevnum = num
-            elif "UPPER" in bullets:
-                num = ord(bullets["UPPER"]) - ord("A")
-                sequential = int(prevnum is None or num - prevnum == 1)
-                prevnum = num
-            else:
-                pass  # do not do roman numerals for now
             # print(bool(sequential), text)
         feats["sequential"] = sequential
         for name in BBOX_FEATS:
