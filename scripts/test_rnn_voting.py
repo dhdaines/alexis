@@ -53,9 +53,7 @@ def main():
         if args.tokenize:
             tokenizer = Tokenizer.from_pretrained("camembert-base")
             words = retokenize(words, tokenizer, drop=True)
-        all_data = load_rnn_data(
-            words, feat2id, id2label, config["features"], config["labels"]
-        )
+        all_data = load_rnn_data(words, feat2id, id2label, config["labels"])
         ordering, sorted_test_data = zip(
             *sorted(enumerate(all_data), reverse=True, key=lambda x: len(x[1][0]))
         )

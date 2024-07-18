@@ -62,9 +62,6 @@ def make_argparse():
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
     )
     parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
-    parser.add_argument(
-        "--features", default="text+layout+structure", help="Extracteur de traits"
-    )
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument(
         "--min-count",
@@ -180,7 +177,6 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2la
             "veclen": veclen,
             "label_weights": label_weights,
             "hidden_size": args.hidden_size,
-            "features": args.features,
             "labels": args.labels,
             "constrain": args.constrain,
         }
@@ -301,7 +297,6 @@ def run_training(args, train_data, featdims, feat2id, label_weights, id2label):
         "veclen": veclen,
         "label_weights": label_weights,
         "hidden_size": args.hidden_size,
-        "features": args.features,
         "labels": args.labels,
         "constrain": args.constrain,
     }
@@ -343,7 +338,7 @@ def main():
         tokenizer = Tokenizer.from_pretrained("camembert-base")
 
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
-        args.csvs, features=args.features, labels=args.labels, tokenizer=tokenizer
+        args.csvs, labels=args.labels, tokenizer=tokenizer
     )
     # Note that weights must be greater than 1.0 for training to work
     label_weights = [
