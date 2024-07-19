@@ -1,21 +1,31 @@
-Immediate fixes/enhancements
-----------------------------
+DATA
+----
 
-- redo serafim CI
-  - download alexi files with https://github.com/dawidd6/action-download-artifact
-- better features / training
-  - numeric sequence features
-  - gazetteers possibly
-  - optimize feature extraction
-- better sequence tagging
-  - use main train_crf.py
-  - identify pages for training/testing (for now, those with at least one sequence tag)
-- support more ways of addressing stuff
-  - Titre I, II, III in that one stupid bylaw (WTF)
-  - Paragraph numbers (actually items in lists)
-  
+- Correct titles in zonage glossary
+- Correct extraction (see below, use RNN) of titles numbers etc
+- Annotate multiple TOCs in Sainte-Agathe urbanisme
+
 DERP LERNING
 ------------
+
+Pre-training
+============
+
+- DocBank is not useful unfortunately
+  - No BIO tags on paragraphs and list items (WTF Microsoft!)
+  - Hard to even get their dataset and it is full of junk
+  - But their extraction *is* useful
+  - We could redo their extraction with French data
+- Look at other document structure analysis models
+  - DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
+    - Yes: it separates paragraphs and section headings
+    - Need to download the huge image archive to get this though ;(
+  - Check out its leaderboard
+- Evaluate models already trained on DocLayNet:
+  - https://github.com/moured/YOLOv10-Document-Layout-Analysis
+  - https://huggingface.co/spaces/atlury/document-layout-comparison
+  - https://huggingface.co/DILHTWD/documentlayoutsegmentation_YOLOv8_ondoclaynet
+  - https://huggingface.co/spaces/omoured/YOLOv10-Document-Layout-Analysis
 
 Segmentation
 ============
@@ -26,25 +36,25 @@ Segmentation
   - Embed words and categorical features DONE
   - Use same evaluator as CRF training for comparison DONE
   - Scale layout features by page size and include as vector DONE
-  - Retrain from full dataset + patches
-    - early stopping? sample a dev set?
-  - Do extraction and qualitative evaluation
-    - sort for batch processing then unsort afterwards
+  - Retrain from full dataset + patches DONE
 - CRF output layer DONE
 - Ensemble RNN DONE
 - Viterbi decoding (with allowed transitions only) on RNN outputs DONE
   - Could *possibly* train a CRF to do this, in fact DONE
+- Do prediction with Transformers (LayoutLM) DONE
+  - heuristic chunking based on line gap (not indent) DONE
+- Move Amendement from segmentation to sequence tagging
+  - update all training data
+  - compare main and `more_rnn_feats` branches
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings
   - Heuristic pre-chunking as described below
   - Either tokenize from chars (above) or use first embedding per word
   - Probably project 768 dimensions down to something smaller
-- Do prediction with Transformers (LayoutLM) DONE
-  - heuristic chunking based on line gap (not indent) DONE
-- Do prediction with Transformers (CamemBERT)
-- Do prediction with Transformers (CamemBERT + vector feats)
-
+  - Freeze and train RNN(+CRF)
+- Do sequence tagging with RNN(+CRF)
+- Do sequence tagging with Transformers (CamemBERT)
 
 Segmentation results
 ====================

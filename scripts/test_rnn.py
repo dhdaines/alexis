@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader
+from tokenizers import Tokenizer
 
 from alexi.segment import (
     load,
@@ -16,6 +17,7 @@ from alexi.segment import (
     RNN,
     RNNCRF,
     bio_transitions,
+    retokenize,
 )
 
 from allennlp_light.modules.conditional_random_field import ConditionalRandomField
@@ -35,6 +37,9 @@ def make_argparse():
     parser.add_argument(
         "--all-labels", action="store_true", help="Evaluater toutes les classes"
     )
+    parser.add_argument(
+        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
+    )
     parser.add_argument("csvs", nargs="+", help="Fichiers CSV de test", type=Path)
     return parser
 
@@ -48,8 +53,13 @@ def main():
         config = json.load(infh)
         id2label = config["id2label"]
         feat2id = config["feat2id"]
+    tokenizer = None
+    words = load(args.csvs)
+    if args.tokenize:
+        tokenizer = Tokenizer.from_pretrained("camembert-base")
+        words = retokenize(words, tokenizer, drop=True)
     all_data = load_rnn_data(
-        load(args.csvs), feat2id, id2label, config["features"], config["labels"]
+        words, feat2id, id2label, config["features"], config["labels"]
     )
     ordering, sorted_test_data = zip(
         *sorted(enumerate(all_data), reverse=True, key=lambda x: len(x[1][0]))

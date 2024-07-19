@@ -24,6 +24,7 @@ from sklearn_crfsuite import metrics
 from torch.utils.data import DataLoader, Subset
 
 from alexi.segment import make_rnn_data, pad_collate_fn, pad_collate_fn_predict, RNNCRF
+from tokenizers import Tokenizer
 
 
 def make_argparse():
@@ -45,6 +46,9 @@ def make_argparse():
         "--feat-dim", default=8, type=int, help="Dimension des embeddings des traits"
     )
     parser.add_argument(
+        "--min-feat", default=15, type=int, help="Nombre minimal d'instances d'un trait"
+    )
+    parser.add_argument(
         "--lr", default=0.01, type=float, help="Facteur d'apprentissage"
     )
     parser.add_argument(
@@ -61,9 +65,6 @@ def make_argparse():
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
     )
     parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
-    parser.add_argument(
-        "--features", default="text+layout+structure", help="Extracteur de traits"
-    )
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument(
         "--min-count",
@@ -89,6 +90,9 @@ def make_argparse():
         "-s",
         "--scores",
         help="Fichier destination pour évaluations",
+    )
+    parser.add_argument(
+        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
     )
     parser.add_argument(
         "-i",
@@ -176,7 +180,6 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, label_weights, id2la
             "veclen": veclen,
             "label_weights": label_weights,
             "hidden_size": args.hidden_size,
-            "features": args.features,
             "labels": args.labels,
             "constrain": args.constrain,
         }
@@ -297,7 +300,6 @@ def run_training(args, train_data, featdims, feat2id, label_weights, id2label):
         "veclen": veclen,
         "label_weights": label_weights,
         "hidden_size": args.hidden_size,
-        "features": args.features,
         "labels": args.labels,
         "constrain": args.constrain,
     }
@@ -334,9 +336,17 @@ def main():
     set_seeds(args.seed)
     if args.scores is None:
         args.scores = args.outfile.with_suffix(".csv")
+    tokenizer = None
+    if args.tokenize:
+        tokenizer = Tokenizer.from_pretrained("camembert-base")
 
     all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
-        args.csvs, features=args.features, labels=args.labels
+        args.csvs,
+        labels=args.labels,
+        tokenizer=tokenizer,
+        min_count=args.min_feat,
+        word_dim=args.word_dim,
+        feat_dim=args.feat_dim,
     )
     # Note that weights must be greater than 1.0 for training to work
     label_weights = [

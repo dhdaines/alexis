@@ -55,7 +55,7 @@ def sign(x: Union[int | float]) -> int:
     return 1
 
 
-def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+def structure_features(page: Iterable[T_obj]) -> Iterator[list[str]]:
     """Traits de structure logique pour entrainement d'un modèle."""
     for word in page:
         elements = set(word.get("tagstack", "Span").split(";"))
@@ -71,7 +71,7 @@ def structure_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
         yield features
 
 
-def layout_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
+def layout_features(page: Iterable[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
     lines = list(line_breaks(page))
@@ -181,7 +181,7 @@ def text_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
         yield features
 
 
-def literal(page: Sequence[T_obj]) -> Iterator[list[str]]:
+def literal(page: Iterable[T_obj]) -> Iterator[list[str]]:
     for word in page:
         features = []
         for key in FEATNAMES:
@@ -292,43 +292,26 @@ def filter_tab(words: Iterable[T_obj]) -> Iterator[T_obj]:
         yield w
 
 
-def retokenize(words: Iterable[T_obj], tokenizer: "Tokenizer") -> Iterator[T_obj]:
-    """Refaire la tokenisation en alignant les traits et etiquettes.
-
-    Notez que parce que le positionnement de chaque sous-mot sera
-    identique aux autres, les modeles de mise en page risquent de ne
-    pas bien marcher.  Il serait preferable d'appliquer la
-    tokenisation directement sur les caracteres.
-    """
+def retokenize(
+    words: Iterable[T_obj], tokenizer: "Tokenizer", drop: bool = False
+) -> Iterator[T_obj]:
+    """Refaire la tokenisation en alignant les traits et etiquettes."""
     for widx, w in enumerate(words):
         e = tokenizer.encode(w["text"], add_special_tokens=False)
         for tidx, (tok, tid) in enumerate(zip(e.tokens, e.ids)):
             wt = w.copy()
-            wt["text"] = tok
-            wt["word"] = w["text"]
+            wt["token"] = tok
             wt["word_id"] = widx
             wt["token_id"] = tid
-            # Change B to I for subtokens
             if tidx > 0:
+                if drop:
+                    continue
                 for ltype in "sequence", "segment":
                     if ltype in w:
                         label = w[ltype]
                         if label and label[0] == "B":
                             wt[ltype] = f"I-{label[2:]}"
             yield wt
-
-
-def detokenize(words: Iterable[T_obj], _tokenizer: "Tokenizer") -> Iterator[T_obj]:
-    """Defaire la retokenisation"""
-    widx = -1
-    for w in words:
-        if w["word_id"] != widx:
-            widx = w["word_id"]
-            w["text"] = w["word"]
-            del w["word"]
-            del w["word_id"]
-            del w["token_id"]
-            yield w
 
 
 def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
@@ -347,91 +330,125 @@ def make_fontname(fontname):
     return fontname
 
 
+BBOX_FEATS = ["x0", "x1", "top", "bottom"]
+DELTA_FEATS = [f"{f}:delta" for f in BBOX_FEATS]
+DELTA_DELTA_FEATS = [f"{f}:delta" for f in DELTA_FEATS]
+LINE_FEATS = ["line:indent", "line:gap", "line:height"]
+
+
 def add_deltas(page):
     prev = {}
     for w in page:
-        for f in list(f for f in w if f.startswith("v:")):
-            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
-            prev[f] = w[f]
+        for f in BBOX_FEATS:
+            delta = int(w[f]) - prev.setdefault(f, int(w[f]))
+            w[f"{f}:delta"] = str(round(delta / 10))
+            prev[f] = int(w[f])
     prev = {}
     for w in page:
-        for f in list(f for f in w if f.endswith(":delta")):
-            w[f"{f}:delta"] = w[f] - prev.setdefault(f, w[f])
-            prev[f] = w[f]
+        for f in DELTA_FEATS:
+            delta = int(w[f]) - prev.setdefault(f, int(w[f]))
+            w[f"{f}:delta"] = str(round(delta / 10))
+            prev[f] = int(w[f])
 
 
 def make_rnn_features(
     page: Iterable[T_obj],
-    features: str = "text+layout+structure",
     labels: str = "literal",
 ) -> tuple[list[T_obj], list[str]]:
-    rnn_features = list(
+    crf_features = list(
         dict((name, val) for name, _, val in (w.partition("=") for w in feats))
-        for feats in page2features(list(page), features)
+        for feats in layout_features(page)
     )
-    for f, w in zip(rnn_features, page):
-        f["line:left"] = float(f["line:left"]) / float(w["page_width"])
-        f["line:top"] = float(f["line:top"]) / float(w["page_height"])
-        f["v:top"] = float(w["top"]) / float(w["page_height"])
-        f["v:left"] = float(w["x0"]) / float(w["page_width"])
-        f["v:top"] = float(w["top"]) / float(w["page_height"])
-        f["v:right"] = (float(w["page_width"]) - float(w["x1"])) / float(
-            w["page_width"]
-        )
-        f["v:bottom"] = (float(w["page_height"]) - float(w["bottom"])) / float(
-            w["page_height"]
-        )
-
+    rnn_features = []
+    maxdim = max(float(page[0][x]) for x in ("page_width", "page_height"))
+    prevnum = None
+    for f, w in zip(crf_features, page):
+        elements = w.get("tagstack", "Span").split(";")
+        text = w["text"]
+        fontname = make_fontname(w["fontname"])
+        feats = {
+            "lower": text.lower(),
+            "token": w.get("token", ""),
+            "fontname": fontname,
+            "rgb": w.get("rgb", "#000"),
+            "mctag": w.get("mctag", "P"),
+            "element": elements[-1],
+            "first": f["first"],
+            "last": f["last"],
+            "uppercase": text.isupper(),
+            "title": text.istitle(),
+            "punc": bool(PUNC.match(text)),
+            "endpunc": bool(ENDPUNC.match(text)),
+            "multipunc": bool(MULTIPUNC.match(text)),
+            "numeric": text.isnumeric(),
+            "bold": ("bold" in fontname.lower()),
+            "italic": ("italic" in fontname.lower()),
+        }
+        bullets = {}
+        for pattern in Bullet:
+            m = pattern.value.match(text)
+            # By definition a bullet comes first in the line
+            if m and int(f["first"]):
+                bullets[pattern.name] = m.group(1)
+        feats["bullet"] = len(bullets) > 0
+        sequential = 0
+        if int(f["first"]):
+            if "NUMERIC" in bullets:
+                num = int(bullets["NUMERIC"])
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
+            elif "LOWER" in bullets:
+                num = ord(bullets["LOWER"]) - ord("a")
+                sequential = int(prevnum is None or num - prevnum == 1)
+                prevnum = num
+            # print(bool(sequential), text)
+        feats["sequential"] = sequential
+        for name in BBOX_FEATS:
+            val = float(w[name]) / maxdim * 100
+            feats[name] = str(round(val))
+        for name in LINE_FEATS:
+            val = float(f[name]) / maxdim * 100
+            feats[name] = str(round(val))
+        rnn_features.append(feats)
     add_deltas(rnn_features)
     rnn_labels = list(page2labels(page, labels))
     return rnn_features, rnn_labels
 
 
-FEATNAMES = [
-    "lower",
-    "rgb",
-    "mctag",
+FEATNAMES = (
+    [
+        "lower",
+        "fontname",
+        "rgb",
+        "mctag",
+        "element",
+    ]
+    + BBOX_FEATS
+    + DELTA_FEATS
+    + DELTA_DELTA_FEATS
+    + LINE_FEATS
+)
+
+# Note that these are all binary
+VECNAMES = [
+    "first",
+    "last",
+    "sequential",
     "uppercase",
-    "title",
     "punc",
     "endpunc",
+    "multipunc",
     "numeric",
     "bold",
     "italic",
-    "toc",
-    "header",
-    "head:table",
-    "head:chapitre",
-    "head:annexe",
-    "line:height",
-    "line:indent",
-    "line:gap",
-    "first",
-    "last",
-]
-
-VECNAMES = [
-    "line:left",
-    "line:top",
-    "v:left",
-    "v:top",
-    "v:right",
-    "v:bottom",
-    "v:left:delta",
-    "v:top:delta",
-    "v:right:delta",
-    "v:bottom:delta",
-    "v:left:delta:delta",
-    "v:top:delta:delta",
-    "v:right:delta:delta",
-    "v:bottom:delta:delta",
+    "bullet",
 ]
 
 
-def make_page_feats(feat2id, page):
+def make_page_feats(feat2id, page, featdims):
     return [
         (
-            [feat2id[name].get(feats[name], 0) for name in FEATNAMES],
+            [feat2id[name].get(feats[name], 0) for name in featdims],
             [float(feats[name]) for name in VECNAMES],
         )
         for feats in page
@@ -446,36 +463,51 @@ def make_rnn_data(
     csvs: Iterable[Path],
     word_dim: int = 32,
     feat_dim: int = 8,
-    features: str = "text+layout_structure",
     labels: str = "literal",
+    tokenizer: Union["Tokenizer", None] = None,
+    min_count: int = 5,
 ):
     """Creer le jeu de donnees pour entrainer un modele RNN."""
-    X, y = zip(
-        *(
-            make_rnn_features(p, features=features, labels=labels)
-            for p in split_pages(filter_tab(load(csvs)))
-        )
-    )
+    words = filter_tab(load(csvs))
+    if tokenizer is not None:
+        words = retokenize(words, tokenizer, drop=True)
+    pages = split_pages(words)
+    X, y = zip(*(make_rnn_features(p, labels=labels) for p in pages))
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-    feat2id = {name: {"": 0} for name in FEATNAMES}
+    feat2count = {name: Counter() for name in FEATNAMES}
+    if tokenizer is not None:
+        # FIXME: should use all tokens
+        feat2count["token"] = Counter()
     for feats in itertools.chain.from_iterable(X):
-        for name, ids in feat2id.items():
-            if feats[name] not in ids:
-                ids[feats[name]] = len(ids)
-
+        for name, val in feats.items():
+            if name in feat2count:
+                feat2count[name][val] += 1
+    if tokenizer is not None:
+        del feat2count["lower"]
+    feat2id = {}
+    for name, counts in feat2count.items():
+        ids = feat2id[name] = {"": 0}
+        for val, count in counts.most_common():
+            if count < min_count:
+                break
+            if val not in ids:
+                ids[val] = len(ids)
+        # Eliminate features with only one embedding
+        if len(ids) == 1:
+            del feat2id[name]
+    # FIXME: Should go in train_rnn
+    featdims = dict(
+        (name, word_dim) if name == "lower" else (name, feat_dim) for name in feat2id
+    )
     all_data = [
         (
-            make_page_feats(feat2id, page),
+            make_page_feats(feat2id, page, featdims),
             make_page_labels(label2id, tags),
         )
         for page, tags in zip(X, y)
     ]
-    # FIXME: Should go in train_rnn
-    featdims = dict(
-        (name, word_dim) if name == "lower" else (name, feat_dim) for name in FEATNAMES
-    )
 
     return all_data, featdims, feat2id, label_counts, id2label
 
@@ -484,18 +516,15 @@ def load_rnn_data(
     iobs: Iterable[T_obj],
     feat2id,
     id2label,
-    features: str = "text+layout+structure",
+    featdims,
     labels: str = "literal",
 ):
     """Creer le jeu de donnees pour tester un modele RNN."""
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-    pages = (
-        make_rnn_features(p, features=features, labels=labels)
-        for p in split_pages(iobs)
-    )
+    pages = (make_rnn_features(p, labels=labels) for p in split_pages(iobs))
     all_data = [
         (
-            make_page_feats(feat2id, page),
+            make_page_feats(feat2id, page, featdims),
             make_page_labels(label2id, tags),
         )
         for page, tags in pages
@@ -632,6 +661,15 @@ class RNN(nn.Module):
         inputs: PackedSequence | torch.Tensor
         # https://discuss.pytorch.org/t/how-to-use-pack-sequence-if-we-are-going-to-use-word-embedding-and-bilstm/28184
         if isinstance(features, PackedSequence):
+            # for idx, name in enumerate(self.featdims):
+            #     print(
+            #         "WTF",
+            #         name,
+            #         features.data[:, idx].min(),
+            #         features.data[:, idx].max(),
+            #         features.data[:, idx],
+            #     )
+            #     _ = self.embedding_layers[name](features.data[:, idx])
             stack = [
                 self.embedding_layers[name](features.data[:, idx])
                 for idx, name in enumerate(self.featdims)
@@ -786,7 +824,9 @@ class RNNSegmenteur(Segmenteur):
     def __call__(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
         for p in split_pages(words):
             page, _labels = make_rnn_features(p)
-            features = make_page_feats(self.config["feat2id"], page)
+            features = make_page_feats(
+                self.config["feat2id"], page, self.model.featdims
+            )
             feats, vector = zip(*features)
             batch = (
                 torch.LongTensor(feats, device=self.device),
