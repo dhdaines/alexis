@@ -5,6 +5,7 @@ import csv
 import json
 import logging
 from pathlib import Path
+from typing import Dict
 
 import numpy as np
 import torch
@@ -54,6 +55,9 @@ def make_argparse():
     )
     parser.add_argument("--early-stopping", action="store_true", help="Arret anticipe")
     parser.add_argument(
+        "--min-epochs", type=int, default=40, help="Nombre minimal d'epochs"
+    )
+    parser.add_argument(
         "--patience", default=10, type=int, help="Patience pour arret anticipe"
     )
     parser.add_argument("--seed", default=1381, type=int, help="Graine aléatoire")
@@ -87,6 +91,17 @@ def make_argparse():
         "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
     )
     return parser
+
+
+class MyEarlyStopping(EarlyStopping):
+    def __init__(self, *, min_epochs=0, **kwargs):
+        super().__init__(**kwargs)
+        self.min_epochs = min_epochs
+
+    def on_epoch_end(self, epoch_number: int, logs: Dict):
+        if epoch_number < self.min_epochs:
+            return
+        super().on_epoch_end(epoch_number, logs)
 
 
 def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
@@ -156,10 +171,11 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
                 )
             )
             callbacks.append(
-                EarlyStopping(
+                MyEarlyStopping(
                     monitor="val_fscore_macro",
                     mode="max",
                     patience=args.patience,
+                    min_epochs=args.min_epochs,
                     verbose=True,
                 )
             )
