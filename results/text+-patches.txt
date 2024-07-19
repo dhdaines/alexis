@@ -1,0 +1,20 @@
+               precision    recall  f1-score   support
+
+            O       1.00      0.23      0.38        26
+     B-Alinea       0.75      0.39      0.51       279
+     B-Annexe       1.00      1.00      1.00         4
+    B-Article       0.90      0.42      0.58       111
+   B-Chapitre       0.71      1.00      0.83         5
+     B-Figure       0.00      0.00      0.00         3
+      B-Liste       0.71      0.75      0.73       238
+       B-Pied       1.00      0.56      0.71        45
+    B-Section       1.00      1.00      1.00        15
+B-SousSection       0.75      0.40      0.52        15
+        B-TOC       0.60      0.75      0.67         4
+       B-Tete       0.96      0.98      0.97        44
+      B-Titre       0.40      0.33      0.36        18
+
+    micro avg       0.77      0.55      0.65       807
+    macro avg       0.75      0.60      0.64       807
+ weighted avg       0.79      0.55      0.63       807
+
