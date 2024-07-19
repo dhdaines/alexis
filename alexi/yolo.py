@@ -1,25 +1,34 @@
 import argparse
+import csv
 from pathlib import Path
 
 from ultralytics import YOLO
 import numpy as np
+import pdfplumber
 from pdfplumber.utils.geometry import obj_to_bbox
 
 from alexi import segment
-from alexi.convert import Converteur
+from alexi.convert import FIELDNAMES
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pdf", type=Path)
+    parser.add_argument("csv", type=argparse.FileType("rt"))
+    parser.add_argument("out", type=argparse.FileType("wt"))
     args = parser.parse_args()
 
     docseg_model = YOLO(
         "yolov8x-doclaynet-epoch64-imgsz640-initiallr1e-4-finallr1e-5.pt"
     )
 
-    conv = Converteur(args.pdf)
-    for page, words in zip(conv.pdf.pages, segment.split_pages(conv.extract_words())):
+    pdf = pdfplumber.open(args.pdf)
+    reader = csv.DictReader(args.csv)
+    fieldnames = FIELDNAMES[:]
+    fieldnames.insert(0, "yolo")
+    writer = csv.DictWriter(args.out, fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for page, words in zip(pdf.pages, segment.split_pages(reader)):
         print(f"{page.page_number}:")
         image = page.to_image(resolution=72, antialias=True).original
         results = docseg_model(
@@ -80,18 +89,18 @@ def main():
 
         prev_label = None
         for w in words:
-            bbox = np.array(obj_to_bbox(w))
+            bbox = np.array([float(w) for w in obj_to_bbox(w)])
             ratio = mostly_contained(boxes, bbox)
             # print("ratio", ratio)
             in_box = ratio.argmax()
             in_ratio = ratio.max()
             # print("in_box", in_box, "in_ratio", in_ratio)
-            in_labels = [labels[idx] for idx, val in enumerate(ratio) if val > 0.5]
+            # in_labels = [labels[idx] for idx, val in enumerate(ratio) if val > 0.5]
             label = in_box if in_ratio > 0.5 else None
             iob = "B" if label != prev_label else "I"
             prev_label = label
-            tag = f"{iob}-{labels[label]}" if label is not None else "O"
-            print(w["text"], tag, bbox, in_labels)
+            w["yolo"] = f"{iob}-{labels[label]}" if label is not None else "O"
+            writer.writerow(w)
 
 
 if __name__ == "__main__":
