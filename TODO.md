@@ -45,6 +45,7 @@ Segmentation
   - heuristic chunking based on line gap (not indent) DONE
 - Move Amendement from segmentation to sequence tagging
   - update all training data
+  - compare main and `more_rnn_feats` branches
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings

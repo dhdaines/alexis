@@ -113,7 +113,7 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
         train_loader = DataLoader(
             train_data,
             batch_size=args.batch_size,
-            # shuffle=True,
+            shuffle=True,
             collate_fn=pad_collate_fn,
         )
         dev_data = Subset(all_data, dev_idx)
