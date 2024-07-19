@@ -74,6 +74,10 @@ train = [
           data/*.csv data/patches/*.csv""",
 """python scripts/train_rnn_crf.py --nepoch 1 --freeze -i alexi/models/rnn.pt \\
           -o alexi/models/rnn_crf.pt data/*.csv data/patches/*.csv""",
+"""python scripts/train_crf.py \\
+    --features text+layout --labels bonly \\
+    --outfile alexi/models/crf.vl.joblib.gz \\
+    data/*.csv""",
 """python scripts/train_crf_seq.py \\
     --outfile alexi/models/crfseq.joblib.gz \\
     data/*.csv data/patches/*.csv""",
