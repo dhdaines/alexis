@@ -77,7 +77,7 @@ train = [
 """python scripts/train_crf.py \\
     --features text+layout --labels bonly \\
     --outfile alexi/models/crf.vl.joblib.gz \\
-    data/*.csv""",
+    data/*.csv data/patches/*.csv""",
 """python scripts/train_crf_seq.py \\
     --outfile alexi/models/crfseq.joblib.gz \\
     data/*.csv data/patches/*.csv""",
