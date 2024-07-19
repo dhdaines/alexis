@@ -46,6 +46,9 @@ Segmentation
 - Move Amendement from segmentation to sequence tagging
   - update all training data
   - compare main and `more_rnn_feats` branches
+- Do pre-segmentation with YOLO+DocLayNet
+  - get bboxes and classes DONE
+  - 
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings
