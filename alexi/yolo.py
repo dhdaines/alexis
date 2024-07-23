@@ -47,6 +47,8 @@ def main():
             _, b = e
             return (b[1], b[0], -(b[3] - b[1]), -(b[2] - b[0]))
 
+        if len(entry.boxes.xyxy) == 0:
+            continue
         ordering, boxes = zip(
             *sorted(
                 enumerate(bbox.cpu().numpy() for bbox in entry.boxes.xyxy),

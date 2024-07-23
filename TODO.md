@@ -26,9 +26,6 @@ Pre-training
   - We could redo their extraction with French data
 - Look at other document structure analysis models
   - DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
-    - Yes: it separates paragraphs and section headings
-    - Need to download the huge image archive to get this though ;(
-  - Check out its leaderboard
 - Evaluate models already trained on DocLayNet:
   - https://github.com/moured/YOLOv10-Document-Layout-Analysis
   - https://huggingface.co/spaces/atlury/document-layout-comparison
@@ -51,12 +48,10 @@ Segmentation
   - Could *possibly* train a CRF to do this, in fact DONE
 - Do prediction with Transformers (LayoutLM) DONE
   - heuristic chunking based on line gap (not indent) DONE
-- Move Amendement from segmentation to sequence tagging
-  - update all training data
-  - compare main and `more_rnn_feats` branches
-- Do pre-segmentation with YOLO+DocLayNet
-  - get bboxes and classes DONE
-  - 
+- Move Amendement from segmentation to sequence tagging DONE
+- Do pre-segmentation with YOLO+DocLayNet DONE
+- Integrate DocLayNet pre-segmentation into pipeline
+  - Do image/table identification with it
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings
