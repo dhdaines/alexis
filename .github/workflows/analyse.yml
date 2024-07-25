@@ -53,14 +53,18 @@ jobs:
             done
         done
         alexi -v download -u https://vsadm.ca/citoyens/reglementation/reglementation-durbanisme/ -o download/vsadm --all-pdf-links
+        alexi -v download -u https://www.vss.ca/services-aux-citoyens/services/reglementation-durbanisme/ \
+              -o download/vss --all-pdf-links -x '[Aa]nnexe'
     - name: Extract
       run: |
         alexi -v extract -m download/index.json download/*.pdf
         alexi -v extract -m download/vsadm/index.json -o export/vsadm download/vsadm/*.pdf
+        alexi -v extract -m download/vss/index.json -o export/vss download/vss/*.pdf
     - name: Index
       run: |
         alexi -v index -o export/_idx export
         alexi -v index -o export/vsadm/_idx export/vsadm
+        alexi -v index -o export/vss/_idx export/vss
     - name: Setup Pages
       uses: actions/configure-pages@v5
     - name: Upload artifact

@@ -40,6 +40,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--csv", help="Fichier CSV corriger pour mettre à jour la visualisation"
     )
+    parser.add_argument("--force", help="Réécrire le fichier CSV même si existant")
     parser.add_argument("doc", help="Document en PDF", type=Path)
     parser.add_argument("out", help="Nom de base des fichiers de sortie", type=Path)
     return parser
@@ -136,14 +137,20 @@ def main(args: argparse.Namespace) -> None:
     """Ajouter des anotations à un PDF selon l'extraction ALEXI"""
     pages = [int(x.strip()) for x in args.pages.split(",")]
     pages.sort()
+    maybe_csv = args.out.with_suffix(".csv")
+    if args.csv is None:
+        if maybe_csv.exists() and not args.force:
+            LOGGER.warning(
+                "Utilisation du fichier CSV déjà existant: %s "
+                "(pour réecrire ajouter --force)",
+                args.csv,
+            )
+            args.csv = maybe_csv
     if args.csv is not None:
         with open(args.csv, "rt", encoding="utf-8-sig") as infh:
             iob = list(csv.DictReader(infh))
     else:
-        args.csv = args.out.with_suffix(".csv")
-        if args.csv.exists():
-            LOGGER.error("Fichier déjà existant: %s", args.csv)
-            return
+        args.csv = maybe_csv
         if args.segment_model is not None:
             crf = Segmenteur(args.segment_model)
             crf_n = crf

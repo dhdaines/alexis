@@ -83,6 +83,8 @@ def main(args: argparse.Namespace) -> None:
         soup = BeautifulSoup(infh, "lxml")
         if args.all_pdf_links:
             for a in soup.find_all("a"):
+                if "href" not in a.attrs:
+                    continue
                 path = a["href"]
                 if path.lower().endswith(".pdf"):
                     paths.append(path)
