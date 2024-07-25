@@ -18,11 +18,8 @@ dependencies = [
     "pdfplumber",
     "scikit-learn",
     "sklearn-crfsuite",
-    "tokenizers",
     "lunr[languages]",
     "unidecode",
-    "torch",
-    "allennlp-light",  # it is not very light
 ]
 [project.optional-dependencies]
 dev = [
@@ -35,6 +32,9 @@ dev = [
   "pytest",
   "pytest-cov",
   "poutyne",
+  "tokenizers",
+  "torch",
+  "allennlp-light",  # it is not very light
 ]
 
 [project.scripts]
