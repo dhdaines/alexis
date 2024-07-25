@@ -140,6 +140,10 @@ def main(args: argparse.Namespace) -> None:
         with open(args.csv, "rt", encoding="utf-8-sig") as infh:
             iob = list(csv.DictReader(infh))
     else:
+        args.csv = args.out.with_suffix(".csv")
+        if args.csv.exists():
+            LOGGER.error("Fichier déjà existant: %s", args.csv)
+            return
         if args.segment_model is not None:
             crf = Segmenteur(args.segment_model)
             crf_n = crf
@@ -155,7 +159,7 @@ def main(args: argparse.Namespace) -> None:
         else:
             segs = crf(feats)
         iob = list(spread_i(crf_s(segs)))
-        with open(args.out.with_suffix(".csv"), "wt") as outfh:
+        with open(args.csv, "wt") as outfh:
             write_csv(iob, outfh)
     annotate_pdf(args.doc, pages, iob, args.out.with_suffix(".pdf"))
 

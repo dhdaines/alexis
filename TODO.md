@@ -3,7 +3,10 @@ DATA
 
 - Correct titles in zonage glossary
 - Correct extraction (see below, use RNN) of titles numbers etc
-- Annotate multiple TOCs in Sainte-Agathe urbanisme
+- Annotate multiple TOCs in Sainte-Agathe urbanisme DONE
+- Add Sainte-Agathe to download DONE
+- Add Sainte-Agathe to export (under /vsadm) DONE
+- Do the same thing for Saint-Sauveur
 
 DERP LERNING
 ------------

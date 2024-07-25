@@ -20,9 +20,7 @@ from alexi.segment import (
     page2labels,
     split_pages,
     filter_tab,
-    retokenize,
 )
-from tokenizers import Tokenizer
 
 LOGGER = logging.getLogger("train-crf")
 
@@ -35,7 +33,9 @@ def make_argparse():
     parser.add_argument(
         "--niter", default=200, type=int, help="Nombre d'iterations d'entrainement"
     )
-    parser.add_argument("--features", default="text+layout+structure", help="Extracteur de traits")
+    parser.add_argument(
+        "--features", default="text+layout+structure", help="Extracteur de traits"
+    )
     parser.add_argument("--labels", default="literal", help="Transformateur de classes")
     parser.add_argument("-n", default=2, type=int, help="Largeur du contexte de traits")
     parser.add_argument(
@@ -60,9 +60,6 @@ def make_argparse():
     )
     parser.add_argument("-o", "--outfile", help="Fichier destination pour modele")
     parser.add_argument("-s", "--scores", help="Fichier destination pour évaluations")
-    parser.add_argument(
-        "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
-    )
     return parser
 
 
@@ -144,9 +141,6 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     data = filter_tab(load(args.csvs))
-    if args.tokenize:
-        tokenizer = Tokenizer.from_pretrained("camembert-base")
-        data = retokenize(data, tokenizer)
     pages = list(split_pages(data))
     X = [page2features(s, args.features, args.n) for s in pages]
     y = [page2labels(s, args.labels) for s in pages]

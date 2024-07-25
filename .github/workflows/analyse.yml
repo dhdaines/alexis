@@ -52,12 +52,15 @@ jobs:
                 fi
             done
         done
+        alexi -v download -u https://vsadm.ca/citoyens/reglementation/reglementation-durbanisme/index.html -o download/vsadm --all-pdf-links
     - name: Extract
       run: |
         alexi -v extract -m download/index.json download/*.pdf
+        alexi -v extract -m download/vsadm/index.json -o export/vsadm download/vsadm/*.pdf
     - name: Index
       run: |
         alexi -v index export
+        alexi -v index export/vsadm
     - name: Setup Pages
       uses: actions/configure-pages@v5
     - name: Upload artifact
