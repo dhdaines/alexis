@@ -20,6 +20,7 @@ dependencies = [
     "sklearn-crfsuite",
     "lunr[languages]",
     "unidecode",
+    "natsort",
 ]
 [project.optional-dependencies]
 dev = [
