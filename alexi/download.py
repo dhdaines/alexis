@@ -42,7 +42,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--all-pdf-links",
         action="store_true",
-        help="Télécharger les liens vers des PDF dans le document sans égard à sa structure",
+        help="Télécharger les liens vers des PDF dans le document "
+        "sans égard à sa structure",
     )
     parser.add_argument(
         "section",
