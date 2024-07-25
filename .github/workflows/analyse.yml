@@ -52,7 +52,7 @@ jobs:
                 fi
             done
         done
-        alexi -v download -u https://vsadm.ca/citoyens/reglementation/reglementation-durbanisme/index.html -o download/vsadm --all-pdf-links
+        alexi -v download -u https://vsadm.ca/citoyens/reglementation/reglementation-durbanisme/ -o download/vsadm --all-pdf-links
     - name: Extract
       run: |
         alexi -v extract -m download/index.json download/*.pdf

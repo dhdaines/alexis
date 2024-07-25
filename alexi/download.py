@@ -57,6 +57,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
 def main(args: argparse.Namespace) -> None:
     u = urllib.parse.urlparse(args.url)
     LOGGER.info("Downloading %s", args.url)
+    args.outdir.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
             [
@@ -75,7 +76,10 @@ def main(args: argparse.Namespace) -> None:
             raise
     excludes = [re.compile(r) for r in args.exclude]
     paths = []
-    with open(args.outdir / Path(u.path).name) as infh:
+    index = args.outdir / Path(u.path).name
+    if not index.exists():
+        index = args.outdir / "index.html"
+    with open(index) as infh:
         soup = BeautifulSoup(infh, "lxml")
         if args.all_pdf_links:
             for a in soup.find_all("a"):
