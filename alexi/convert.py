@@ -82,6 +82,10 @@ def get_rgb(c: T_obj) -> str:
         r = g = b = couleur[0]
     elif len(couleur) == 3:
         r, g, b = couleur
+    elif len(couleur) == 4:
+        return "CMYK#" + "".join(
+            ("%x" % int(min(0.999, val) * 16) for val in (couleur))
+        )
     else:
         LOGGER.warning("Espace couleur non pris en charge: %s", couleur)
         return "#000"
