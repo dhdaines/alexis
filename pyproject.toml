@@ -23,6 +23,7 @@ dependencies = [
     "unidecode",
     "torch",
     "allennlp-light",  # it is not very light
+    "natsort",
 ]
 [project.optional-dependencies]
 dev = [

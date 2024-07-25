@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 from typing import Any, Iterable, Optional, TextIO
 
+from natsort import natsorted
+
 from alexi.analyse import Analyseur, Bloc, Document, Element, extract_zonage
 from alexi.convert import Converteur
 from alexi.format import HtmlFormatter
@@ -301,7 +303,16 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> dict[str, dict[str, str
 </html>
 """
     metadata = {}
-    docs.sort(key=operator.attrgetter("numero"))
+
+    def doc_sort_key(doc):
+        if doc.numero != "":
+            return f"{doc.numero}: {doc.titre}"
+        elif doc.fileid.startswith("RUD_T"):  # FIXME: Very special case here
+            return f"843: Règlement d’urbanisme durable: {doc.titre}"
+        else:
+            return doc.titre
+
+    docs = natsorted(docs, key=doc_sort_key)
     with open(outdir / "index.html", "wt") as outfh:
         LOGGER.info("Génération de %s", outdir / "index.html")
         outfh.write(HTML_HEADER)
@@ -309,9 +320,7 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> dict[str, dict[str, str
             outfh.write('<li class="Document node"><details>\n')
             # Make fragment links to this ID expand the document (as
             # we usually do not want to link to the full text)
-            outfh.write(
-                f'<summary id="{doc.fileid}">{doc.numero}: {doc.titre}</summary>\n'
-            )
+            outfh.write(f'<summary id="{doc.fileid}">{doc_sort_key(doc)}</summary>\n')
             make_doc_subtree(doc, outfh)
             outfh.write("</details></li>\n")
             doc_metadata = {
@@ -353,6 +362,9 @@ class Extracteur:
         if metadata:
             with open(metadata, "rt") as infh:
                 self.pdfdata = json.load(infh)
+                for key in list(self.pdfdata.keys()):
+                    if "%20" in key:
+                        self.pdfdata[key.replace("%20", " ")] = self.pdfdata[key]
         else:
             self.pdfdata = {}
         self.metadata = {"pdfs": self.pdfdata}
