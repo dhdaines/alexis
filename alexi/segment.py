@@ -16,6 +16,7 @@ import torch
 from allennlp_light.modules.conditional_random_field import (
     ConditionalRandomFieldWeightTrans,
 )
+from tokenizers import Tokenizer  # type: ignore
 from torch import nn
 from torch.nn.utils.rnn import (
     PackedSequence,
@@ -33,9 +34,6 @@ DEFAULT_MODEL = Path(__file__).parent / "models" / "crf.joblib.gz"
 DEFAULT_MODEL_NOSTRUCT = Path(__file__).parent / "models" / "crf.vl.joblib.gz"
 DEFAULT_RNN_MODEL = Path(__file__).parent / "models" / "rnn.pt"
 FeatureFunc = Callable[[Sequence[T_obj]], Iterator[list[str]]]
-
-if False:
-    from tokenizers import Tokenizer  # type: ignore
 
 
 class Bullet(Enum):
@@ -74,7 +72,7 @@ def structure_features(page: Iterable[T_obj]) -> Iterator[list[str]]:
 def layout_features(page: Iterable[T_obj]) -> Iterator[list[str]]:
     """Traits de mise en page pour entrainement d'un modèle."""
     # Split page into lines
-    lines = list(line_breaks(page))
+    lines = list(line_breaks(list(page)))
     prev_line_features: dict[str, int] = {}
     for line in lines:
         page_height = int(line[0]["page_height"])
@@ -352,7 +350,7 @@ def add_deltas(page):
 
 
 def make_rnn_features(
-    page: Iterable[T_obj],
+    page: Sequence[T_obj],
     labels: str = "literal",
 ) -> tuple[list[T_obj], list[str]]:
     crf_features = list(
@@ -476,7 +474,7 @@ def make_rnn_data(
     label_counts = Counter(itertools.chain.from_iterable(y))
     id2label = sorted(label_counts.keys(), reverse=True)
     label2id = dict((label, idx) for (idx, label) in enumerate(id2label))
-    feat2count = {name: Counter() for name in FEATNAMES}
+    feat2count: dict[str, Counter] = {name: Counter() for name in FEATNAMES}
     if tokenizer is not None:
         # FIXME: should use all tokens
         feat2count["token"] = Counter()
