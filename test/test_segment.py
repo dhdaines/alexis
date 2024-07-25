@@ -59,5 +59,5 @@ def test_retokenize():
         tokenizer = MockTokenizer()
         retokenized = retokenize(iobs, tokenizer)
         assert iobs != retokenized
-        detokenized = list(detokenize(retokenized, tokenizer))
+        detokenized = list(detokenize(retokenized))
         assert iobs == detokenized

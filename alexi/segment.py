@@ -275,6 +275,40 @@ def filter_tab(words: Iterable[T_obj]) -> Iterator[T_obj]:
         yield w
 
 
+def retokenize(
+    words: Iterable[T_obj], tokenizer, drop: bool = False
+) -> Iterator[T_obj]:
+    """Refaire la tokenisation en alignant les traits et etiquettes."""
+    for widx, w in enumerate(words):
+        e = tokenizer.encode(w["text"], add_special_tokens=False)
+        for tidx, (tok, tid) in enumerate(zip(e.tokens, e.ids)):
+            wt = w.copy()
+            wt["token"] = tok
+            wt["word_id"] = widx
+            wt["token_id"] = tid
+            if tidx > 0:
+                if drop:
+                    continue
+                for ltype in "sequence", "segment":
+                    if ltype in w:
+                        label = w[ltype]
+                        if label and label[0] == "B":
+                            wt[ltype] = f"I-{label[2:]}"
+            yield wt
+
+
+def detokenize(words: Iterable[T_obj]) -> Iterator[T_obj]:
+    """Defaire la retokenisation"""
+    widx = -1
+    for w in words:
+        if w["word_id"] != widx:
+            widx = w["word_id"]
+            del w["token"]
+            del w["word_id"]
+            del w["token_id"]
+            yield w
+
+
 def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
     for p in paths:
         with open(Path(p), "rt") as infh:
