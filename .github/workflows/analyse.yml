@@ -59,8 +59,8 @@ jobs:
         alexi -v extract -m download/vsadm/index.json -o export/vsadm download/vsadm/*.pdf
     - name: Index
       run: |
-        alexi -v index export
-        alexi -v index export/vsadm
+        alexi -v index -o export/_idx export
+        alexi -v index -o export/vsadm/_idx export/vsadm
     - name: Setup Pages
       uses: actions/configure-pages@v5
     - name: Upload artifact
