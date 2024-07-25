@@ -237,7 +237,7 @@ class Document:
     """Document avec blocs de texte et structure."""
 
     fileid: str
-    meta: dict[str, str]
+    meta: dict[str, list[str]]
     paliers: dict[str, list[Element]]
     contenu: list[Bloc]
     unknown_id: int = 0
