@@ -70,10 +70,10 @@ format = [
   "isort alexi test",
 ]
 train = [
-"""python scripts/train_rnn.py --nepoch 45 -o alexi/models/rnn.pt \\
-          data/*.csv data/patches/*.csv""",
-"""python scripts/train_rnn_crf.py --nepoch 1 --freeze -i alexi/models/rnn.pt \\
-          -o alexi/models/rnn_crf.pt data/*.csv data/patches/*.csv""",
+# """python scripts/train_rnn.py --nepoch 45 -o alexi/models/rnn.pt \\
+#           data/*.csv data/patches/*.csv""",
+# """python scripts/train_rnn_crf.py --nepoch 1 --freeze -i alexi/models/rnn.pt \\
+#           -o alexi/models/rnn_crf.pt data/*.csv data/patches/*.csv""",
 """python scripts/train_crf.py \\
     --features text+layout+structure --labels bonly \\
     --outfile alexi/models/crf.joblib.gz \\
