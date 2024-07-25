@@ -40,6 +40,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         default=[],
     )
     parser.add_argument(
+        "--all-pdf-links",
+        action="store_true",
+        help="Télécharger les liens vers des PDF dans le document "
+        "sans égard à sa structure",
+    )
+    parser.add_argument(
         "section",
         help="Expression régulière pour sélectionner la section des documents",
         default=r"urbanisme",
@@ -71,19 +77,25 @@ def main(args: argparse.Namespace) -> None:
     paths = []
     with open(args.outdir / Path(u.path).name) as infh:
         soup = BeautifulSoup(infh, "lxml")
-        for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
-            ul = h2.find_next("ul")
-            for li in ul.find_all("li"):
-                path = li.a["href"]
-                excluded = False
-                for r in excludes:
-                    if r.search(path):
-                        excluded = True
-                        break
-                if not excluded:
+        if args.all_pdf_links:
+            for a in soup.find_all("a"):
+                path = a["href"]
+                if path.lower().endswith(".pdf"):
                     paths.append(path)
+        else:
+            for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
+                ul = h2.find_next("ul")
+                for li in ul.find_all("li"):
+                    paths.append(li.a["href"])
     urls = {}
     for p in paths:
+        excluded = False
+        for r in excludes:
+            if r.search(p):
+                excluded = True
+                break
+        if excluded:
+            continue
         up = urllib.parse.urlparse(p)
         if up.netloc:
             url = p
