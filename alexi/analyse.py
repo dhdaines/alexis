@@ -417,11 +417,10 @@ class Analyseur:
         self.fileid = fileid
         self.words: list[T_obj] = list(words)
         self.blocs: list[Bloc] = list(group_iob(self.words, "segment"))
-        self.metadata: dict[str, str] = {}
+        self.metadata: dict[str, list[str]] = {}
         for bloc in group_iob(self.words, "sequence"):
-            if bloc.type not in self.metadata:
-                LOGGER.info(f"{bloc.type}: {bloc.texte}")
-                self.metadata[bloc.type] = bloc.texte
+            LOGGER.info(f"sequence {bloc.type}: {bloc.texte}")
+            self.metadata.setdefault(bloc.type, []).append(bloc.texte)
 
     def add_images(self, images: Iterable[Bloc], merge: bool = True):
         """Insérer les images en les fusionnant avec le texte (et entre elles)
@@ -459,8 +458,8 @@ class Analyseur:
         blocs: Optional[Iterable[Bloc]] = None,
     ) -> Document:
         """Analyse du structure d'un document."""
-        titre = self.metadata.get("Titre", "Document")
-        numero = self.metadata.get("Numero", "")
+        titre = self.metadata.get("Titre", ["Document"])[0]
+        numero = self.metadata.get("Numero", [""])[0]
         if m := re.search(r"(?i:num[ée]ro)\s+([0-9][A-Z0-9-]+)", titre):
             LOGGER.info("Numéro extrait du titre: %s", m.group(1))
             numero = m.group(1)
