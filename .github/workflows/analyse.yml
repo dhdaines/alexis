@@ -37,7 +37,7 @@ jobs:
       id: cache-downloads
       uses: actions/cache@v4
       with:
-        path: download/*.pdf
+        path: download
         key: reglements-urbanisme
     - name: Download
       run: |
