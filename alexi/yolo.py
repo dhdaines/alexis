@@ -6,6 +6,7 @@ from ultralytics import YOLO
 import numpy as np
 import pdfplumber
 from pdfplumber.utils.geometry import obj_to_bbox
+from huggingface_hub import hf_hub_download
 
 from alexi import segment
 from alexi.convert import FIELDNAMES
@@ -18,9 +19,11 @@ def main():
     parser.add_argument("out", type=argparse.FileType("wt"))
     args = parser.parse_args()
 
-    docseg_model = YOLO(
-        "yolov8x-doclaynet-epoch64-imgsz640-initiallr1e-4-finallr1e-5.pt"
+    yolo_model = hf_hub_download(
+        repo_id="DILHTWD/documentlayoutsegmentation_YOLOv8_ondoclaynet",
+        filename="yolov8x-doclaynet-epoch64-imgsz640-initiallr1e-4-finallr1e-5.pt",
     )
+    docseg_model = YOLO(yolo_model)
 
     pdf = pdfplumber.open(args.pdf)
     reader = csv.DictReader(args.csv)

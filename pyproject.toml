@@ -21,6 +21,7 @@ dependencies = [
     "lunr[languages]",
     "unidecode",
     "natsort",
+    "huggingface-hub",
 ]
 [project.optional-dependencies]
 dev = [
