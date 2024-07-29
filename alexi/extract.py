@@ -438,6 +438,7 @@ class Extracteur:
 
     def output_json(self):
         """Sauvegarder les metadonnées"""
+        self.metadata["urls"] = sorted(self.resolver.urls)
         with open(self.outdir / "index.json", "wt") as outfh:
             LOGGER.info("Génération de %s", self.outdir / "index.json")
             json.dump(self.metadata, outfh, indent=2, ensure_ascii=False)

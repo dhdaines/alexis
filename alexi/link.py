@@ -55,6 +55,7 @@ class Resolver:
         self.metadata = {"docs": {}} if metadata is None else metadata
         self.numeros = {}
         self.titles = {}
+        self.urls = set()
         for docpath, info in self.metadata["docs"].items():
             self.numeros[info["numero"]] = docpath
             self.titles[normalize_title(info["titre"])] = docpath
@@ -202,6 +203,7 @@ class Resolver:
             url = "https://www.legisquebec.gouv.qc.ca/fr/document/lc/Q-2"
         else:
             return None
+        self.urls.add(url)
         for m in SEC_RE.finditer(text):
             sectype = m.group("sec")
             num = m.group("num")
