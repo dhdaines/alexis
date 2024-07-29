@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from pdfplumber.utils.geometry import obj_to_bbox
 import pytest
+from pdfplumber.utils.geometry import obj_to_bbox
 
 from alexi.convert import Converteur
 from alexi.recognize import Objets, bbox_contains
