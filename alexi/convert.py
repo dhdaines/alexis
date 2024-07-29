@@ -74,22 +74,23 @@ def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> 
 
 
 def get_rgb(c: T_obj) -> str:
-    """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
+    """Extraire la couleur d'un objet en chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
-    if couleur is None:
+    if couleur is None or couleur == "":
         return "#000"
     elif len(couleur) == 1:
-        r = g = b = couleur[0]
-    elif len(couleur) == 3:
-        r, g, b = couleur
-    elif len(couleur) == 4:
-        return "CMYK#" + "".join(
-            ("%x" % int(min(0.999, val) * 16) for val in (couleur))
+        return "#" + "".join(
+            (
+                "%x" % int(min(0.999, val) * 16)
+                for val in (couleur[0], couleur[0], couleur[0])
+            )
         )
+    elif len(couleur) == 3 or len(couleur) == 4:
+        # Could be RGB, RGBA, CMYK...
+        return "#" + "".join(("%x" % int(min(0.999, val) * 16) for val in couleur))
     else:
         LOGGER.warning("Espace couleur non pris en charge: %s", couleur)
         return "#000"
-    return "#" + "".join(("%x" % int(min(0.999, val) * 16) for val in (r, g, b)))
 
 
 def get_word_features(
