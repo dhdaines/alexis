@@ -3,15 +3,7 @@ DATA
 
 - Correct titles in zonage glossary
 - Correct extraction (see below, use RNN) of titles numbers etc
-<<<<<<< Updated upstream
-- Annotate multiple TOCs in Sainte-Agathe urbanisme DONE
-- Add Sainte-Agathe to download DONE
-- Add Sainte-Agathe to export (under /vsadm) DONE
-- Do the same thing for Saint-Sauveur
-=======
-- Annotate multiple TOCs in Sainte-Agathe urbanisme
 - Redo alexi download to not use wget (httpx is nice)
->>>>>>> Stashed changes
 
 DERP LERNING
 ------------
@@ -19,18 +11,25 @@ DERP LERNING
 Pre-training
 ============
 
-- DocBank is not useful unfortunately
-  - No BIO tags on paragraphs and list items (WTF Microsoft!)
-  - Hard to even get their dataset and it is full of junk
-  - But their extraction *is* useful
-  - We could redo their extraction with French data
-- Look at other document structure analysis models
-  - DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
-- Evaluate models already trained on DocLayNet:
-  - https://github.com/moured/YOLOv10-Document-Layout-Analysis
-  - https://huggingface.co/spaces/atlury/document-layout-comparison
-  - https://huggingface.co/DILHTWD/documentlayoutsegmentation_YOLOv8_ondoclaynet
-  - https://huggingface.co/spaces/omoured/YOLOv10-Document-Layout-Analysis
+- DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
+  - Specifically the legal subset
+- PubLayNet maybe (check the annotations)
+- Evaluating DocLayNet YOLO models for my task: DONE
+  - can simply evaluate F1 on entire train set DONE
+  - test dpi, antialias, rendering engines DONE
+  - best results: resize to YOLO model size (max dimension 640px) with antialiasing
+    - integrate this with existing PDF rendering
+- Other pre-trained DocLayNet models?
+  - pre-train Detectron2 / SSD / R-CNN / other?
+- Pre-train ALEXI LSTM on LAU and other relevant laws (code civil, etc)
+  - Get list of URLs from alexi link
+  - NOTE: license does not permit redistribution, use for modeling
+    (especially for layout analysis) should be okay though
+  - Make a script for downloading and processing data
+- Pre-train an LSTM on DocLayNet legal?
+  - Generic Titre, Alinea, Liste only
+  - Layout embeddings and binary features only
+  
 
 Segmentation
 ============
