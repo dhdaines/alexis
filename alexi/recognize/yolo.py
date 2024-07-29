@@ -1,6 +1,9 @@
 import argparse
 import csv
+import re
+from os import PathLike
 from pathlib import Path
+from typing import Union
 
 from ultralytics import YOLO
 import numpy as np
@@ -10,11 +13,41 @@ from huggingface_hub import hf_hub_download
 
 from alexi import segment
 from alexi.convert import FIELDNAMES
+from alexi.segment import Objets
+
+
+def scale_to_model(page, modeldim):
+    """Find scaling factor for model dimension."""
+    maxdim = max(page.width, page.height)
+    return modeldim / maxdim * 72
+
+
+class ObjetsYOLO(Objets):
+    """Détecteur d'objects textuels utilisant YOLOv8 (pré-entraîné sur
+    DocLayNet mais d'autres seront possibles).
+    """
+
+    def __init__(self, yolo_weights: Union[PathLike, None] = None):
+        if yolo_weights is None:
+            yolo_weights = hf_hub_download(
+                repo_id="DILHTWD/documentlayoutsegmentation_YOLOv8_ondoclaynet",
+                filename="yolov8x-doclaynet-epoch64-imgsz640-initiallr1e-4-finallr1e-5.pt",
+            )
+        self.model = YOLO(yolo_weights)
+
+    def __call__(self, pdf_path: PathLike):
+        """Extraire les rectangles correspondant aux objets"""
+        # FIXME: pdfplumber not necessary here, should use pypdfium2 directly
+        pdf = pdfplumber.open(pdf_path)
+        images = (
+            page.to_image(resolution=scale_to_model(page, 640), antialias=True).original
+            for page in pdf.pages
+        )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("pdf", type=Path)
+    parser.add_argument("pdf_or_png", type=Path)
     parser.add_argument("csv", type=argparse.FileType("rt"))
     parser.add_argument("out", type=argparse.FileType("wt"))
     args = parser.parse_args()
@@ -25,15 +58,29 @@ def main():
     )
     docseg_model = YOLO(yolo_model)
 
-    pdf = pdfplumber.open(args.pdf)
+    if args.pdf_or_png.exists():
+        pdf = pdfplumber.open(args.pdf_or_png)
+        images = (
+            page.to_image(resolution=scale_to_model(page, 640), antialias=True).original
+            for page in pdf.pages
+        )
+    else:
+        pngdir = args.pdf_or_png.parent
+        pngre = re.compile(re.escape(args.pdf_or_png.name) + r"-(\d+)\.png")
+        pngs = []
+        for path in pngdir.iterdir():
+            m = pngre.match(path.name)
+            if m is None:
+                continue
+            pngs.append((int(m.group(1)), path))
+        images = (path for _idx, path in sorted(pngs))
+
     reader = csv.DictReader(args.csv)
     fieldnames = FIELDNAMES[:]
     fieldnames.insert(0, "yolo")
     writer = csv.DictWriter(args.out, fieldnames, extrasaction="ignore")
     writer.writeheader()
-    for page, words in zip(pdf.pages, segment.split_pages(reader)):
-        print(f"{page.page_number}:")
-        image = page.to_image(resolution=72, antialias=True).original
+    for image, words in zip(images, segment.split_pages(reader)):
         results = docseg_model(
             source=image,
             show_labels=True,
@@ -42,7 +89,6 @@ def main():
         )
         assert len(results) == 1
         entry = results[0]
-        entry.save(Path("output") / f"page{page.page_number}.png")
 
         # Probably should do some kind of spatial indexing
         def boxsort(e):
@@ -59,7 +105,15 @@ def main():
             )
         )
         labels = [entry.names[entry.boxes.cls[idx].item()] for idx in ordering]
+        page_width, page_height = float(words[0]["page_width"]), float(
+            words[0]["page_height"]
+        )
+        img_height, img_width = entry.orig_shape
+        print("scale x", page_width / img_width)
+        print("scale y", page_height / img_height)
         boxes = np.array(boxes)
+        boxes[:, [0, 2]] = boxes[:, [0, 2]] * page_width / img_width
+        boxes[:, [1, 3]] = boxes[:, [1, 3]] * page_height / img_height
         for label, box in zip(labels, boxes):
             print(label, box)
 
