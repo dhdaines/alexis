@@ -37,6 +37,10 @@ dev = [
   "pytest-cov",
   "poutyne",
 ]
+yolo = [
+    "huggingface-hub",
+    "ultralytics",
+]
 
 [project.scripts]
 alexi = "alexi:main"

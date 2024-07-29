@@ -7,15 +7,13 @@ Ce module est le point d'entrée principale pour le logiciel ALEXI.
 import argparse
 import csv
 import dataclasses
-import itertools
 import json
 import logging
-import operator
 import sys
 from pathlib import Path
 
 from . import annotate, download, extract
-from .analyse import Analyseur, Bloc, merge_overlaps
+from .analyse import Analyseur, Bloc
 from .convert import Converteur, write_csv
 from .format import format_html
 from .index import index
@@ -36,24 +34,6 @@ def convert_main(args: argparse.Namespace):
     else:
         pages = None
     conv = Converteur(args.pdf)
-    if args.images is not None:
-        args.images.mkdir(parents=True, exist_ok=True)
-        images: list[dict] = []
-        for _, group in itertools.groupby(
-            conv.extract_images(pages), operator.attrgetter("page_number")
-        ):
-            merged = merge_overlaps(group)
-            for bloc in merged:
-                images.append(dataclasses.asdict(bloc))
-                img = (
-                    conv.pdf.pages[bloc.page_number - 1]
-                    .crop(bloc.bbox)
-                    .to_image(resolution=150, antialias=True)
-                )
-                LOGGER.info("Extraction de %s", args.images / bloc.img)
-                img.save(args.images / bloc.img)
-        with open(args.images / "images.json", "wt") as outfh:
-            json.dump(images, outfh, indent=2)
     write_csv(conv.extract_words(pages), sys.stdout)
 
 
@@ -134,9 +114,6 @@ def make_argparse() -> argparse.ArgumentParser:
     )
     convert.add_argument(
         "--pages", help="Liste de numéros de page à extraire, séparés par virgule"
-    )
-    convert.add_argument(
-        "--images", help="Répertoire pour écrire des images des tableaux", type=Path
     )
     convert.set_defaults(func=convert_main)
 

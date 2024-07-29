@@ -3,10 +3,7 @@ DATA
 
 - Correct titles in zonage glossary
 - Correct extraction (see below, use RNN) of titles numbers etc
-- Annotate multiple TOCs in Sainte-Agathe urbanisme DONE
-- Add Sainte-Agathe to download DONE
-- Add Sainte-Agathe to export (under /vsadm) DONE
-- Do the same thing for Saint-Sauveur
+- Redo alexi download to not use wget (httpx is nice)
 
 DERP LERNING
 ------------
@@ -14,21 +11,25 @@ DERP LERNING
 Pre-training
 ============
 
-- DocBank is not useful unfortunately
-  - No BIO tags on paragraphs and list items (WTF Microsoft!)
-  - Hard to even get their dataset and it is full of junk
-  - But their extraction *is* useful
-  - We could redo their extraction with French data
-- Look at other document structure analysis models
-  - DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
-    - Yes: it separates paragraphs and section headings
-    - Need to download the huge image archive to get this though ;(
-  - Check out its leaderboard
-- Evaluate models already trained on DocLayNet:
-  - https://github.com/moured/YOLOv10-Document-Layout-Analysis
-  - https://huggingface.co/spaces/atlury/document-layout-comparison
-  - https://huggingface.co/DILHTWD/documentlayoutsegmentation_YOLOv8_ondoclaynet
-  - https://huggingface.co/spaces/omoured/YOLOv10-Document-Layout-Analysis
+- DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
+  - Specifically the legal subset
+- PubLayNet maybe (check the annotations)
+- Evaluating DocLayNet YOLO models for my task: DONE
+  - can simply evaluate F1 on entire train set DONE
+  - test dpi, antialias, rendering engines DONE
+  - best results: render at YOLO model size (max dimension 640px) with
+    antialiasing using Cairo (pdfium is less good... why?) DONE
+- Other pre-trained DocLayNet models?
+  - pre-train Detectron2 / SSD / R-CNN / other?
+- Pre-train ALEXI LSTM on LAU and other relevant laws (code civil, etc)
+  - Get list of URLs from alexi link
+  - NOTE: license does not permit redistribution, use for modeling
+    (especially for layout analysis) should be okay though
+  - Make a script for downloading and processing data
+- Pre-train an LSTM on DocLayNet legal?
+  - Generic Titre, Alinea, Liste only
+  - Layout embeddings and binary features only
+  
 
 Segmentation
 ============
@@ -46,12 +47,10 @@ Segmentation
   - Could *possibly* train a CRF to do this, in fact DONE
 - Do prediction with Transformers (LayoutLM) DONE
   - heuristic chunking based on line gap (not indent) DONE
-- Move Amendement from segmentation to sequence tagging
-  - update all training data
-  - compare main and `more_rnn_feats` branches
-- Do pre-segmentation with YOLO+DocLayNet
-  - get bboxes and classes DONE
-  - 
+- Move Amendement from segmentation to sequence tagging DONE
+- Do pre-segmentation with YOLO+DocLayNet DONE
+- Integrate DocLayNet pre-segmentation into pipeline
+  - Do image/table identification with it
 - Tokenize from chars
   - Add functionality to pdfplumber
 - Use Transformers for embeddings

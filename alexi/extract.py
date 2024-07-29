@@ -10,8 +10,9 @@ import logging
 import operator
 import os
 from pathlib import Path
-from typing import Any, Iterable, Optional, TextIO
+from typing import Any, Iterable, TextIO, Union
 
+import pdfplumber
 from natsort import natsorted
 
 from alexi.analyse import Analyseur, Bloc, Document, Element, extract_zonage
@@ -20,6 +21,7 @@ from alexi.format import HtmlFormatter
 from alexi.label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from alexi.label import Identificateur
 from alexi.link import Resolver
+from alexi.recognize import Objets
 from alexi.segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from alexi.segment import DEFAULT_MODEL_NOSTRUCT, RNNSegmenteur, Segmenteur
 from alexi.types import T_obj
@@ -51,6 +53,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Fichier JSON avec metadonnées des documents",
         type=Path,
     )
+    parser.add_argument("-y", "--yolo", action="store_true")
     parser.add_argument(
         "docs", help="Documents en PDF ou CSV pré-annoté", type=Path, nargs="+"
     )
@@ -181,7 +184,7 @@ def make_index_html(
         outfh.write(HTML_FOOTER)
 
 
-def save_images_from_pdf(blocs: list[Bloc], conv: Converteur, docdir: Path):
+def save_images_from_pdf(blocs: list[Bloc], pdf_path: Path, docdir: Path):
     """Convertir des éléments du PDF difficiles à réaliser en texte en
     images et les insérer dans la structure du document (liste de blocs).
     """
@@ -190,8 +193,10 @@ def save_images_from_pdf(blocs: list[Bloc], conv: Converteur, docdir: Path):
         if bloc.type in ("Tableau", "Figure"):
             assert isinstance(bloc.page_number, int)
             images.setdefault(bloc.page_number, []).append(bloc)
+    # FIXME: Use pypdfium2 directly
+    pdf = pdfplumber.open(pdf_path)
     for page_number, image_blocs in images.items():
-        page = conv.pdf.pages[page_number - 1]
+        page = pdf.pages[page_number - 1]
         for bloc in image_blocs:
             x0, top, x1, bottom = bloc.bbox
             if x0 == x1 or top == bottom:
@@ -206,6 +211,7 @@ def save_images_from_pdf(blocs: list[Bloc], conv: Converteur, docdir: Path):
             )
             LOGGER.info("Extraction de %s", docdir / bloc.img)
             img.save(docdir / bloc.img)
+    pdf.close()
 
 
 def make_redirect(path: Path, target: Path):
@@ -338,18 +344,26 @@ def make_doc_tree(docs: list[Document], outdir: Path) -> dict[str, dict[str, str
 
 
 class Extracteur:
+    obj: Objets
     crf: Segmenteur
 
     def __init__(
         self,
         outdir: Path,
-        metadata: Path,
-        segment_model: Optional[Path] = None,
+        metadata: Union[Path, None] = None,
+        segment_model: Union[Path, None] = None,
         no_csv=False,
         no_images=False,
+        yolo=False,
     ):
         self.outdir = outdir
         self.crf_s = Identificateur()
+        if yolo:
+            from alexi.recognize.yolo import ObjetsYOLO
+
+            self.obj = ObjetsYOLO()
+        else:
+            self.obj = Objets()
         if segment_model is not None:
             if segment_model.suffix == ".pt":
                 self.crf = RNNSegmenteur(segment_model)
@@ -359,7 +373,7 @@ class Extracteur:
         else:
             self.crf = Segmenteur(DEFAULT_SEGMENT_MODEL)
             self.crf_n = Segmenteur(DEFAULT_MODEL_NOSTRUCT)
-        if metadata:
+        if metadata is not None:
             with open(metadata, "rt") as infh:
                 self.pdfdata = json.load(infh)
                 for key in list(self.pdfdata.keys()):
@@ -372,7 +386,7 @@ class Extracteur:
         self.no_images = no_images
         outdir.mkdir(parents=True, exist_ok=True)
 
-    def __call__(self, path: Path) -> Optional[Document]:
+    def __call__(self, path: Path) -> Union[Document, None]:
         pdf_path = path.with_suffix(".pdf")
         if self.pdfdata and pdf_path.name not in self.pdfdata:
             LOGGER.warning("Non-traitement de %s car absent des metadonnées", path)
@@ -399,25 +413,26 @@ class Extracteur:
         if conv is None and pdf_path.exists():
             conv = Converteur(pdf_path)
         assert conv is not None
-        doc = self.analyse(iob, conv, path.stem)
+        doc = self.analyse(iob, pdf_path)
         if self.pdfdata:
             doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)
         if "zonage" in doc.titre.lower() and "zonage" not in self.metadata:
             self.metadata["zonage"] = extract_zonage(doc)
         return doc
 
-    def analyse(self, iob: Iterable[T_obj], conv: Converteur, fileid: str):
+    def analyse(self, iob: Iterable[T_obj], pdf_path: Path):
+        fileid = pdf_path.stem
         docdir = self.outdir / fileid
         imgdir = self.outdir / fileid / "img"
         LOGGER.info("Génération de pages HTML sous %s", docdir)
         docdir.mkdir(parents=True, exist_ok=True)
         analyseur = Analyseur(fileid, iob)
-        if conv and not self.no_images:
+        if pdf_path and not self.no_images:
             LOGGER.info("Extraction d'images sous %s", imgdir)
             imgdir.mkdir(parents=True, exist_ok=True)
-            images = conv.extract_images()
+            images = self.obj(pdf_path)
             analyseur.add_images(images)
-            save_images_from_pdf(analyseur.blocs, conv, imgdir)
+            save_images_from_pdf(analyseur.blocs, pdf_path, imgdir)
         LOGGER.info("Analyse de la structure de %s", fileid)
         return analyseur()
 
@@ -567,7 +582,12 @@ class Extracteur:
 
 def main(args) -> None:
     extracteur = Extracteur(
-        args.outdir, args.metadata, args.segment_model, args.no_csv, args.no_images
+        args.outdir,
+        metadata=args.metadata,
+        segment_model=args.segment_model,
+        no_csv=args.no_csv,
+        no_images=args.no_images,
+        yolo=args.yolo,
     )
     docs = []
     for path in args.docs:
