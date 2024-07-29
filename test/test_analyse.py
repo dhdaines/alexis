@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 
 from alexi.analyse import Analyseur, extract_zonage, group_iob
-from alexi.convert import Converteur
+from alexi.recognize import Objets
 
 DATADIR = Path(__file__).parent / "data"
 TRAINDIR = Path(__file__).parent.parent / "data"
@@ -47,11 +47,11 @@ def test_analyse():
 
 
 def test_analyse_tableaux_figures():
-    conv = Converteur(DATADIR / "pdf_figures.pdf")
+    obj = Objets()
     with open(DATADIR / "pdf_figures.csv", "rt") as infh:
         reader = csv.DictReader(infh)
         analyseur = Analyseur("pdf_figures", reader)
-        analyseur.add_images(conv.extract_images())
+        analyseur.add_images(obj(DATADIR / "pdf_figures.pdf"))
         doc = analyseur()
         assert "Figure" in (bloc.type for bloc in doc.contenu)
         assert "Tableau" in (bloc.type for bloc in doc.contenu)

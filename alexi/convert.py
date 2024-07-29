@@ -46,50 +46,24 @@ def write_csv(
     writer.writerows(doc)
 
 
-def bbox_contains(bbox: T_bbox, ibox: T_bbox) -> bool:
-    """Déterminer si une BBox est contenu entièrement par une autre."""
-    x0, top, x1, bottom = bbox
-    ix0, itop, ix1, ibottom = ibox
-    return ix0 >= x0 and ix1 <= x1 and itop >= top and ibottom <= bottom
-
-
-def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> T_bbox:
-    """Obtenir le BBox autour d'un élément structurel."""
-    bbox = el.attributes.get("BBox", None)
-    if bbox is not None:
-        x0, y0, x1, y1 = bbox
-        top = page.height - y1
-        bottom = page.height - y0
-        return (x0, top, x1, bottom)
-    else:
-        mcidset = set(mcids)
-        mcid_objs = [
-            c
-            for c in itertools.chain.from_iterable(page.objects.values())
-            if c.get("mcid") in mcidset
-        ]
-        if not mcid_objs:
-            return (-1, -1, -1, -1)  # An impossible BBox
-        return geometry.objects_to_bbox(mcid_objs)
-
-
 def get_rgb(c: T_obj) -> str:
-    """Extraire la couleur d'un objet en 3 chiffres hexadécimaux"""
+    """Extraire la couleur d'un objet en chiffres hexadécimaux"""
     couleur = c.get("non_stroking_color", c.get("stroking_color"))
-    if couleur is None:
+    if couleur is None or couleur == "":
         return "#000"
     elif len(couleur) == 1:
-        r = g = b = couleur[0]
-    elif len(couleur) == 3:
-        r, g, b = couleur
-    elif len(couleur) == 4:
-        return "CMYK#" + "".join(
-            ("%x" % int(min(0.999, val) * 16) for val in (couleur))
+        return "#" + "".join(
+            (
+                "%x" % int(min(0.999, val) * 16)
+                for val in (couleur[0], couleur[0], couleur[0])
+            )
         )
+    elif len(couleur) == 3 or len(couleur) == 4:
+        # Could be RGB, RGBA, CMYK...
+        return "#" + "".join(("%x" % int(min(0.999, val) * 16) for val in couleur))
     else:
         LOGGER.warning("Espace couleur non pris en charge: %s", couleur)
         return "#000"
-    return "#" + "".join(("%x" % int(min(0.999, val) * 16) for val in (r, g, b)))
 
 
 def get_word_features(
@@ -188,67 +162,3 @@ class Converteur:
                 feats = get_word_features(word, page, chars, elmap)
                 feats["path"] = str(self.path)
                 yield feats
-
-    def make_bloc(
-        self, el: PDFStructElement, page_number: int, mcids: Iterable[int]
-    ) -> Bloc:
-        page = self.pdf.pages[page_number - 1]
-        x0, top, x1, bottom = get_element_bbox(page, el, mcids)
-        return Bloc(
-            type="Tableau" if el.type == "Table" else el.type,
-            contenu=[],
-            _page_number=int(page_number),
-            _bbox=(round(x0), round(top), round(x1), round(bottom)),
-        )
-
-    def extract_images(self, pages: Optional[Iterable[int]] = None) -> Iterator[Bloc]:
-        """Trouver des éléments qui seront représentés par des images
-        (tableaux et figures pour le moment)"""
-        if self.tree is None:
-            return
-        if pages is None:
-            pages = range(1, len(self.pdf.pages) + 1)
-        pageset = set(pages)
-
-        # tables *might* span multiple pages (in practice, no...) so
-        # we have to split them at page breaks, but also, their
-        # top-level elements don't have page numbers for this reason.
-        # So, we find them in a first traversal, then gather their
-        # children in a second one.
-        def gather_elements() -> Iterator[PDFStructElement]:
-            """Traverser l'arbre structurel en profondeur pour chercher les
-            figures et tableaux."""
-            if self.tree is None:
-                return
-            d = deque(self.tree)
-            while d:
-                el = d.popleft()
-                if el.type == "Table":
-                    yield el
-                elif el.type == "Figure":
-                    yield el
-                else:
-                    d.extendleft(reversed(el.children))
-
-        def get_child_mcids(el: PDFStructElement) -> Iterator[tuple[int, int]]:
-            """Trouver tous les MCIDs (avec numeros de page, sinon ils sont
-            inutiles!) à l'intérieur d'un élément structurel"""
-            for mcid in el.mcids:
-                assert el.page_number is not None
-                yield el.page_number, mcid
-            d = deque(el.children)
-            while d:
-                el = d.popleft()
-                for mcid in el.mcids:
-                    assert el.page_number is not None
-                    yield el.page_number, mcid
-                d.extend(el.children)
-
-        for el in gather_elements():
-            # Note: we must sort them as we can't guarantee they come
-            # in any particular order
-            mcids = list(get_child_mcids(el))
-            mcids.sort()
-            for page_number, group in itertools.groupby(mcids, operator.itemgetter(0)):
-                if page_number in pageset:
-                    yield self.make_bloc(el, page_number, (mcid for _, mcid in group))
