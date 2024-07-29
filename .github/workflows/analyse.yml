@@ -41,7 +41,7 @@ jobs:
         key: reglements-urbanisme
     - name: Download
       run: |
-        alexi -v download --exclude=Plan --exclude=/derogation \
+        alexi -v download --exclude=/derogation \
                  --exclude='\d-[aA]dopt' --exclude='Z-\d' \
                  --exclude='-[rR]eso'
         for d in download/*.pdf; do
