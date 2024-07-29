@@ -8,7 +8,7 @@ import itertools
 import logging
 from operator import attrgetter
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Union
 
 import pypdfium2 as pdfium  # type: ignore
 import pypdfium2.raw as pdfium_c  # type: ignore
@@ -40,14 +40,16 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--csv", help="Fichier CSV corriger pour mettre à jour la visualisation"
     )
-    parser.add_argument("--force", help="Réécrire le fichier CSV même si existant")
+    parser.add_argument(
+        "--force", action="store_true", help="Réécrire le fichier CSV même si existant"
+    )
     parser.add_argument("doc", help="Document en PDF", type=Path)
     parser.add_argument("out", help="Nom de base des fichiers de sortie", type=Path)
     return parser
 
 
 def annotate_pdf(
-    path: Path, pages: list[int], iob: list[dict[str, Any]], outpath: Path
+    path: Path, pages: Union[list[int], None], iob: list[dict[str, Any]], outpath: Path
 ) -> None:
     """
     Marquer les blocs de texte extraits par ALEXI dans un PDF.
@@ -135,8 +137,10 @@ def spread_i(iobs: Iterable[T_obj]) -> Iterator[T_obj]:
 
 def main(args: argparse.Namespace) -> None:
     """Ajouter des anotations à un PDF selon l'extraction ALEXI"""
-    pages = [int(x.strip()) for x in args.pages.split(",")]
-    pages.sort()
+    if args.pages is not None:
+        pages = sorted(int(x.strip()) for x in args.pages.split(","))
+    else:
+        pages = None
     maybe_csv = args.out.with_suffix(".csv")
     if args.csv is None:
         if maybe_csv.exists() and not args.force:
