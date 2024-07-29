@@ -8,14 +8,14 @@ from typing import Iterable, Iterator, Union
 
 import numpy as np
 import pdfplumber
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download  # type: ignore
 from pdfplumber.utils.geometry import obj_to_bbox
-from ultralytics import YOLO
+from ultralytics import YOLO  # type: ignore
 
 from alexi import segment
+from alexi.analyse import Bloc
 from alexi.convert import FIELDNAMES
 from alexi.recognize import Objets
-from alexi.analyse import Bloc
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -50,6 +50,7 @@ class ObjetsYOLO(Objets):
     ) -> Iterator[Bloc]:
         """Extraire les rectangles correspondant aux objets"""
         # FIXME: pdfplumber not necessary here, should use pypdfium2 directly
+        pdf_path = Path(pdf_path)
         pdf = pdfplumber.open(pdf_path)
         if pages is None:
             pages = range(1, len(pdf.pages) + 1)
@@ -76,7 +77,7 @@ class ObjetsYOLO(Objets):
 
             if len(entry.boxes.xyxy) == 0:
                 continue
-            ordering, boxes = zip(
+            ordering, box_list = zip(
                 *sorted(
                     enumerate(bbox.cpu().numpy() for bbox in entry.boxes.xyxy),
                     key=boxsort,
@@ -86,7 +87,7 @@ class ObjetsYOLO(Objets):
             img_height, img_width = entry.orig_shape
             LOGGER.info("scale x %f", page.width / img_width)
             LOGGER.info("scale y %f", page.height / img_height)
-            boxes = np.array(boxes)
+            boxes = np.array(box_list)
             boxes[:, [0, 2]] = boxes[:, [0, 2]] * page.width / img_width
             boxes[:, [1, 3]] = boxes[:, [1, 3]] * page.height / img_height
             for label, box in zip(labels, boxes):

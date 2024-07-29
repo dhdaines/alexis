@@ -17,8 +17,8 @@ Pre-training
 - Evaluating DocLayNet YOLO models for my task: DONE
   - can simply evaluate F1 on entire train set DONE
   - test dpi, antialias, rendering engines DONE
-  - best results: resize to YOLO model size (max dimension 640px) with antialiasing
-    - integrate this with existing PDF rendering
+  - best results: render at YOLO model size (max dimension 640px) with
+    antialiasing using Cairo (pdfium is less good... why?) DONE
 - Other pre-trained DocLayNet models?
   - pre-train Detectron2 / SSD / R-CNN / other?
 - Pre-train ALEXI LSTM on LAU and other relevant laws (code civil, etc)

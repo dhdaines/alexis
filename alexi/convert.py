@@ -1,9 +1,7 @@
 """Conversion de PDF en CSV"""
 
 import csv
-import itertools
 import logging
-import operator
 from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional, TextIO
@@ -11,10 +9,7 @@ from typing import Any, Iterable, Iterator, Optional, TextIO
 from pdfplumber import PDF
 from pdfplumber.page import Page
 from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
-from pdfplumber.utils import geometry
-from pdfplumber.utils.geometry import T_bbox
 
-from .analyse import Bloc
 from .types import T_obj
 
 LOGGER = logging.getLogger("convert")

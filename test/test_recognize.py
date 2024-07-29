@@ -1,10 +1,15 @@
 from pathlib import Path
 
 from pdfplumber.utils.geometry import obj_to_bbox
+import pytest
 
 from alexi.convert import Converteur
 from alexi.recognize import Objets, bbox_contains
-from alexi.recognize.yolo import ObjetsYOLO
+
+try:
+    from alexi.recognize.yolo import ObjetsYOLO
+except ImportError:
+    ObjetsYOLO = None
 
 DATADIR = Path(__file__).parent / "data"
 
@@ -25,6 +30,8 @@ def test_extract_tables_and_figures() -> None:
 
 
 def test_extract_tables_and_figures_yolo() -> None:
+    if ObjetsYOLO is None:
+        pytest.skip("No YOLO, won't go")
     conv = Converteur(DATADIR / "pdf_figures.pdf")
     obj = ObjetsYOLO()
     words = list(conv.extract_words())

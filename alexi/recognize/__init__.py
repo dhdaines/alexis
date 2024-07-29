@@ -18,12 +18,12 @@ import operator
 from collections import deque
 from os import PathLike
 from pathlib import Path
-from typing import Union, Iterable, Iterator
+from typing import Iterable, Iterator, Union
 
 import pdfplumber
+from pdfplumber.page import Page
 from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
-from pdfplumber.page import Page
 
 from alexi.analyse import Bloc
 
@@ -65,6 +65,7 @@ class Objets:
     ) -> Iterator[Bloc]:
         """Extraire les rectangles correspondant aux objets qui seront
         représentés par des images."""
+        pdf_path = Path(pdf_path)
         pdf = pdfplumber.open(pdf_path)
         try:
             # Get the tree for the *entire* document since elements
