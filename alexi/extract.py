@@ -53,6 +53,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Fichier JSON avec metadonnées des documents",
         type=Path,
     )
+    parser.add_argument("-y", "--yolo", action="store_true")
     parser.add_argument(
         "docs", help="Documents en PDF ou CSV pré-annoté", type=Path, nargs="+"
     )
@@ -353,10 +354,16 @@ class Extracteur:
         segment_model: Union[Path, None] = None,
         no_csv=False,
         no_images=False,
+        yolo=False,
     ):
         self.outdir = outdir
         self.crf_s = Identificateur()
-        self.obj = Objets()
+        if yolo:
+            from alexi.recognize.yolo import ObjetsYOLO
+
+            self.obj = ObjetsYOLO()
+        else:
+            self.obj = Objets()
         if segment_model is not None:
             self.crf = Segmenteur(segment_model)
             self.crf_n = None
@@ -572,7 +579,12 @@ class Extracteur:
 
 def main(args) -> None:
     extracteur = Extracteur(
-        args.outdir, args.metadata, args.segment_model, args.no_csv, args.no_images
+        args.outdir,
+        metadata=args.metadata,
+        segment_model=args.segment_model,
+        no_csv=args.no_csv,
+        no_images=args.no_images,
+        yolo=args.yolo,
     )
     docs = []
     for path in args.docs:
