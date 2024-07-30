@@ -7,11 +7,12 @@ import itertools
 import json
 import logging
 import re
+import sys
 
 from pathlib import Path
 from sequence_align.pairwise import hirschberg
 
-from alexi import segment
+from alexi import segment, convert
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 
@@ -29,7 +30,7 @@ def process(csvpath, jsonpath):
     original context IDs.
 
     """
-    iobs = segment.load([csvpath])
+    iobs = list(segment.load([csvpath]))
     cwords = [w["text"] for w in iobs]
     with open(jsonpath, "rt") as infh:
         xhtml = json.load(infh)
@@ -50,30 +51,51 @@ def process(csvpath, jsonpath):
     for m in re.finditer(r"\S+", xtext):
         start, end = m.span()
         xwords.append(m[0])
-        print(m[0], start, end)
-        print(ctx, f"{pos}:{next_pos}")
+        LOGGER.debug("token %s %d:%d", m[0], start, end)
+        LOGGER.debug("ctx %s %d:%d", ctx, pos, next_pos)
         while start >= next_pos:
-            (ctx, pos), (next_ctx, next_pos) = next(itor)
-            print("->", ctx, f"{pos}:{next_pos}")
+            (ctx, pos), (_, next_pos) = next(itor)
+            LOGGER.debug("-> %s %d:%d", ctx, pos, next_pos)
         tctx = [ctx]
         while end >= next_pos:
-            (ctx, pos), (next_ctx, next_pos) = next(itor)
+            (ctx, pos), (_, next_pos) = next(itor)
             if next_pos > end:
                 break
             tctx.append(ctx)
-            print("+>", ctx, f"{pos}:{next_pos}")
-        print(" =>", tctx)
-        print()
+            LOGGER.debug("+> %s %d:%d", ctx, pos, next_pos)
+        LOGGER.debug(" => %s", tctx)
         xctx.append(tctx)
     alignment = hirschberg(cwords, xwords, gap="\x00")
-    print("ALIGN", len(alignment[0]), len(cwords), len(xwords))
+    LOGGER.debug("ALIGN %d %d %d", len(alignment[0]), len(cwords), len(xwords))
     xitor = zip(xwords, xctx)
-    for c, x in zip(*alignment):
-        if x != "\x00":
+    prev_ctx = -1
+    for w, c, x in zip(iobs, *alignment):
+        if x == "\x00":
+            w["segment"] = "O"
+            prev_ctx = -1
+        elif c.lower() != x.lower():
+            w["segment"] = "O"
+            prev_ctx = -1
             xw, ctx = next(xitor)
-            print(c, xw, ctx)
         else:
-            print(c, "O")
+            xw, ctx = next(xitor)
+            if ctx != prev_ctx:  # FIXME: Not quite right
+                iob = "B"
+            else:
+                iob = "I"
+            ctxtxt = ";".join(xhtml["ctx"][cc] for cc in ctx)
+            if "Label-Section" in ctxtxt:
+                tag = "Article"
+            elif "group5" in ctxtxt:
+                tag = "Section"
+            elif "Paragraph" in ctxtxt:
+                tag = "Liste"
+            else:
+                tag = "Alinea"
+
+            w["segment"] = f"{iob}-{tag}"
+        prev_ctx = ctx
+    convert.write_csv(iobs, sys.stdout)
 
 
 def main():
