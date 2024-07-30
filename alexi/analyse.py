@@ -9,7 +9,7 @@ import re
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Iterator, NamedTuple, Optional
+from typing import Iterable, Iterator, NamedTuple, Optional, Union
 
 from pdfplumber.utils.geometry import T_bbox, calculate_area, merge_bboxes
 
@@ -481,7 +481,7 @@ class Analyseur:
         return doc
 
 
-def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
+def extract_zonage(doc: Document) -> Union[dict[str, dict[str, dict[str, str]]], None]:
     """
     Extraire les éléments du zonage d'un règlement et générer des
     metadonnées pour l'identification des hyperliens et la
@@ -490,7 +490,7 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
     mz: Optional[Element] = None
     if "Chapitre" not in doc.paliers:
         LOGGER.warning("Aucun chapitre présent dans %s", doc.fileid)
-        return {}
+        return None
     for c in doc.paliers["Chapitre"]:
         if "milieux et zones" in c.titre.lower():
             LOGGER.info("Extraction de milieux et zones")
@@ -498,7 +498,7 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
             break
     if mz is None:
         LOGGER.info("Chapitre milieux et zones non trouvé")
-        return {}
+        return None
     top = Path(doc.fileid) / "Chapitre" / mz.numero
     metadata: dict[str, dict[str, dict[str, str]]] = {
         "categorie_milieu": {},
@@ -520,4 +520,6 @@ def extract_zonage(doc: Document) -> dict[str, dict[str, dict[str, str]]]:
                     "titre": m.group(2),
                     "url": str(subsecdir),
                 }
+    if len(metadata["categorie_milieu"]) == 0 and len(metadata["milieu"]) == 0:
+        return None
     return metadata

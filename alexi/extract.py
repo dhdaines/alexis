@@ -414,7 +414,9 @@ class Extracteur:
         if self.pdfdata:
             doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)
         if "zonage" in doc.titre.lower() and "zonage" not in self.metadata:
-            self.metadata["zonage"] = extract_zonage(doc)
+            zonage = extract_zonage(doc)
+            if zonage is not None:
+                self.metadata["zonage"] = zonage
         return doc
 
     def analyse(self, iob: Iterable[T_obj], pdf_path: Path):
