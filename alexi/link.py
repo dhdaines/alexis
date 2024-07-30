@@ -55,7 +55,7 @@ class Resolver:
         self.metadata = {"docs": {}} if metadata is None else metadata
         self.numeros = {}
         self.titles = {}
-        self.urls = set()
+        self.urls: set[str] = set()
         for docpath, info in self.metadata["docs"].items():
             self.numeros[info["numero"]] = docpath
             self.titles[normalize_title(info["titre"])] = docpath
