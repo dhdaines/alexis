@@ -88,7 +88,6 @@ def extract(path: Path):
         with open(json_path, "wt") as outfh:
             ctx, text = linearise(tree)
             json.dump({"ctx": ctx, "text": text}, outfh, indent=2, ensure_ascii=False)
-    return
     pdfpath = path.with_suffix(".pdf")
     csvpath = path.with_suffix(".csv")
     LOGGER.info("Extracting %s to %s", pdfpath, csvpath)
