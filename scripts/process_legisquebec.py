@@ -68,41 +68,73 @@ def process(csvpath, jsonpath):
     alignment = hirschberg(cwords, xwords, gap="\x00")
     LOGGER.debug("ALIGN %d %d %d", len(alignment[0]), len(cwords), len(xwords))
     xitor = zip(xwords, xctx)
-    prev_ctx = -1
+    prev_ctx = ""
+    prev_tag = "O"
+
+    def enclosing_block(ctx):
+        stack = ctx.split(",")
+        for el in reversed(stack):
+            tag, _, _ = el.split("|")
+            if tag == "div":
+                return el
+
     for w, c, x in zip(iobs, *alignment):
         if x == "\x00":
             w["segment"] = "O"
-            prev_ctx = -1
-        elif c.lower() != x.lower():
-            w["segment"] = "O"
-            prev_ctx = -1
+            prev_tag = "O"
+            prev_block = None
+            continue
+        elif c == "\x00":
             xw, ctx = next(xitor)
-        else:
-            xw, ctx = next(xitor)
-            if ctx != prev_ctx:  # FIXME: Not quite right
-                iob = "B"
-            else:
-                iob = "I"
-            ctxtxt = ";".join(xhtml["ctx"][cc] for cc in ctx)
-            if "Label-Section" in ctxtxt:
-                tag = "Article"
-            elif "group5" in ctxtxt:
-                tag = "Section"
-            elif "Paragraph" in ctxtxt:
-                tag = "Liste"
-            else:
-                tag = "Alinea"
+            LOGGER.warning("Skipping word in XHTML: %s", xw)
+            continue
 
-            w["segment"] = f"{iob}-{tag}"
+        xw, contexts = next(xitor)
+        cid = contexts[0]
+        ctx = xhtml["ctx"][cid]
+        block = enclosing_block(ctx)
+        LOGGER.debug(
+            "CSV word %s XHTML word %s cid %d block %s context %s",
+            c,
+            x,
+            cid,
+            block,
+            ctx,
+        )
+        if "Label-Section" in ctx:
+            tag = "Article"
+        elif "group5" in ctx:
+            tag = "Section"
+        elif "Paragraph" in ctx:
+            tag = "Liste"
+        else:
+            # HistoricalNote is Alinea, but we can set sequence=Amendement...
+            tag = "Alinea"
+
+        if tag != prev_tag:
+            iob = "B"
+        else:
+            # Some particular rules
+            if "Heading" in ctx or "HistoricalNote" in ctx:
+                # Heading and HistoricalNote make up a single element
+                # (there are sequence tags within them...)
+                iob = "I"
+            else:
+                # Alinea, Liste, will break on enclosing blocks
+                iob = "I" if block == prev_block else "B"
+        w["segment"] = f"{iob}-{tag}"
+        prev_block = block
         prev_ctx = ctx
+        prev_tag = tag
     convert.write_csv(iobs, sys.stdout)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--debug", action="store_true")
     parser.add_argument("path", help="Fichier CSV", type=Path)
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     process(args.path, args.path.with_suffix(".json"))
 
 
