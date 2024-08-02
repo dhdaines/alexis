@@ -24,6 +24,7 @@ dependencies = [
     "torch",
     "allennlp-light",  # it is not very light
     "natsort",
+    "more-itertools",
 ]
 [project.optional-dependencies]
 dev = [
