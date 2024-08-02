@@ -11,6 +11,9 @@ DERP LERNING
 Pre-training
 ============
 
+- LegisQuebec pretraining
+  - R-13 has some alignment failures
+  - and whatever one has "silteux-limonPrismatique," in it
 - DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
   - Specifically the legal subset
 - PubLayNet maybe (check the annotations)

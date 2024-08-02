@@ -155,8 +155,9 @@ def process(path, outdir="lqout"):
             continue
         elif c == GAP:
             xw, ctx = next(xitor)
-            LOGGER.warning("Skipping word in XHTML: %s", xw)
-            continue
+            # FIXME: possibility to recover from this?
+            LOGGER.error("Skipped word in XHTML in %s - alignment failure", path)
+            return
 
         xw, contexts = next(xitor)
         cid = contexts[0]
