@@ -132,7 +132,11 @@ def process(path, outdir="lqout"):
         LOGGER.debug(" => %s", tctx)
         xctx.append(tctx)
 
-    alignment = align(cwords, xwords)
+    try:
+        alignment = align(cwords, xwords)
+    except Exception as e:
+        LOGGER.error("Alignment failure in %s: %s", path, e)
+        return
     LOGGER.debug("ALIGN %d %d %d", len(alignment[0]), len(cwords), len(xwords))
     xitor = zip(xwords, xctx)
     prev_tag = "O"
@@ -156,7 +160,7 @@ def process(path, outdir="lqout"):
         elif c == GAP:
             xw, ctx = next(xitor)
             # FIXME: possibility to recover from this?
-            LOGGER.error("Skipped word in XHTML in %s - alignment failure", path)
+            LOGGER.error("Alignment failure in %s: skipped word in XHTML", path)
             return
 
         xw, contexts = next(xitor)
@@ -243,9 +247,15 @@ def main():
     parser.add_argument("csvs", help="Fichiers CSV", type=Path, nargs="+")
     args = parser.parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     process_to = functools.partial(process, outdir=args.outdir)
-    process_map(process_to, args.csvs)
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+        for path in args.csvs:
+            LOGGER.info("Processing %s", path)
+            process_to(path)
+    else:
+        logging.basicConfig(level=logging.INFO)
+        process_map(process_to, args.csvs, max_workers=os.cpu_count())
 
 
 if __name__ == "__main__":
