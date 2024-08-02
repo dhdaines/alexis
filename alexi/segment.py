@@ -117,7 +117,7 @@ def textplus_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
     )
     for word in page:
         text: str = word["text"]
-        fontname = word["fontname"]
+        fontname = word["fontname"].lower()
         features = [
             "lower=%s" % text.lower(),
             "uppercase=%s" % text.isupper(),
@@ -127,8 +127,8 @@ def textplus_features(page: Sequence[T_obj]) -> Iterator[list[str]]:
             "multipunc=%s" % bool(MULTIPUNC.match(text)),
             "numeric=%s" % text.isnumeric(),
             "rgb=%s" % word.get("rgb", "#000"),
-            "bold=%s" % ("bold" in fontname.lower()),
-            "italic=%s" % ("italic" in fontname.lower()),
+            "bold=%s" % ("bold" in fontname),
+            "italic=%s" % ("italic" in fontname or "oblique" in fontname),
             "head:table=%s" % ("table" in firstline),
             "head:chapitre=%s" % ("chapitre" in firstline),
             "head:annexe=%s" % ("annexe" in firstline),
@@ -323,8 +323,20 @@ def load(paths: Iterable[PathLike]) -> Iterator[T_obj]:
 
 def make_fontname(fontname):
     a, plus, b = fontname.partition("+")
-    if plus:
-        return b
+    if plus:  # strip off PDF junk
+        fontname = b
+    # Don't strip these off unless we plan to do something with them!
+    # a, dash, b = fontname.partition("-")
+    # if dash:  # strip off bold, italic, oblique
+    #     fontname = a
+    # a, comma, b = fontname.partition(",")
+    # if comma:  # strip off bold, italic, oblique
+    #     fontname = a
+    # Normalize dash/comma as separator
+    fontname = fontname.replace(",", "-")
+    # remove other junk
+    fontname = re.sub(r"MT$", "", fontname)
+    fontname = re.sub(r"PS$", "", fontname)
     return fontname
 
 
