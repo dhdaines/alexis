@@ -58,6 +58,8 @@ def align(cwords, xwords):
                 break
         else:
             start_doc = -1
+    # FIXME: This is still quite slow, we could also pre-segment the
+    # data at heuristically determined anchor points (chapter headings perhaps)
     if start_toc != -1 and start_doc != -1:
         LOGGER.debug("Excluding TOC from %d to %d. Alignment:", start_toc, start_doc)
         alignment = hirschberg(cwords[:start_toc] + cwords[start_doc:], xwords, gap=GAP)
@@ -162,6 +164,14 @@ def process(csvpath, jsonpath):
         )
         if "Label-Section" in ctx:
             tag = "Article"
+        elif "group1" in ctx:  # Partie
+            tag = "Chapitre"
+        elif "group2" in ctx:  # Livre
+            tag = "Chapitre"
+        elif "group3" in ctx:  # Titre
+            tag = "Chapitre"
+        elif "group4" in ctx:
+            tag = "Chapitre"
         elif "group5" in ctx:
             tag = "Section"
         elif "Paragraph" in ctx:
