@@ -11,27 +11,25 @@ DERP LERNING
 Pre-training
 ============
 
-- LegisQuebec pretraining
+- LegisQuebec pretraining IN PROGRESS
   - R-13 has some alignment failures
   - and whatever one has "silteux-limonPrismatique," in it
-- DocLayNet is more interesting: https://huggingface.co/datasets/ds4sd/DocLayNet
+- DocLayNet pretraining
   - Specifically the legal subset
+  - Use my existing evaluation / conversion script
 - PubLayNet maybe (check the annotations)
 - Evaluating DocLayNet YOLO models for my task: DONE
   - can simply evaluate F1 on entire train set DONE
   - test dpi, antialias, rendering engines DONE
   - best results: render at YOLO model size (max dimension 640px) with
     antialiasing using Cairo (pdfium is less good... why?) DONE
-- Other pre-trained DocLayNet models?
-  - pre-train Detectron2 / SSD / R-CNN / other?
-- Pre-train ALEXI LSTM on LAU and other relevant laws (code civil, etc)
-  - Get list of URLs from alexi link
-  - NOTE: license does not permit redistribution, use for modeling
-    (especially for layout analysis) should be okay though
-  - Make a script for downloading and processing data
-- Pre-train an LSTM on DocLayNet legal?
-  - Generic Titre, Alinea, Liste only
-  - Layout embeddings and binary features only
+- Other pre-trained DocLayNet models
+  - DETR from https://huggingface.co/Aryn/deformable-detr-DocLayNet - has a better license!
+  - YOLOv10 from https://huggingface.co/omoured/YOLOv10-Document-Layout-Analysis
+  - pre-train my own DINO or DETR with detrex?
+- Fine-tune YOLO / DETR on ALEXI
+  - Need to annotate gold standard tables and figures on, e.g. PIIA
+  - Use Docanno for this evidently
   
 
 Segmentation
