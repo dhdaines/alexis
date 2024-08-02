@@ -3,17 +3,18 @@ par référence aux PDF pour créer des données d'entraînement.
 """
 
 import argparse
+import csv
+import functools
 import itertools
 import json
 import logging
+import os
 import re
-import sys
+from pathlib import Path
 
 import more_itertools
-from pathlib import Path
 from sequence_align.pairwise import hirschberg
-
-from alexi import segment, convert
+from tqdm.contrib.concurrent import process_map
 
 LOGGER = logging.getLogger(Path(__file__).stem)
 GAP = "\x00"
@@ -89,9 +90,13 @@ def align(cwords, xwords):
         return hirschberg(cwords, xwords, gap=GAP)
 
 
-def process(csvpath, jsonpath):
+def process(path, outdir="lqout"):
     """Assign segment tags to PDF using XML alignment."""
-    iobs = list(segment.load([csvpath]))
+    csvpath = path.with_suffix(".csv")
+    jsonpath = path.with_suffix(".json")
+    with open(csvpath, "rt", encoding="utf-8-sig") as infh:
+        reader = csv.DictReader(infh)
+        iobs = list(reader)
     cwords = [w["text"] for w in iobs]
     with open(jsonpath, "rt") as infh:
         xhtml = json.load(infh)
@@ -168,6 +173,8 @@ def process(csvpath, jsonpath):
         )
         if "Label-Section" in ctx:
             tag = "Article"
+        elif "Label-Schedule" in ctx:
+            tag = "Annexe"
         elif "group1" in ctx:
             tag = "Partie"
         elif "group2" in ctx:
@@ -216,16 +223,28 @@ def process(csvpath, jsonpath):
         prev_block = block
         prev_heading_block = heading_block
         prev_tag = tag
-    convert.write_csv(iobs, sys.stdout)
+    with open(Path(outdir) / csvpath.name, "wt") as outfh:
+        writer = csv.DictWriter(outfh, fieldnames=reader.fieldnames)
+        writer.writeheader()
+        for w in iobs:
+            writer.writerow(w)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("path", help="Fichier CSV", type=Path)
+    parser.add_argument(
+        "--outdir",
+        help="Repertoire destination",
+        type=Path,
+        default="legisquebec/train",
+    )
+    parser.add_argument("csvs", help="Fichiers CSV", type=Path, nargs="+")
     args = parser.parse_args()
+    args.outdir.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
-    process(args.path, args.path.with_suffix(".json"))
+    process_to = functools.partial(process, outdir=args.outdir)
+    process_map(process_to, args.csvs)
 
 
 if __name__ == "__main__":

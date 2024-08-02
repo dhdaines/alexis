@@ -25,6 +25,7 @@ dependencies = [
     "allennlp-light",  # it is not very light
     "natsort",
     "more-itertools",
+    "tqdm",
 ]
 [project.optional-dependencies]
 dev = [
