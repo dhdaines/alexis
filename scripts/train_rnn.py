@@ -90,6 +90,12 @@ def make_argparse():
     parser.add_argument(
         "-t", "--tokenize", action="store_true", help="Tokeniser les mots"
     )
+    parser.add_argument(
+        "-i",
+        "--init-model",
+        help="Fichier modele pour initialisation",
+        type=Path,
+    )
     return parser
 
 
@@ -120,7 +126,8 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
     # NOTE: This is cheating slightly since label_counts comes from
     # the entire dataset
     label_weights = [
-        (args.bscale if x[0] == "B" else 1.0) / label_counts[x] for x in id2label
+        (args.bscale if x[0] == "B" else 1.0) / (label_counts[x] or 1.0)
+        for x in id2label
     ]
     veclen = len(all_data[0][0][0][1])
     device = torch.device(args.device)
@@ -147,6 +154,20 @@ def run_cv(args, all_data, featdims, feat2id, label_counts, id2label):
             "labels": args.labels,
         }
         my_network = RNN(**config)
+        if args.init_model:
+            try:
+                fold_init = args.init_model.with_stem(
+                    args.init_model.stem + f"_fold{fold+1}"
+                )
+                state_dict = torch.load(fold_init)
+            except FileNotFoundError:
+                state_dict = torch.load(args.init_model)
+            reinit = [
+                key for key in state_dict.keys() if key.startswith("output_layer")
+            ]
+            for key in reinit:
+                del state_dict[key]
+            my_network.load_state_dict(state_dict, strict=False)
         optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
         loss_function = nn.CrossEntropyLoss(weight=torch.FloatTensor(label_weights))
         model = Model(
@@ -253,7 +274,8 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
     )
     veclen = len(train_data[0][0][0][1])
     label_weights = [
-        (args.bscale if x[0] == "B" else 1.0) / label_counts[x] for x in id2label
+        (args.bscale if x[0] == "B" else 1.0) / (label_counts[x] or 1.0)
+        for x in id2label
     ]
     device = torch.device(args.device)
     config = {
@@ -268,6 +290,12 @@ def run_training(args, train_data, featdims, feat2id, label_counts, id2label):
     with open(args.outfile.with_suffix(".json"), "wt", encoding="utf-8") as outfh:
         json.dump(config, outfh, ensure_ascii=False, indent=2)
     my_network = RNN(**config)
+    if args.init_model:
+        state_dict = torch.load(args.init_model)
+        reinit = [key for key in state_dict.keys() if key.startswith("output_layer")]
+        for key in reinit:
+            del state_dict[key]
+        my_network.load_state_dict(state_dict, strict=False)
     optimizer = optim.Adam(my_network.parameters(), lr=args.lr)
     loss_function = nn.CrossEntropyLoss(weight=torch.FloatTensor(label_weights))
     model = Model(
@@ -296,15 +324,21 @@ def main():
     tokenizer = None
     if args.tokenize:
         tokenizer = Tokenizer.from_pretrained("camembert-base")
-
-    all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
-        args.csvs,
-        labels=args.labels,
-        tokenizer=tokenizer,
-        min_count=args.min_feat,
-        word_dim=args.word_dim,
-        feat_dim=args.feat_dim,
-    )
+    if args.init_model:
+        with open(args.init_model.with_suffix(".json"), "rt", encoding="utf-8") as infh:
+            config = json.load(infh)
+        all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
+            args.csvs, config=config
+        )
+    else:
+        all_data, featdims, feat2id, label_counts, id2label = make_rnn_data(
+            args.csvs,
+            labels=args.labels,
+            tokenizer=tokenizer,
+            min_count=args.min_feat,
+            word_dim=args.word_dim,
+            feat_dim=args.feat_dim,
+        )
 
     print("Vocabulary size:")
     for feat, vals in feat2id.items():
