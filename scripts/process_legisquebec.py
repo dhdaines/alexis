@@ -131,14 +131,16 @@ def process(csvpath, jsonpath):
     LOGGER.debug("ALIGN %d %d %d", len(alignment[0]), len(cwords), len(xwords))
     xitor = zip(xwords, xctx)
     prev_tag = "O"
-    prev_block = ""
+    prev_block = block = None
+    prev_heading_block = heading_block = None
 
-    def enclosing_block(ctx):
+    def enclosing_block(ctx, classname=None):
         stack = ctx.split(",")
         for el in reversed(stack):
-            tag, _, _ = el.split("|")
-            if tag == "div":
+            tag, _, tclass = el.split("|")
+            if tag == "div" and (classname is None or classname in tclass):
                 return el
+        return None
 
     for w, c, x in zip(iobs, *alignment):
         if x == GAP:
@@ -155,6 +157,8 @@ def process(csvpath, jsonpath):
         cid = contexts[0]
         ctx = xhtml["ctx"][cid]
         block = enclosing_block(ctx)
+        if "Heading" in ctx:
+            heading_block = enclosing_block(ctx, "Heading")
         LOGGER.debug(
             "CSV word %s XHTML word %s cid %d context %s",
             c,
@@ -164,12 +168,12 @@ def process(csvpath, jsonpath):
         )
         if "Label-Section" in ctx:
             tag = "Article"
-        elif "group1" in ctx:  # Partie
-            tag = "Chapitre"
-        elif "group2" in ctx:  # Livre
-            tag = "Chapitre"
-        elif "group3" in ctx:  # Titre
-            tag = "Chapitre"
+        elif "group1" in ctx:
+            tag = "Partie"
+        elif "group2" in ctx:
+            tag = "Livre"
+        elif "group3" in ctx:
+            tag = "Titre"
         elif "group4" in ctx:
             tag = "Chapitre"
         elif "group5" in ctx:
@@ -191,15 +195,26 @@ def process(csvpath, jsonpath):
             iob = "B"
         else:
             # Some particular rules
-            if "Heading" in ctx or "HistoricalNote" in ctx:
-                # Heading and HistoricalNote make up a single element
-                # (there are sequence tags within them...)
+            if "Heading" in ctx:
+                # Break at the level of the Heading and not the
+                # immediate enclosing block
+                LOGGER.debug(
+                    "heading_block %s prev_heading_block %s",
+                    heading_block,
+                    prev_heading_block,
+                )
+                iob = "I" if heading_block == prev_heading_block else "B"
+            elif "HistoricalNote" in ctx:
+                # HistoricalNote is a single Alinea (there are
+                # sequence tags within them...)
                 iob = "I"
             else:
                 # Alinea, Liste, will break on enclosing blocks
                 iob = "I" if block == prev_block else "B"
         w["segment"] = f"{iob}-{tag}"
+        LOGGER.debug("-> %s", w["segment"])
         prev_block = block
+        prev_heading_block = heading_block
         prev_tag = tag
     convert.write_csv(iobs, sys.stdout)
 
