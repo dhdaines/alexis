@@ -24,6 +24,7 @@ def linearise(tree):
 
     def add_text(stack, t):
         stack_id = stacks.setdefault(",".join(stack), len(stacks))
+        LOGGER.debug("add_text %d: %s", stack_id, t)
         text.append((stack_id, t))
 
     gen_id = itertools.count()
@@ -40,13 +41,16 @@ def linearise(tree):
             add_text(stack, el)
             continue
         el_id = el.get("id", "__" + str(next(gen_id)))
-        stack.append("|".join((el.tag, el_id, el.get("class", ""))))
+        el_ctx = "|".join((el.tag, el_id, el.get("class", "")))
+        stack.append(el_ctx)
+        LOGGER.debug("Element %s", el_ctx)
+        # block elements (there is only div) get surrounded in newlines
+        if el.tag == "div":
+            # Make sure to add the \n even if there is no leading text
+            # (the div starts with a span for instance)
+            el.text = "\n" + ("" if el.text is None else el.text)
         if el.text:
-            # block elements (there is only div) get surrounded in newlines
-            if el.tag == "div":
-                add_text(stack, "\n" + el.text)
-            else:
-                add_text(stack, el.text)
+            add_text(stack, el.text)
         if el.tag == "div":
             q.appendleft("\n" if el.tail is None else el.tail + "\n")
         else:
@@ -98,12 +102,11 @@ def extract(path: Path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("indir", help="Repertoire avec fichiers", type=Path)
+    parser.add_argument("htmls", help="Fichiers HTMLS", type=Path, nargs="+")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    for path in args.indir.iterdir():
-        if path.suffix == ".html":
-            extract(path)
+    for path in args.htmls:
+        extract(path)
 
 
 if __name__ == "__main__":
