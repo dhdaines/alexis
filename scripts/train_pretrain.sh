@@ -5,7 +5,7 @@ set -e
 : ${mf:=5}
 
 # Pre-train on lq
-python scripts/train_rnn.py -o lqfeats.pt --hidden-size $hs --nepoch 5 -i feats.pt \
+python scripts/train_rnn.py -o lqfeats.pt --hidden-size $hs --nepoch 1 \
        legisquebec/train/*.csv
 
 # Fine-tune on data only
