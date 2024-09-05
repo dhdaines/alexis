@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from alexi.analyse import Document, match_links
-from alexi.link import Resolver, locate_article
+from alexi.link import Resolver, locate_article, normalize_title
 
 DATADIR = Path(__file__).parent / "data"
 TRAINDIR = Path(__file__).parent.parent / "data"
@@ -125,7 +125,15 @@ BYLAWS = [
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
+        "règlement foo bar baz 1314-2021-Z",
+        "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
+    ),
+    (
         "Règlement sur les permis et certificats 1314-2021-PC",
+        "../index.html#Rgl-1314-2021-PC-version-en-vigueur-20231013",
+    ),
+    (
+        "RÈGLEMENT 1314-2021-PC",
         "../index.html#Rgl-1314-2021-PC-version-en-vigueur-20231013",
     ),
     (
@@ -142,6 +150,10 @@ BYLAWS = [
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
+        "Règlement sur les permis et certificats",
+        "../index.html#Rgl-1314-2021-PC-version-en-vigueur-20231013",
+    ),
+    (
         "section 3 du chapitre 5 du Règlement de zonage 1314-2021-Z",
         "../20231213-Codification-administrative-Rgl-1314-2021-Z/Chapitre/5/Section/3/index.html",
     ),
@@ -156,7 +168,8 @@ BYLAWS = [
 @pytest.mark.parametrize("test_input,expected", BYLAWS)
 def test_bylaws(test_input, expected):
     r = Resolver(METADATA)
-    assert r(test_input, ".") == expected
+    found = r(test_input, ".")
+    assert found == expected
 
 
 with open(DATADIR / "lotissement.json", "rt") as infh:
@@ -315,3 +328,24 @@ def test_match_multiples(text, before, multi, after):
     for link, ref in zip(links, multi):
         assert text[link.start : link.end] == ref
         assert link.alt == f"{before} {ref} {after}"
+
+
+TITLES = [
+    ("RÈGLEMENT ", ""),
+    (
+        "règlement  relatif aux projets particuliers de construction, de modification ou d'occupation d'un immeuble.",
+        "projets particuliers de construction de modification ou d'occupation d'un immeuble",
+    ),
+    (
+        "RÈGLEMENT  AFIN DE DÉCRÉTER DES DISPOSITIONS CONCERNANT L’OCCUPATION DU DOMAINE PUBLIC.",
+        "décréter des dispositions concernant l'occupation du domaine public",
+    ),
+    ("Règlement de construction ", "construction"),
+    ("Règlement sur les dérogations mineures ", "dérogations mineures"),
+]
+
+
+@pytest.mark.parametrize("text,after", TITLES)
+def test_normalize_title(text, after):
+    """Verifier la normalisation des titres de règlements"""
+    assert normalize_title(text) == after

@@ -22,7 +22,7 @@ SEC_RE = re.compile(
     r"\b(?P<sec>article|chapitre|section|sous-section|annexe) (?P<num>[\d\.]+)",
     re.IGNORECASE,
 )
-REG_RE = re.compile(r"règlement[^\d]+(?P<reg>[\d\.A-Z-]+)", re.IGNORECASE)
+REG_RE = re.compile(r"(?i:règlement)(?:[^\d]+(?P<reg>[\d\.A-Z-]+))?")
 MILIEU_RE = re.compile(rf"{MILIEU}\s+(?P<mtype>{MTYPE})", re.IGNORECASE | re.VERBOSE)
 PALIER_IDX = {palier: idx for idx, palier in enumerate(PALIERS)}
 
@@ -40,14 +40,22 @@ def locate_article(numero: str, doc: Document) -> list[str]:
 def normalize_title(title: str):
     title = title.lower()
     title = re.sub(r"\s+", " ", title).strip()
-    title = re.sub(r"^règlement (?:de|sur|concernant|relatif aux) ", "", title)
+    title = re.sub(
+        r"^règlement"
+        r"(?: (?:des|de|sur|concernant|relatif|afin de))?"
+        r"(?: (?:aux|au|à la|les|des|de la|de|du|le|la))?",
+        "",
+        title,
+    )
     title = re.sub(
         r"\bpiia\b",
         r"plans d'implantation et d'intégration architecturale",
         title,
     )
+    title = re.sub(r"[‘’]", "'", title)
+    title = re.sub(r", ", " ", title)
     title = re.sub(r"\([^\)]+\)$", "", title)
-    return title
+    return title.strip(r""" .,;'«»"“”""")
 
 
 class Resolver:
@@ -58,7 +66,10 @@ class Resolver:
         self.urls: set[str] = set()
         for docpath, info in self.metadata["docs"].items():
             self.numeros[info["numero"]] = docpath
-            self.titles[normalize_title(info["titre"])] = docpath
+            normtitle = normalize_title(info["titre"])
+            if normtitle != "":
+                self.titles[normtitle] = docpath
+            LOGGER.info("%s:%s => %s", info["numero"], normtitle, docpath)
 
     def __call__(
         self, text: str, srcpath: str = "", doc: Optional[Document] = None
@@ -98,15 +109,15 @@ class Resolver:
         """
         docpath = None
         text = re.sub(r"\s+", " ", text).strip()
-        # NOTE: This really matches anything starting with "règlement"
         if m := REG_RE.search(text):
-            numero = m.group("reg").strip(" .,;")
-            if numero is None:
-                return None
-            docpath = self.numeros.get(numero)
+            numero = m.group("reg")
+            if numero is not None:
+                numero = numero.strip(" .,;")
+                docpath = self.numeros.get(numero)
             if docpath is None:
+                normtext = normalize_title(text)
                 for title in self.titles:
-                    if title in text.lower():
+                    if title in normtext:
                         docpath = self.titles[title]
                         break
             if docpath is None:
