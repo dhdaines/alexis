@@ -12,14 +12,12 @@ import logging
 import sys
 from pathlib import Path
 
-from . import annotate, download, extract
+from . import annotate, download, extract, index, search
 from .analyse import Analyseur, Bloc
 from .convert import Converteur, write_csv
 from .format import format_html
-from .index import index
 from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
 from .label import Identificateur
-from .search import search
 from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
 from .segment import Segmenteur
 
@@ -77,16 +75,6 @@ def json_main(args: argparse.Namespace):
     else:
         doc = analyseur()
     print(json.dumps(dataclasses.asdict(doc), indent=2, ensure_ascii=False))
-
-
-def index_main(args: argparse.Namespace):
-    """Construire un index sur des fichiers JSON"""
-    index(args.indir, args.outdir)
-
-
-def search_main(args: argparse.Namespace):
-    """Lancer une recherche sur l'index"""
-    search(args.indexdir, args.query, args.nresults)
 
 
 def make_argparse() -> argparse.ArgumentParser:
@@ -168,32 +156,17 @@ def make_argparse() -> argparse.ArgumentParser:
     extract.add_arguments(extract_command)
     extract_command.set_defaults(func=extract.main)
 
-    index = subp.add_parser(
+    index_command = subp.add_parser(
         "index", help="Générer un index Whoosh sur les documents extraits"
     )
-    index.add_argument(
-        "-o",
-        "--outdir",
-        help="Repertoire destination pour l'index",
-        type=Path,
-        default="export/_idx",
-    )
-    index.add_argument("indir", help="Repertoire avec les fichiers extraits", type=Path)
-    index.set_defaults(func=index_main)
+    index.add_arguments(index_command)
+    index_command.set_defaults(func=index.main)
 
-    search = subp.add_parser("search", help="Effectuer une recherche sur l'index")
-    search.add_argument(
-        "-i",
-        "--indexdir",
-        help="Repertoire source pour l'index",
-        type=Path,
-        default="export/_idx",
+    search_command = subp.add_parser(
+        "search", help="Effectuer une recherche sur l'index"
     )
-    search.add_argument(
-        "-n", "--nresults", help="Nombre de résultats affichés", type=int, default=10
-    )
-    search.add_argument("query", help="Requête", nargs="+")
-    search.set_defaults(func=search_main)
+    search.add_arguments(search_command)
+    search_command.set_defaults(func=search.main)
 
     annotate_command = subp.add_parser(
         "annotate", help="Annoter un PDF pour corriger erreurs"

@@ -1,12 +1,23 @@
 DATA
 ----
 
+- Semantify the HTML somewhat
+- Eliminate use of CDN / pure
 - Correct titles in zonage glossary
 - Correct extraction (see below, use RNN) of titles numbers etc
 - Redo alexi download to not use wget (httpx is nice)
 
 DERP LERNING
 ------------
+
+Indexing/matching/clustering
+============================
+
+- SentenceTransformers for indexing / retrieval
+  - Version of alexi index that indexes all the things for multiple municipalities
+  - New command: alexi embed - does the same thing but with STs
+- Quick qualitative evaluation of dense retrieval
+
 
 Pre-training
 ============
