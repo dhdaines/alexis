@@ -125,7 +125,7 @@ BYLAWS = [
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
-        "règlement foo bar baz 1314-2021-Z",
+        "règlement concernant foo bar baz 1314-2021-Z",
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
