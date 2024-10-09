@@ -63,6 +63,7 @@ jobs:
         alexi -v extract -m download/vsadm/index.json -o export/vsadm download/vsadm/*.pdf
         alexi -v extract -m download/vss/index.json -o export/vss download/vss/*.pdf
         alexi -v extract -m download/prevost/index.json -o export/prevost download/prevost/*.pdf
+        echo '<meta http-equiv="refresh" content="0; url=vdsa/index.html">' > export/index.html
     - name: Index
       run: |
         alexi -v index export/vdsa export/vsadm export/vss export/prevost
