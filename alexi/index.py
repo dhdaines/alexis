@@ -8,7 +8,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Iterator, Tuple
+from typing import Iterator, List, Tuple
 
 from bs4 import BeautifulSoup
 from lunr import get_default_builder, lunr, trimmer  # type: ignore
