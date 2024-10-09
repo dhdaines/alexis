@@ -39,7 +39,7 @@ yolo = [
 ]
 
 [project.scripts]
-alexi = "alexi:main"
+alexi = "alexi.cli:main"
 
 [tool.hatch.version]
 path = "alexi/__init__.py"

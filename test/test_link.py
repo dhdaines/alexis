@@ -125,7 +125,7 @@ BYLAWS = [
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
-        "règlement foo bar baz 1314-2021-Z",
+        "règlement concernant foo bar baz 1314-2021-Z",
         "../index.html#20231213-Codification-administrative-Rgl-1314-2021-Z",
     ),
     (
@@ -333,11 +333,14 @@ def test_match_multiples(text, before, multi, after):
 TITLES = [
     ("RÈGLEMENT ", ""),
     (
-        "règlement  relatif aux projets particuliers de construction, de modification ou d'occupation d'un immeuble.",
-        "projets particuliers de construction de modification ou d'occupation d'un immeuble",
+        "règlement  relatif aux projets particuliers de construction, "
+        "de modification ou d'occupation d'un immeuble.",
+        "projets particuliers de construction de modification ou "
+        "d'occupation d'un immeuble",
     ),
     (
-        "RÈGLEMENT  AFIN DE DÉCRÉTER DES DISPOSITIONS CONCERNANT L’OCCUPATION DU DOMAINE PUBLIC.",
+        "RÈGLEMENT  AFIN DE DÉCRÉTER DES DISPOSITIONS CONCERNANT "
+        "L’OCCUPATION DU DOMAINE PUBLIC.",
         "décréter des dispositions concernant l'occupation du domaine public",
     ),
     ("Règlement de construction ", "construction"),
