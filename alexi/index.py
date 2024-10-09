@@ -126,7 +126,7 @@ def index(indirs: List[Path], outdir: Path) -> None:
     )
     builder.pipeline.add(unifold)
     builder.search_pipeline.add(unifold)
-    builder.metadata_whitelist.append("position")
+    # builder.metadata_whitelist.append("position")
     LOGGER.info("pipeline: %s", builder.pipeline)
     LOGGER.info("search pipeline: %s", builder.pipeline)
 
