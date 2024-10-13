@@ -21,6 +21,7 @@ dependencies = [
     "lunr[languages]",
     "unidecode",
     "natsort",
+    "fastapi",
 ]
 [project.optional-dependencies]
 dev = [
