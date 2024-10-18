@@ -5,6 +5,7 @@ API pour indexes ALEXI
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import List, Union
 
@@ -72,7 +73,7 @@ app = FastAPI()
 app.mount("/api", API)
 app.mount("/", StaticFiles(directory=DOCDIR), name="alexi")
 middleware_args: dict[str, str | list[str]]
-if os.getenv("DEVELOPMENT", False):
+if os.getenv("DEVELOPMENT", False) or "dev" in sys.argv:
     LOGGER.info(
         "Running in development mode, will allow requests from http://localhost:*"
     )

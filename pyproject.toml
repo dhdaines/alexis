@@ -21,7 +21,6 @@ dependencies = [
     "lunr[languages]",
     "unidecode",
     "natsort",
-    "fastapi",
 ]
 [project.optional-dependencies]
 dev = [
@@ -37,6 +36,9 @@ dev = [
 yolo = [
     "huggingface-hub",
     "ultralytics",
+]
+api = [
+    "fastapi[standard]",
 ]
 
 [project.scripts]
@@ -55,7 +57,7 @@ testpaths = ["test"]
 addopts = "--cov=alexi --cov-report html"
 
 [tool.hatch.envs.default]
-features = [ "dev" ]
+features = [ "dev", "api", "yolo" ]
 
 [tool.hatch.envs.default.scripts]
 test = [
