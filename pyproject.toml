@@ -37,6 +37,9 @@ yolo = [
     "huggingface-hub",
     "ultralytics",
 ]
+api = [
+    "fastapi[standard]",
+]
 
 [project.scripts]
 alexi = "alexi.cli:main"
@@ -54,7 +57,7 @@ testpaths = ["test"]
 addopts = "--cov=alexi --cov-report html"
 
 [tool.hatch.envs.default]
-features = [ "dev" ]
+features = [ "dev", "api", "yolo" ]
 
 [tool.hatch.envs.default.scripts]
 test = [
