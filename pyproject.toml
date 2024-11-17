@@ -59,6 +59,16 @@ addopts = "--cov=alexi --cov-report html"
 [tool.hatch.envs.default]
 features = [ "dev", "api", "yolo" ]
 
+[tool.hatch.envs.default.env-vars]
+# Avoid downloading gigabytes of CUDA junk
+PIP_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cpu"
+UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cpu"
+
+[tool.hatch.envs.gpu.env-vars]
+# Disable PyTorch CPU respository
+PIP_EXTRA_INDEX_URL = ""
+UV_EXTRA_INDEX_URL = ""
+
 [tool.hatch.envs.default.scripts]
 test = [
   "pytest", "coverage html"
