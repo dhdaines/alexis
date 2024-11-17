@@ -8,7 +8,10 @@ from typing import Any, Iterable, Iterator, Optional, TextIO
 
 from pdfplumber import PDF
 from pdfplumber.page import Page
-from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
+from playa.structtree import (
+    StructElement as PDFStructElement,
+    StructTree as PDFStructTree,
+)
 
 from .types import T_obj
 
@@ -114,8 +117,8 @@ class Converteur:
             # page in which the top element appears (this is the way
             # the structure tree implementation in pdfplumber works,
             # which might be a bug)
-            self.tree = PDFStructTree(self.pdf)
-        except StructTreeMissing:
+            self.tree = PDFStructTree(self.pdf.doc)
+        except KeyError:
             self.tree = None
 
     def element_map(self, page_number: int) -> dict[int, str]:
@@ -133,7 +136,7 @@ class Converteur:
             else:
                 d.append(el.type)
                 tagstack.append(el.type)
-                if el.page_number == page_number:
+                if el.mcids and el.page_idx + 1 == page_number:
                     for mcid in el.mcids:
                         elmap[mcid] = ";".join(tagstack)
                 d.extend(el.children)
