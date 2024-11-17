@@ -407,9 +407,6 @@ class Extracteur:
                     if self.crf_n is not None:
                         crf = self.crf_n
                 iob = list(self.crf_s(crf(feats)))
-        if conv is None and pdf_path.exists():
-            conv = Converteur(pdf_path)
-        assert conv is not None
         doc = self.analyse(iob, pdf_path)
         if self.pdfdata:
             doc.pdfurl = self.pdfdata.get(pdf_path.name, {}).get("url", None)

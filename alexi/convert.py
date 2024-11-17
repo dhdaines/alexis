@@ -160,3 +160,4 @@ class Converteur:
                 feats = get_word_features(word, page, chars, elmap)
                 feats["path"] = str(self.path)
                 yield feats
+            page.close()
