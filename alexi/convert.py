@@ -136,7 +136,11 @@ class Converteur:
             else:
                 d.append(el.type)
                 tagstack.append(el.type)
-                if el.mcids and el.page_idx + 1 == page_number:
+                if (
+                    el.mcids
+                    and el.page_idx is not None
+                    and el.page_idx + 1 == page_number
+                ):
                     for mcid in el.mcids:
                         elmap[mcid] = ";".join(tagstack)
                 d.extend(el.children)
