@@ -22,7 +22,10 @@ from typing import Iterable, Iterator, Union
 
 import pdfplumber
 from pdfplumber.page import Page
-from pdfplumber.structure import PDFStructElement, PDFStructTree, StructTreeMissing
+from playa.structtree import (
+    StructElement as PDFStructElement,
+    StructTree as PDFStructTree,
+)
 from pdfplumber.utils.geometry import T_bbox, objects_to_bbox
 
 from alexi.analyse import Bloc
@@ -74,8 +77,8 @@ class Objets:
             # page in which the top element appears (this is the way
             # the structure tree implementation in pdfplumber works,
             # which might be a bug)
-            tree = PDFStructTree(pdf)
-        except StructTreeMissing:
+            tree = PDFStructTree(pdf.doc)
+        except KeyError:
             LOGGER.warning("Arborescence structurel absent dans %s", pdf_path)
             return
         if pages is None:
@@ -103,15 +106,17 @@ class Objets:
         def get_child_mcids(el: PDFStructElement) -> Iterator[tuple[int, int]]:
             """Trouver tous les MCIDs (avec numeros de page, sinon ils sont
             inutiles!) à l'intérieur d'un élément structurel"""
-            for mcid in el.mcids:
-                assert el.page_number is not None
-                yield el.page_number, mcid
+            if el.mcids:  # FIXME: this should be asserted in playa
+                assert el.page_idx is not None
+                for mcid in el.mcids:
+                    yield el.page_idx + 1, mcid
             d = deque(el.children)
             while d:
                 el = d.popleft()
-                for mcid in el.mcids:
-                    assert el.page_number is not None
-                    yield el.page_number, mcid
+                if el.mcids:  # FIXME: this should be asserted in playa
+                    assert el.page_idx is not None
+                    for mcid in el.mcids:
+                        yield el.page_idx + 1, mcid
                 d.extend(el.children)
 
         def make_bloc(

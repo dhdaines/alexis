@@ -16,7 +16,7 @@ dependencies = [
     "joblib",
     "httpx",
     "lxml",
-    "pdfplumber",
+    "pdfplumber @ git+https://github.com/dhdaines/pdfplumber@playa",
     "scikit-learn",
     "sklearn-crfsuite",
     "lunr[languages]",
@@ -44,6 +44,9 @@ api = [
 
 [project.scripts]
 alexi = "alexi.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.version]
 path = "alexi/__init__.py"
