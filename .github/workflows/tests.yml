@@ -2,58 +2,35 @@ name: Tests
 
 on: [pull_request]
 
-# Install much smaller CPU version of PyTorch
-env:
-  PIP_INDEX_URL: https://download.pytorch.org/whl/cpu
-  PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
-
 jobs:
   lint:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-
+    - name: Install Hatch
+      uses: pypa/hatch@install
     - name: Configure pip caching
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml')}}
-
-    - name: Install Python dependencies
-      run: python -m pip install hatch
-
-    - name: Validate with flake8, black, isort, mypyp
+    - name: Validate with flake8, black, isort, mypy
       run: hatch run lint
 
   test:
     needs: lint
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-
+    - name: Install Hatch
+      uses: pypa/hatch@install
     - name: Configure pip caching
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml')}}
-
-    - name: Install Python dependencies
-      run: python -m pip install hatch
-
     - name: Run tests
       run: hatch run test
-
     - name: Upload code coverage
       uses: codecov/codecov-action@v4

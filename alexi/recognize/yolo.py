@@ -37,16 +37,16 @@ class ObjetsYOLO(Objets):
     DocLayNet mais d'autres seront possibles).
     """
 
-    def __init__(self, yolo_weights: Union[PathLike, None] = None):
+    def __init__(self, yolo_weights: Union[str, PathLike, None] = None):
         if yolo_weights is None:
             yolo_weights = hf_hub_download(
                 repo_id="DILHTWD/documentlayoutsegmentation_YOLOv8_ondoclaynet",
                 filename="yolov8x-doclaynet-epoch64-imgsz640-initiallr1e-4-finallr1e-5.pt",
             )
-        self.model = YOLO(yolo_weights)
+        self.model = YOLO(str(yolo_weights))
 
     def __call__(
-        self, pdf_path: PathLike, pages: Union[None, Iterable[int]] = None
+        self, pdf_path: Union[str, PathLike], pages: Union[None, Iterable[int]] = None
     ) -> Iterator[Bloc]:
         """Extraire les rectangles correspondant aux objets"""
         # FIXME: pdfplumber not necessary here, should use pypdfium2 directly

@@ -5,15 +5,25 @@ Télécharger juste les documents dont on a besoin.
 """
 
 import argparse
+import asyncio
+import datetime
+import email.utils
 import json
 import logging
+import os
 import re
-import subprocess
+import ssl
 import urllib.parse
 from pathlib import Path
 
-from bs4 import BeautifulSoup
+import httpx
+from bs4 import BeautifulSoup, Tag
 
+CONTEXT = ssl.create_default_context()
+# Work around misconfigured Sainte-Adèle (and maybe others eventually)
+# website by adding some certificates to the default ones
+CONTEXT.load_verify_locations(Path(__file__).parent / "extracerts.pem")
+CLIENT = httpx.AsyncClient(verify=CONTEXT)
 LOGGER = logging.getLogger("download")
 
 
@@ -54,50 +64,43 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
-def main(args: argparse.Namespace) -> None:
+async def async_main(args: argparse.Namespace) -> None:
     u = urllib.parse.urlparse(args.url)
-    LOGGER.info("Downloading %s", args.url)
+    index = args.outdir / "index.html"
+    LOGGER.info("Downloading %s to %s", args.url, index)
     args.outdir.mkdir(parents=True, exist_ok=True)
-    try:
-        subprocess.run(
-            [
-                "wget",
-                "--quiet",
-                "--no-check-certificate",
-                "--timestamping",
-                "-P",
-                str(args.outdir),
-                args.url,
-            ],
-            check=True,
-        )
-    except subprocess.CalledProcessError as err:
-        if err.returncode != 8:
-            raise
+    r = await CLIENT.get(args.url, follow_redirects=True)
+    if r.status_code != 200:
+        LOGGER.error("Download failed: %s", r)
+        return
+    with open(index, "w") as outfh:
+        outfh.write(r.text)
     excludes = [re.compile(r) for r in args.exclude]
     paths = []
-    index = args.outdir / Path(u.path).name
-    if not index.exists():
-        index = args.outdir / "index.html"
     with open(index) as infh:
         soup = BeautifulSoup(infh, "lxml")
         if args.all_pdf_links:
             for a in soup.find_all("a"):
+                assert isinstance(a, Tag)
                 if "href" not in a.attrs:
                     continue
-                path = a["href"]
+                path = str(a["href"])
                 if path.lower().endswith(".pdf"):
                     paths.append(path)
         else:
             for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
                 ul = h2.find_next("ul")
+                assert isinstance(ul, Tag)
                 for li in ul.find_all("li"):
-                    paths.append(li.a["href"])
+                    assert isinstance(li, Tag)
+                    aa = li.find("a")
+                    assert isinstance(aa, Tag)
+                    paths.append(str(aa["href"]))
     urls = {}
     for p in paths:
         excluded = False
-        for r in excludes:
-            if r.search(p):
+        for rx in excludes:
+            if rx.search(p):
                 excluded = True
                 break
         if excluded:
@@ -107,30 +110,46 @@ def main(args: argparse.Namespace) -> None:
             url = p
         else:
             url = f"{u.scheme}://{u.netloc}{up.path}"
-        urls[Path(up.path).name] = {"url": url}
+        outname = Path(up.path).name
+        outpath = args.outdir / outname
+        try:
+            mtime = datetime.datetime.fromtimestamp(
+                outpath.stat().st_mtime, tz=datetime.timezone.utc
+            )
+            urls[outname] = {
+                "url": url,
+                "modified": mtime.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            }
+        except FileNotFoundError:
+            urls[outname] = {"url": url}
     if not urls:
         LOGGER.error("Could not find any documents to download!")
         return
-    for u in urls.values():
-        LOGGER.info("Downloading %s", u["url"])
-    try:
-        subprocess.run(
-            [
-                "wget",
-                "--no-check-certificate",
-                "--timestamping",
-                "--quiet",
-                "-P",
-                str(args.outdir),
-                *(u["url"] for u in urls.values()),
-            ],
-            check=True,
-        )
-    except subprocess.CalledProcessError as err:
-        if err.returncode != 8:
-            raise
+    for outname, info in urls.items():
+        if "modified" in info:
+            r = await CLIENT.get(
+                info["url"], headers={"if-modified-since": info["modified"]}
+            )
+            if r.status_code == 304:
+                continue
+        else:
+            r = await CLIENT.get(info["url"])
+        with open(args.outdir / outname, "wb") as outfh:
+            outfh.write(r.content)
+        if "last-modified" in r.headers:
+            info["modified"] = r.headers["last-modified"]
+            # DO NOT USE STRPTIME OMG WTF
+            timestamp = email.utils.parsedate_to_datetime(
+                r.headers["last-modified"]
+            ).timestamp()
+            os.utime(args.outdir / outname, (timestamp, timestamp))
+
     with open(args.outdir / "index.json", "wt") as outfh:
         json.dump(urls, outfh, indent=2)
+
+
+def main(args: argparse.Namespace) -> None:
+    asyncio.run(async_main(args))
 
 
 if __name__ == "__main__":
@@ -138,4 +157,4 @@ if __name__ == "__main__":
     add_arguments(parser)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING)
-    main(args)
+    asyncio.run(async_main(args))
