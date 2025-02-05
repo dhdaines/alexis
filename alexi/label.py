@@ -56,7 +56,7 @@ class Identificateur:
     def __init__(self, model=DEFAULT_MODEL):
         self.crf = joblib.load(model)
 
-    def predict(self, words: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+    def predict(self, words: Iterable[dict[str, Any]]) -> Iterator[str]:
         first_page = last_page = None
         for page in split_pages(words):
             if last_page is None:
