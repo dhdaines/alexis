@@ -8,7 +8,6 @@ import argparse
 import asyncio
 import datetime
 import email.utils
-import httpx
 import json
 import logging
 import os
@@ -17,6 +16,7 @@ import ssl
 import urllib.parse
 from pathlib import Path
 
+import httpx
 from bs4 import BeautifulSoup
 
 CONTEXT = ssl.create_default_context()
