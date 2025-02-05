@@ -94,8 +94,8 @@ async def async_main(args: argparse.Namespace) -> None:
     urls = {}
     for p in paths:
         excluded = False
-        for r in excludes:
-            if r.search(p):
+        for rx in excludes:
+            if rx.search(p):
                 excluded = True
                 break
         if excluded:
@@ -134,10 +134,10 @@ async def async_main(args: argparse.Namespace) -> None:
         if "last-modified" in r.headers:
             info["modified"] = r.headers["last-modified"]
             # DO NOT USE STRPTIME OMG WTF
-            mtime = email.utils.parsedate_to_datetime(
+            timestamp = email.utils.parsedate_to_datetime(
                 r.headers["last-modified"]
             ).timestamp()
-            os.utime(args.outdir / outname, (mtime, mtime))
+            os.utime(args.outdir / outname, (timestamp, timestamp))
 
     with open(args.outdir / "index.json", "wt") as outfh:
         json.dump(urls, outfh, indent=2)
