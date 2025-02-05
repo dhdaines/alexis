@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, List, Tuple
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from lunr import get_default_builder, lunr, trimmer  # type: ignore
 from lunr.pipeline import Pipeline  # type: ignore
 from unidecode import unidecode  # type: ignore
@@ -26,13 +26,14 @@ class Document:
 
 
 def body_text(soup: BeautifulSoup):
-    body = soup.find_all("div", id="body")
-    assert body is not None
-    for header in body[0](class_="header"):
+    body = soup.find("div", id="body")
+    assert isinstance(body, Tag)
+    for header in body.find_all(class_="header"):
         header.extract()
-    for img in body[0]("img"):
+    for img in body.find_all("img"):
+        assert isinstance(img, Tag)
         alt = soup.new_tag("p")
-        alt.string = img["alt"]
+        alt.string = str(img["alt"])
         img.replace_with(alt)
     return re.sub("\n\n+", "\n\n", soup.text.strip())
 

@@ -17,7 +17,7 @@ import urllib.parse
 from pathlib import Path
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 CONTEXT = ssl.create_default_context()
 # Work around misconfigured Sainte-Adèle (and maybe others eventually)
@@ -81,16 +81,21 @@ async def async_main(args: argparse.Namespace) -> None:
         soup = BeautifulSoup(infh, "lxml")
         if args.all_pdf_links:
             for a in soup.find_all("a"):
+                assert isinstance(a, Tag)
                 if "href" not in a.attrs:
                     continue
-                path = a["href"]
+                path = str(a["href"])
                 if path.lower().endswith(".pdf"):
                     paths.append(path)
         else:
             for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
                 ul = h2.find_next("ul")
+                assert isinstance(ul, Tag)
                 for li in ul.find_all("li"):
-                    paths.append(li.a["href"])
+                    assert isinstance(li, Tag)
+                    aa = li.find("a")
+                    assert isinstance(aa, Tag)
+                    paths.append(str(aa["href"]))
     urls = {}
     for p in paths:
         excluded = False
