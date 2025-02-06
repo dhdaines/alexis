@@ -8,13 +8,7 @@ from typing import Iterable
 import sklearn_crfsuite as crfsuite  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import (
-    Segmenteur,
-    load,
-    page2features,
-    page2labels,
-    split_pages,
-)
+from alexi.segment import Segmenteur, load, page2features, page2labels, split_pages
 
 
 def make_argparse():

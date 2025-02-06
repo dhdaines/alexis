@@ -76,7 +76,10 @@ class Objets:
             return cls
 
     def __call__(
-        self, pdf_path: PathLike, pages: Union[None, Iterable[int]] = None
+        self,
+        pdf_path: PathLike,
+        pages: Union[None, Iterable[int]] = None,
+        labelmap: Union[None, dict] = None,
     ) -> Iterator[Bloc]:
         """Extraire les rectangles correspondant aux objets qui seront
         représentés par des images."""
@@ -130,7 +133,7 @@ class Objets:
                 d.extend(el.children)
 
         def make_bloc(
-            el: PDFStructElement, page_number: int, mcids: Iterable[int]
+            el: PDFStructElement, page_number: int, mcids: Iterable[int], name: str
         ) -> Bloc:
             page = pdf.pages[page_number - 1]
             x0, top, x1, bottom = get_element_bbox(page, el, mcids)
@@ -148,4 +151,8 @@ class Objets:
             mcids.sort()
             for page_number, group in itertools.groupby(mcids, operator.itemgetter(0)):
                 if page_number in pageset:
-                    yield make_bloc(el, page_number, (mcid for _, mcid in group))
+                    if labelmap is None or el.type in labelmap:
+                        name = el.type if labelmap is None else labelmap[el.type]
+                        yield make_bloc(
+                            el, page_number, (mcid for _, mcid in group), name
+                        )

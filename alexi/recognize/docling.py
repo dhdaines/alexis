@@ -14,10 +14,6 @@ from alexi.analyse import Bloc
 from alexi.recognize import Objets
 
 LOGGER = logging.getLogger(Path(__file__).stem)
-LABELMAP = {
-    "Table": "Tableau",
-    "Picture": "Figure",
-}
 
 
 def scale_to_model(page: PdfPage, modeldim: float):
@@ -62,7 +58,10 @@ class ObjetsDocling(Objets):
         self.model_info = self.model.info()
 
     def __call__(
-        self, pdf_path: Union[str, PathLike], pages: Union[None, Iterable[int]] = None
+        self,
+        pdf_path: Union[str, PathLike],
+        pages: Union[None, Iterable[int]] = None,
+        labelmap: Union[dict, None] = None,
     ) -> Iterator[Bloc]:
         pdf_path = Path(pdf_path)
         pdf = PdfDocument(pdf_path)
@@ -84,17 +83,20 @@ class ObjetsDocling(Objets):
 
             boxes = sorted(self.model.predict(image), key=boxsort)
             for box in boxes:
-                if box["label"] in LABELMAP:
+                if labelmap is None or box["label"] in labelmap:
                     bbox = tuple(
                         round(x / scale)
                         for x in (box["l"], box["t"], box["r"], box["b"])
                     )
                     yield Bloc(
-                        type=LABELMAP[box["label"]],
+                        type=(
+                            box["label"] if labelmap is None else labelmap[box["label"]]
+                        ),
                         contenu=[],
                         _page_number=page_number,
                         _bbox=bbox,
                     )
+            page.close()
         pdf.close()
 
 

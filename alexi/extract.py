@@ -27,6 +27,11 @@ from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
 from alexi.types import T_obj
 
 LOGGER = logging.getLogger("extract")
+LABELMAP = {
+    "Table": "Tableau",
+    "Picture": "Figure",
+    "Figure": "Figure",
+}
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -427,7 +432,7 @@ class Extracteur:
         if pdf_path and not self.no_images:
             LOGGER.info("Extraction d'images sous %s", imgdir)
             imgdir.mkdir(parents=True, exist_ok=True)
-            images = self.obj(pdf_path)
+            images = self.obj(pdf_path, labelmap=LABELMAP)
             analyseur.add_images(images)
             save_images_from_pdf(analyseur.blocs, pdf_path, imgdir)
         LOGGER.info("Analyse de la structure de %s", fileid)

@@ -7,13 +7,7 @@ from pathlib import Path
 
 from sklearn_crfsuite import metrics
 
-from alexi.segment import (
-    Segmenteur,
-    load,
-    page2features,
-    page2labels,
-    split_pages,
-)
+from alexi.segment import Segmenteur, load, page2features, page2labels, split_pages
 
 
 def make_argparse():
