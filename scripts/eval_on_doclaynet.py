@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sklearn_crfsuite import metrics
 
-from alexi.segment import split_pages, filter_tab, load
+from alexi.segment import filter_tab, load, split_pages
 
 
 def main():

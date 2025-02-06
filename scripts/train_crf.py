@@ -14,13 +14,7 @@ from sklearn.metrics import make_scorer  # type: ignore
 from sklearn.model_selection import KFold, cross_validate  # type: ignore
 from sklearn_crfsuite import metrics
 
-from alexi.segment import (
-    load,
-    page2features,
-    page2labels,
-    split_pages,
-    filter_tab,
-)
+from alexi.segment import filter_tab, load, page2features, page2labels, split_pages
 
 LOGGER = logging.getLogger("train-crf")
 

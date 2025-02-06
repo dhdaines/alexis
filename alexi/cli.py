@@ -12,20 +12,13 @@ import logging
 import sys
 from pathlib import Path
 
-from . import annotate, download, extract, index, search
-from .analyse import Analyseur, Bloc
-from .convert import Converteur, write_csv
-from .format import format_html
-from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
-from .label import Identificateur
-from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
-from .segment import Segmenteur
-
 LOGGER = logging.getLogger("alexi")
 
 
 def convert_main(args: argparse.Namespace):
     """Convertir les PDF en CSV"""
+    from .convert import Converteur, write_csv
+
     if args.pages:
         pages = [max(1, int(x)) for x in args.pages.split(",")]
     else:
@@ -36,6 +29,9 @@ def convert_main(args: argparse.Namespace):
 
 def segment_main(args: argparse.Namespace):
     """Segmenter un CSV"""
+    from .convert import write_csv
+    from .segment import Segmenteur
+
     crf: Segmenteur
     crf = Segmenteur(args.model)
     reader = csv.DictReader(args.csv)
@@ -44,6 +40,9 @@ def segment_main(args: argparse.Namespace):
 
 def label_main(args: argparse.Namespace):
     """Étiquetter un CSV"""
+    from .convert import write_csv
+    from .label import Identificateur
+
     crf = Identificateur(args.model)
     reader = csv.DictReader(args.csv)
     write_csv(crf(reader), sys.stdout)
@@ -51,6 +50,9 @@ def label_main(args: argparse.Namespace):
 
 def html_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en HTML"""
+    from .analyse import Analyseur, Bloc
+    from .format import format_html
+
     reader = csv.DictReader(args.csv)
     analyseur = Analyseur(args.csv.name, reader)
     if args.images is not None:
@@ -66,6 +68,8 @@ def html_main(args: argparse.Namespace):
 
 def json_main(args: argparse.Namespace):
     """Convertir un CSV segmenté et étiquetté en JSON"""
+    from .analyse import Analyseur, Bloc
+
     iob = csv.DictReader(args.csv)
     analyseur = Analyseur(args.csv.name, iob)
     if args.images:
@@ -79,6 +83,10 @@ def json_main(args: argparse.Namespace):
 
 def make_argparse() -> argparse.ArgumentParser:
     """Make the argparse"""
+    from . import annotate, download, extract, index, search
+    from .label import DEFAULT_MODEL as DEFAULT_LABEL_MODEL
+    from .segment import DEFAULT_MODEL as DEFAULT_SEGMENT_MODEL
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "-v", "--verbose", help="Émettre des messages", action="store_true"

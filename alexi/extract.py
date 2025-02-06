@@ -10,7 +10,7 @@ import logging
 import operator
 import os
 from pathlib import Path
-from typing import Any, Iterable, TextIO, Union
+from typing import Any, Iterable, TextIO, Type, Union
 
 import pdfplumber
 from natsort import natsorted
@@ -27,6 +27,11 @@ from alexi.segment import DEFAULT_MODEL_NOSTRUCT, Segmenteur
 from alexi.types import T_obj
 
 LOGGER = logging.getLogger("extract")
+LABELMAP = {
+    "Table": "Tableau",
+    "Picture": "Figure",
+    "Figure": "Figure",
+}
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -45,7 +50,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     parser.add_argument("--segment-model", help="Modele CRF", type=Path)
     parser.add_argument(
-        "--label-model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
+        "-l", "--label-model", help="Modele CRF", type=Path, default=DEFAULT_LABEL_MODEL
     )
     parser.add_argument(
         "-m",
@@ -53,7 +58,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Fichier JSON avec metadonnées des documents",
         type=Path,
     )
-    parser.add_argument("-y", "--yolo", action="store_true")
+    parser.add_argument(
+        "-O",
+        "--object-model",
+        choices=["none", "docling", "yolo"],
+        default="none",
+        help="Modele pour detection d'objects",
+    )
     parser.add_argument(
         "docs", help="Documents en PDF ou CSV pré-annoté", type=Path, nargs="+"
     )
@@ -354,16 +365,11 @@ class Extracteur:
         segment_model: Union[Path, None] = None,
         no_csv=False,
         no_images=False,
-        yolo=False,
+        object_model: Type[Objets] = Objets,
     ):
         self.outdir = outdir
         self.crf_s = Identificateur()
-        if yolo:
-            from alexi.recognize.yolo import ObjetsYOLO
-
-            self.obj = ObjetsYOLO()
-        else:
-            self.obj = Objets()
+        self.obj = object_model()
         if segment_model is not None:
             self.crf = Segmenteur(segment_model)
             self.crf_n = None
@@ -426,7 +432,7 @@ class Extracteur:
         if pdf_path and not self.no_images:
             LOGGER.info("Extraction d'images sous %s", imgdir)
             imgdir.mkdir(parents=True, exist_ok=True)
-            images = self.obj(pdf_path)
+            images = self.obj(pdf_path, labelmap=LABELMAP)
             analyseur.add_images(images)
             save_images_from_pdf(analyseur.blocs, pdf_path, imgdir)
         LOGGER.info("Analyse de la structure de %s", fileid)
@@ -584,7 +590,7 @@ def main(args) -> None:
         segment_model=args.segment_model,
         no_csv=args.no_csv,
         no_images=args.no_images,
-        yolo=args.yolo,
+        object_model=Objets.byname(args.object_model),
     )
     docs = []
     for path in args.docs:

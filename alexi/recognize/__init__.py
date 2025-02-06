@@ -18,7 +18,7 @@ import operator
 from collections import deque
 from os import PathLike
 from pathlib import Path
-from typing import Iterable, Iterator, Union
+from typing import Iterable, Iterator, Type, Union
 
 import pdfplumber
 from pdfplumber.page import Page
@@ -60,8 +60,26 @@ def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> 
 class Objets:
     """Classe de base pour les détecteurs d'objects."""
 
+    @classmethod
+    def byname(cls, name: str) -> Type["Objets"]:
+        # We do not want to use a dictionary here because these should
+        # be imported lazily (so as to avoid dependencies)
+        if name == "yolo":
+            from alexi.recognize.yolo import ObjetsYOLO
+
+            return ObjetsYOLO
+        elif name == "docling":
+            from alexi.recognize.docling import ObjetsDocling
+
+            return ObjetsDocling
+        else:
+            return cls
+
     def __call__(
-        self, pdf_path: PathLike, pages: Union[None, Iterable[int]] = None
+        self,
+        pdf_path: PathLike,
+        pages: Union[None, Iterable[int]] = None,
+        labelmap: Union[None, dict] = None,
     ) -> Iterator[Bloc]:
         """Extraire les rectangles correspondant aux objets qui seront
         représentés par des images."""
@@ -115,7 +133,7 @@ class Objets:
                 d.extend(el.children)
 
         def make_bloc(
-            el: PDFStructElement, page_number: int, mcids: Iterable[int]
+            el: PDFStructElement, page_number: int, mcids: Iterable[int], name: str
         ) -> Bloc:
             page = pdf.pages[page_number - 1]
             x0, top, x1, bottom = get_element_bbox(page, el, mcids)
@@ -133,4 +151,8 @@ class Objets:
             mcids.sort()
             for page_number, group in itertools.groupby(mcids, operator.itemgetter(0)):
                 if page_number in pageset:
-                    yield make_bloc(el, page_number, (mcid for _, mcid in group))
+                    if labelmap is None or el.type in labelmap:
+                        name = el.type if labelmap is None else labelmap[el.type]
+                        yield make_bloc(
+                            el, page_number, (mcid for _, mcid in group), name
+                        )
