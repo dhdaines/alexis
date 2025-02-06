@@ -35,33 +35,11 @@ jobs:
         path: download
         key: reglements-urbanisme
     - name: Download
-      run: |
-        alexi -v download --exclude=/derogation \
-                 --exclude='\d-[aA]dopt' --exclude='-Z-\d' \
-                 --exclude='-[rR]eso'
-        for d in download/*.pdf; do
-            bn=$(basename $d .pdf)
-            for dd in data/train data/dev data/test; do
-                if [ -e "${dd}/${bn}.csv" ]; then
-                    cp "${dd}/${bn}.csv" download/
-                fi
-            done
-        done
-        alexi -v download -u https://vsadm.ca/citoyens/reglementation/reglementation-durbanisme/ -o download/vsadm --all-pdf-links
-        alexi -v download -u https://www.vss.ca/services-aux-citoyens/services/reglementation-durbanisme/ \
-              -o download/vss --all-pdf-links -x '[Aa]nnexe'
-        alexi -v download -u https://www.ville.prevost.qc.ca/guichet-citoyen/services/urbanisme/ \
-              -o download/prevost --all-pdf-links -x Annexe -x Formulaires -x PUMD -x PMAD
+      run: sh scripts/download.sh
     - name: Extract
-      run: |
-        alexi -v extract -m download/index.json -o export/vdsa download/*.pdf
-        alexi -v extract -m download/vsadm/index.json -o export/vsadm download/vsadm/*.pdf
-        alexi -v extract -m download/vss/index.json -o export/vss download/vss/*.pdf
-        alexi -v extract -m download/prevost/index.json -o export/prevost download/prevost/*.pdf
-        echo '<meta http-equiv="refresh" content="0; url=vdsa/index.html">' > export/index.html
+      run: sh scripts/extract.sh
     - name: Index
-      run: |
-        alexi -v index export/vdsa export/vsadm export/vss export/prevost
+      run: alexi -v index export/vdsa export/vsadm export/vss export/prevost
     - name: Setup Pages
       uses: actions/configure-pages@v5
     - name: Upload artifact
