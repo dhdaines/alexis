@@ -50,10 +50,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         default=[],
     )
     parser.add_argument(
-        "--all-pdf-links",
+        "--all-links",
         action="store_true",
         help="Télécharger les liens vers des PDF dans le document "
         "sans égard à sa structure",
+    )
+    parser.add_argument(
+        "--extensions", help="Extensions de fichiers à télécharger", default=".pdf"
     )
     parser.add_argument(
         "section",
@@ -76,16 +79,18 @@ async def async_main(args: argparse.Namespace) -> None:
     with open(index, "w") as outfh:
         outfh.write(r.text)
     excludes = [re.compile(r) for r in args.exclude]
+    extensions = args.extensions.split(",")
     paths = []
     with open(index) as infh:
         soup = BeautifulSoup(infh, "lxml")
-        if args.all_pdf_links:
+        if args.all_links:
             for a in soup.find_all("a"):
                 assert isinstance(a, Tag)
                 if "href" not in a.attrs:
                     continue
                 path = str(a["href"])
-                if path.lower().endswith(".pdf"):
+                _, suffix = os.path.splitext(path.lower())
+                if suffix in extensions or suffix[1:] in extensions:
                     paths.append(path)
         else:
             for h2 in soup.find_all("h2", string=re.compile(args.section, re.I)):
