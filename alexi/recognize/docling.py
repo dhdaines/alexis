@@ -54,7 +54,7 @@ class ObjetsDocling(Objets):
         else:
             model_path = Path(model_path)
         self.model = LayoutPredictor(
-            model_path,
+            str(model_path),
             device=device,
             num_threads=num_threads,
             base_threshold=base_threshold,
