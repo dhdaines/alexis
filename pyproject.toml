@@ -38,6 +38,9 @@ yolo = [
     "huggingface-hub",
     "ultralytics",
 ]
+docling = [
+    "docling-ibm-models",
+]
 api = [
     "fastapi[standard]",
 ]
@@ -58,7 +61,7 @@ testpaths = ["test"]
 addopts = "--cov=alexi --cov-report html"
 
 [tool.hatch.envs.default]
-features = [ "dev", "api", "yolo" ]
+features = [ "dev", "api", "yolo", "docling" ]
 
 [tool.hatch.envs.default.env-vars]
 # Avoid downloading gigabytes of CUDA junk
