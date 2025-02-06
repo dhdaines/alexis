@@ -4,6 +4,7 @@ import pytest
 from pdfplumber.utils.geometry import obj_to_bbox
 
 from alexi.convert import Converteur
+from alexi.extract import LABELMAP
 from alexi.recognize import Objets, bbox_contains
 
 try:
@@ -22,7 +23,7 @@ def test_extract_tables_and_figures() -> None:
     conv = Converteur(DATADIR / "pdf_figures.pdf")
     obj = Objets()
     words = list(conv.extract_words())
-    images = list(obj(DATADIR / "pdf_figures.pdf"))
+    images = list(obj(DATADIR / "pdf_figures.pdf", labelmap=LABELMAP))
     assert len(images) == 2
     table = next(img for img in images if img.type == "Tableau")
     figure = next(img for img in images if img.type == "Figure")
@@ -39,7 +40,7 @@ def test_extract_tables_and_figures_yolo() -> None:
     obj = ObjetsYOLO()
     words = list(conv.extract_words())
     # There will be 3 as YOLO "sees" the chart twice (with and without the legend)
-    images = list(obj(DATADIR / "pdf_figures.pdf"))
+    images = list(obj(DATADIR / "pdf_figures.pdf", labelmap=LABELMAP))
     table = next(img for img in images if img.type == "Tableau")
     figure = next(img for img in images if img.type == "Figure")
     for w in words:
@@ -54,7 +55,7 @@ def test_extract_tables_and_figures_docling() -> None:
     conv = Converteur(DATADIR / "pdf_figures.pdf")
     obj = ObjetsDocling()
     words = list(conv.extract_words())
-    images = list(obj(DATADIR / "pdf_figures.pdf"))
+    images = list(obj(DATADIR / "pdf_figures.pdf", labelmap=LABELMAP))
     table = next(img for img in images if img.type == "Tableau")
     figure = next(img for img in images if img.type == "Figure")
     for w in words:
