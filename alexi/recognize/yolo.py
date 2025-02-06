@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Iterable, Iterator, Union
 
 import numpy as np
-import pdfplumber
 from huggingface_hub import hf_hub_download  # type: ignore
 from pdfplumber.utils.geometry import obj_to_bbox
+from pypdfium2 import PdfDocument, PdfPage
 from ultralytics import YOLO  # type: ignore
 
 from alexi import segment
@@ -20,10 +20,10 @@ from alexi.recognize import Objets
 LOGGER = logging.getLogger(Path(__file__).stem)
 
 
-def scale_to_model(page, modeldim):
+def scale_to_model(page: PdfPage, modeldim: float):
     """Find scaling factor for model dimension."""
-    maxdim = max(page.width, page.height)
-    return modeldim / maxdim * 72
+    maxdim = max(page.get_width(), page.get_height())
+    return modeldim / maxdim
 
 
 LABELMAP = {
@@ -49,17 +49,14 @@ class ObjetsYOLO(Objets):
         self, pdf_path: Union[str, PathLike], pages: Union[None, Iterable[int]] = None
     ) -> Iterator[Bloc]:
         """Extraire les rectangles correspondant aux objets"""
-        # FIXME: pdfplumber not necessary here, should use pypdfium2 directly
         pdf_path = Path(pdf_path)
-        pdf = pdfplumber.open(pdf_path)
+        pdf = PdfDocument(pdf_path)
         if pages is None:
-            pages = range(1, len(pdf.pages) + 1)
+            pages = range(1, len(pdf) + 1)
         for page_number in pages:
-            page = pdf.pages[page_number - 1]
+            page = pdf[page_number - 1]
             # FIXME: get the model input size from the model
-            image = page.to_image(
-                resolution=scale_to_model(page, 640), antialias=True
-            ).original
+            image = page.render(scale=scale_to_model(page, 640)).to_pil()
             results = self.model(
                 source=image,
                 # show_labels=True,
@@ -114,11 +111,8 @@ def main():
     docseg_model = YOLO(yolo_model)
 
     if args.pdf_or_png.exists():
-        pdf = pdfplumber.open(args.pdf_or_png)
-        images = (
-            page.to_image(resolution=scale_to_model(page, 640), antialias=True).original
-            for page in pdf.pages
-        )
+        pdf = PdfDocument(args.pdf_or_png)
+        images = (page.render(scale=scale_to_model(page, 640)).to_pil() for page in pdf)
     else:
         pngdir = args.pdf_or_png.parent
         pngre = re.compile(re.escape(args.pdf_or_png.name) + r"-(\d+)\.png")
