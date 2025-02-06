@@ -5,9 +5,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Iterable, Iterator, Union
 
-from docling_ibm_models.layoutmodel.layout_predictor import (  # type: ignore
-    LayoutPredictor,
-)
+from docling_ibm_models.layoutmodel.layout_predictor import LayoutPredictor
 from pypdfium2 import PdfDocument, PdfPage  # type: ignore
 
 from alexi.analyse import Bloc

@@ -39,7 +39,7 @@ yolo = [
     "ultralytics",
 ]
 docling = [
-    "docling-ibm-models",
+    "docling-ibm-models>=3.3.1",
 ]
 api = [
     "fastapi[standard]",
