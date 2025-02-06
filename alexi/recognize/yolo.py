@@ -9,7 +9,7 @@ from typing import Iterable, Iterator, Union
 import numpy as np
 from huggingface_hub import hf_hub_download  # type: ignore
 from pdfplumber.utils.geometry import obj_to_bbox
-from pypdfium2 import PdfDocument, PdfPage
+from pypdfium2 import PdfDocument, PdfPage  # type: ignore
 from ultralytics import YOLO  # type: ignore
 
 from alexi import segment
@@ -82,11 +82,13 @@ class ObjetsYOLO(Objets):
             )
             labels = [entry.names[entry.boxes.cls[idx].item()] for idx in ordering]
             img_height, img_width = entry.orig_shape
-            LOGGER.info("scale x %f", page.width / img_width)
-            LOGGER.info("scale y %f", page.height / img_height)
+            page_width = page.get_width()
+            page_height = page.get_height()
+            LOGGER.info("scale x %f", page_width / img_width)
+            LOGGER.info("scale y %f", page_height / img_height)
             boxes = np.array(box_list)
-            boxes[:, [0, 2]] = boxes[:, [0, 2]] * page.width / img_width
-            boxes[:, [1, 3]] = boxes[:, [1, 3]] * page.height / img_height
+            boxes[:, [0, 2]] = boxes[:, [0, 2]] * page_width / img_width
+            boxes[:, [1, 3]] = boxes[:, [1, 3]] * page_height / img_height
             for label, box in zip(labels, boxes):
                 if label in LABELMAP:
                     yield Bloc(

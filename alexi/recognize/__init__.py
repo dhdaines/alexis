@@ -18,7 +18,7 @@ import operator
 from collections import deque
 from os import PathLike
 from pathlib import Path
-from typing import Iterable, Iterator, Union
+from typing import Iterable, Iterator, Type, Union
 
 import pdfplumber
 from pdfplumber.page import Page
@@ -59,6 +59,21 @@ def get_element_bbox(page: Page, el: PDFStructElement, mcids: Iterable[int]) -> 
 
 class Objets:
     """Classe de base pour les détecteurs d'objects."""
+
+    @classmethod
+    def byname(cls, name: str) -> Type["Objets"]:
+        # We do not want to use a dictionary here because these should
+        # be imported lazily (so as to avoid dependencies)
+        if name == "yolo":
+            from alexi.recognize.yolo import ObjetsYOLO
+
+            return ObjetsYOLO
+        elif name == "docling":
+            from alexi.recognize.docling import ObjetsDocling
+
+            return ObjetsDocling
+        else:
+            return cls
 
     def __call__(
         self, pdf_path: PathLike, pages: Union[None, Iterable[int]] = None
